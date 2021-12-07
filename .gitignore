@@ -1,0 +1,38 @@
+# Ignore everything.
+**
+
+# But include these files...
+!.gitignore
+!LICENSE
+!README.md
+
+# ... and these files under the 'terraform-scripts' directory...
+!tf/
+tf/*
+!tf/data.tf
+!tf/pri-microservices.tf
+!tf/pub-microservices.tf
+!tf/providers.tf
+!tf/resource-group.tf
+!tf/tekton.yaml
+!tf/tekton_Copy.yaml
+!tf/variables.tf
+!tf/variables_no_push.tf.template
+# ... and this directory...
+!tf/cluster_config/
+tf/cluster_config/*
+!tf/cluster_config/.gitkeep
+# ... and these directories...
+!tf/modules/
+tf/modules/*
+!tf/modules/.gitkeep
+!tf/modules/pri-microservice/
+tf/modules/pri-microservice/*
+!tf/modules/pri-microservice/main.tf
+# ... and these directories...
+!tf/modules/
+tf/modules/*
+!tf/modules/.gitkeep
+!tf/modules/pub-microservice/
+tf/modules/pub-microservice/*
+!tf/modules/pub-microservice/main.tf

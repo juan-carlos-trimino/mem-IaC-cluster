@@ -1,0 +1,489 @@
+#https://www.linkedin.com/pulse/building-containers-kubernetes-github-tekton-kaniko-stephen-kuntz
+#https://www.changeip.com/
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tekton-memories
+---
+###########
+# Secrets #
+###########
+# For the private Github repository.
+# Update the ssh-privatekey and known_hosts with the appropriate base64-encoded data.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-github-key
+  namespace: tekton-memories
+  annotations:
+    tekton.dev/git-0: github.com
+type: kubernetes.io/ssh-auth
+data:
+  ssh-privatekey: <base64 encoded>
+  # This is non-standard, but its use is encouraged to make this more secure.
+  # Omitting this results in the server's public key being blindly accepted.
+  known_hosts: <base64 encoded>
+---
+# For the private container registry.
+# Update the tekton.dev/docker-0 and username/password with the appropriate private registry URL and credentials.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton=image-registry
+  namespace: tekton-memories
+  annotations:
+    tekton.dev/docker-0: https://your-registry.your-domain.tld
+type: kubernetes.io/basic-auth
+stringData:
+  username: anonymous
+  password: anonymous
+---
+# For the webhook in the Github repository.
+# Create an access token on the Github site.
+# Update the access token and secret with the appropriate data.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+stringData:
+  token: YOUR-GITHUB-ACCESS-TOKEN
+  secret: random-string-data
+---
+##############################
+# Roles and Service Accounts #
+##############################
+# To create the webhook in the Github repository.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+rules:
+# "" indicates the core API group.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["tekton.dev"]
+  resources: ["eventlisteners"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "create", "update", "delete"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+secrets:
+  - name: tekton-github-webhook
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+subjects:
+  - kind: ServiceAccount
+    name: tekton-github-webhook
+roleRef:
+  kind: Role
+  name: tekton-github-webhook
+  apiGroup: rbac.authorization.k8s.io
+---
+# To run the K8s resources that allow the pipeline to function.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["tekton.dev"]
+  resources: ["eventlisteners", "triggerbindings", "triggertemplates", "pipelineresources"]
+  verbs: ["get"]
+- apiGroups: ["tekton.dev"]
+  resources: ["pipelineruns", "pipelineresources"]
+  verbs: ["create"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+secrets:
+  - name: tekton-github-key
+  - name: tekton-image-registry
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+subjects:
+  - kind: ServiceAccount
+    name: tekton-github-admin
+roleRef:
+  kind: Role
+  name: tekton-github-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: tekton-kaniko-input
+spec:
+  type: git
+  params:
+    - name: revision
+      # Branch.
+      value: master
+    - name: url
+      # Repo.
+      value: https://github.com/juan-carlos-trimino/memories
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: tekton-kaniko-output
+spec:
+  type: image
+  params:
+    - name: url
+      # Container registry.
+      value: <DOCKER_USERNAME>/XXXXXXXXXXXXXXXXXXXXXXXXXXXX
+---
+
+
+###############
+# Tekton Task #
+###############
+# A task defines one or more steps that run in a specified order. Each task runs in a pod, and each
+# step is a container within that pod. A task can be used to run a step of the CI pipeline, such as
+# code linting, code sniffing, unit testing, or anything else that can be run in a container. Tasks
+# also take parameters and use Tekton Resources which make them reusable without modification.
+# Multiple tasks can be executed in series or parallel when run using a Pipeline and PipelineRun.
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko
+  namespace: memories-tekton
+spec:
+  params:
+    - name: pathToDockerfile
+      description: Path to the Dockerfile to build.
+      #default: ./Dockerfile
+      default: $(resources.inputs.docker-source.path)/Dockerfile
+    - name: pathToContext
+      description: The build context used by Kaniko.
+      # https://github.com/GoogleContainerTools/kaniko#kaniko-build-contexts
+      #default: ./
+      default: $(resources.inputs.docker-source.path)
+    - name: EXTRA_ARGS
+      default: ""
+    - name: BUILDER_IMAGE
+      description: The image on which builds will run.
+      default: gcr.io/kaniko-project/executor:v0.17.1
+  resources:
+    input:
+      - name: git-clone
+        type: git
+    outputs:
+      - name: builtImage
+        type: image
+  steps:
+    # kaniko is a tool to build container images from a Dockerfile, inside a container or K8s cluster.
+    - name: build-and-push
+      workingDir: /workspace/$(resources.input.name)
+      image: $(inputs.params.BUILDER_IMAGE)
+      # Specifying DOCKER_CONFIG is required to allow kaniko to detect docker credential.
+      # https://github.com/tektoncd/pipeline/pull/706
+      env:
+        - name: DOCKER_CONFIG
+          value: /tekton/home/.docker
+      command:
+        - /kaniko/executor
+      args:
+        - $(inputs.params.EXTRA_ARGS)
+        #- --dockerfile=$(inputs.params.DOCKERFILE)
+        - --dockerfile=$(params.pathToDockerfile)
+        # The user does not need to care the workspace and the source.
+        #- --context=/workspace/source/$(inputs.params.CONTEXT)
+        - --context=$(params.pathToContext)
+        #- --destination=$(outputs.resources.image.url)
+        - --destination=$(resources.outputs.builtImage.url)
+        - --cache=true
+      #securityContext:
+      #  runAsUser: 0
+---
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: kaniko-run
+spec:
+  serviceAccountName: dockerhub-servicexxxxxxxxxxxxxxx
+  taskRef:
+    name: kaniko
+  #params: not required since it has a default value
+  #  - name: PATH_TO_DOCKERFILE
+  #    value: Dockerfile
+  resources:
+    inputs:
+      - name: git-clone
+        resourceRef:
+          name: kaniko-input
+    outputs:
+      - name: builtImage
+        resourceRef:
+          name: kaniko-output
+---
+###################
+# Tekton Pipeline #
+###################
+# Tasks can be run individually using a Tekton TaskRun, or they can be linked together using a
+# Tekton Pipeline. A pipeline does not need to contain the values of the parameters and resources,
+# although it can if they are static values. A pipeline is executed by a Tekton PipelineRun.
+# Typically the PipelineRun contains the values for the parameters and resources which are then
+# sent down to the TaskRuns.
+apiVersion: tekton.dev/v1alpha1
+kind: Pipeline
+metadata:
+  name: memories-tekton-pipeline
+  namespace: memories-tekton
+spec:
+  resources:
+    - name: source-repo
+      type: git
+    - name: adService-image
+      type: image
+    - name: loadGenerator-image
+      type: image
+  params:
+    - name: adServiceDockerfile
+      type: string
+    - name: adServiceContext
+      type: string
+    - name: loadGeneratorDockerfile
+      type: string
+    - name: loadGeneratorContext
+      type: string
+  tasks:
+  - name: build-adservice
+    taskRef:
+      name: kaniko
+    params:
+      - name: DOCKERFILE
+        value: $(params.adServiceDockerfile)
+      - name: CONTEXT
+        value: $(params.adServiceContext)
+    resources:
+      inputs:
+        - name: source
+          resource: source-repo
+      outputs:
+        - name: image
+          resource: adService-image
+  - name: build-loadgenerator
+    taskRef:
+      name: kaniko
+    params:
+      - name: DOCKERFILE
+        value: $(params.loadGeneratorDockerfile)
+      - name: CONTEXT
+        value: $(params.loadGeneratorContext)
+    resources:
+      inputs:
+        - name: source
+          resource: source-repo
+      outputs:
+        - name: image
+          resource: loadGenerator-image
+---
+##########################
+# Tekton TriggerTemplate #
+##########################
+# Since the objective is to trigger this pipeline from a Github webhook, use a TriggerTemplate.
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: memories-tekton-triggertemplate
+  namespace: memories-tekton
+spec:
+  params:
+    - name: gitrevision
+      description: The git revision
+      default: master
+    - name: gitrepositoryurl
+      description: The git repository url
+    - name: namespace
+      description: The namespace to create the resources
+    - name: registry
+      description: The URL/folder of the repoitory to upload the image to
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1alpha1
+      kind: PipelineRun
+      metadata:
+        name: microservices-demo-pipeline-run-$(uid)
+        namespace: $(params.namespace)
+      spec:
+        serviceAccountName: tekton-triggers-admin
+        pipelineRef:
+          name: microservices-demo-pipeline
+        resources:
+          - name: source-repo
+            resourceSpec:
+              type: git
+              params:
+              - name: revision
+                value: $(params.gitrevision)
+              - name: url
+                value: $(params.gitrepositoryurl)
+          - name: adService-image
+            resourceSpec:
+              type: image
+              params:
+                - name: url
+                  value: $(params.registry)/adservice:$(params.gitrevision)
+          - name: loadGenerator-image
+            resourceSpec:
+              type: image
+              params:
+                - name: url
+                  value: $(params.registry)/loadgenerator:$(params.gitrevision)
+        params:
+          - name: adServiceDockerfile
+            value: ./src/adservice/Dockerfile
+          - name: adServiceContext
+            value: ./src/adservice
+          - name: loadGeneratorDockerfile
+            value: ./src/loadgenerator/Dockerfile
+          - name: loadGeneratorContext
+            value: ./src/loadgenerator
+---
+#########################
+# Tekton TriggerBinding #
+#########################
+# The TriggerBinding creates the parameters from the JSON body of the API call from Github.
+# Update the value of the registry parameter to your registry server URL.
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: microservices-demo-pipelinebinding
+  namespace: microservices-demo
+spec:
+  params:
+    - name: gitrevision
+      value: $(body.head_commit.id)
+    - name: namespace
+      value: microservices-demo
+    - name: gitrepositoryurl
+      value: "git@github.com:$(body.repository.full_name)"
+    - name: registry
+      value: "your-registry.your-domain.tld/microservices-demo"
+---
+########################
+# Tekton EventListener #
+########################
+# The EventListener resource will create a K8s deployment and a service to listen for the API call from Github.
+apiVersion: tekton.dev/v1alpha1
+kind: EventListener
+metadata:
+  name: microservices-demo-listener
+  namespace: microservices-demo
+spec:
+  serviceAccountName: tekton-triggers-admin
+  triggers:
+    - bindings:
+      - name: microservices-demo-pipelinebinding
+      template:
+        name: microservices-demo-triggertemplate
+---
+#####################
+# Webhook on Github #
+#####################
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  name: create-webhook
+  namespace: microservices-demo
+spec:
+  volumes:
+  - name: github-secret
+    secret:
+      secretName: $(inputs.params.GitHubSecretName)
+  inputs:
+    params:
+    - name: ExternalDomain
+      description: "The external domain for the EventListener; e.g., $(inputs.params.EventListenerName).<PROXYIP>.nip.io"
+    - name: GitHubUser
+      description: "The GitHub user"
+    - name: GitHubRepo
+      description: "The GitHub repo where the webhook will be created"
+    - name: GitHubOrg
+      description: "The GitHub organization where the webhook will be created"
+    - name: GitHubSecretName
+      description: "The Secret name for GitHub access token. This is always mounted and must exist"
+    - name: GitHubAccessTokenKey
+      description: "The GitHub access token key name"
+    - name: GitHubSecretStringKey
+      description: "The GitHub secret string key name"
+    - name: GitHubDomain
+      description: "The GitHub domain. Override for GitHub Enterprise"
+      default: "github.com"
+    - name: WebhookEvents
+      description: "List of events the webhook will send notifications for"
+      default: ["push", "pull_request"]
+  steps:
+  - name: create-webhook
+    image: pstauffer/curl:latest
+    volumeMounts:
+    - name: github-secret
+      mountPath: /var/secret
+    command:
+    - sh
+    args:
+    - -ce
+    - |
+      set -e
+      echo "Create Webhook"
+      if [ $(inputs.params.GitHubDomain) = "github.com" ];then
+        curl -v -d "{\"name\": \"web\", \"active\": true, \"events\": $(inputs.params.WebhookEvents), \"config\": {\"url\": \"https://\$(inputs.params.ExternalDomain)\", \"content_type\": \"json\", \"insecure_ssl\": \"0\", \"secret\": \"$(cat /var/secret/$(inputs.params.GitHubSecretStringKey))\"}}" -X POST -u $(inputs.params.GitHubUser):$(cat /var/secret/$(inputs.params.GitHubAccessTokenKey)) -L https://api.github.com/repos/\$(inputs.params.GitHubOrg)/$(inputs.params.GitHubRepo)/hooks
+      else
+        curl -d "{\"name\": \"web\", \"active\": true, \"events\": $(inputs.params.WebhookEvents), \"config\": {\"url\": \"https://$(inputs.params.ExternalDomain)/\", \"content_type\": \"json\", \"insecure_ssl\": \"0\", \"secret\": \"$(cat /var/secret/$(inputs.params.GitHubSecretStringKey))\"}}" -X POST -u $(inputs.params.GitHubUser):$(cat /var/secret/$(inputs.params.GitHubAccessTokenKey)) -L https://$(inputs.params.GitHubDomain)/api/v3/repos/$(inputs.params.GitHubOrg)/$(inputs.params.GitHubRepo)/hooks
+      fi
+---
+# TaskRun containing the repository and authentication information required to create the webhook.
+# Update the 'GitHubOrg', 'GitHubUser', and 'ExternalDomain' values before deploying.
+apiVersion: tekton.dev/v1alpha1
+kind: TaskRun
+metadata:
+  name: microservices-demo-tekton-webhook
+  namespace: microservices-demo
+spec:
+  taskRef:
+    name: create-webhook
+  inputs:
+    params:
+    - name: GitHubOrg
+      value: "<your github user name or organization>"
+    - name: GitHubUser
+      value: "<your github username>"
+    - name: GitHubRepo
+      value: "microservices-demo"
+    - name: GitHubSecretName
+      value: webhook-secret
+    - name: GitHubAccessTokenKey
+      value: token
+    - name: GitHubSecretStringKey
+      value: secret
+    - name: ExternalDomain
+      value: ms-demo-tekton.your-domain.tld
+  timeout: 1000s
+  serviceAccountName: tekton-triggers-createwebhook
+
+
+

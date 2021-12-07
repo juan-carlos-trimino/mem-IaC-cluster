@@ -1,0 +1,244 @@
+#https://www.linkedin.com/pulse/building-containers-kubernetes-github-tekton-kaniko-stephen-kuntz
+#https://www.changeip.com/
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tekton-memories
+---
+###########
+# Secrets #
+# https://github.com/tektoncd/pipeline/blob/main/docs/auth.md
+###########
+# For the private Github repository.
+# Update the ssh-privatekey and known_hosts with the appropriate base64-encoded data.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-github-key
+  namespace: tekton-memories
+  annotations:
+    tekton.dev/git-0: github.com
+type: kubernetes.io/ssh-auth
+data:
+  ssh-privatekey: <base64 encoded>
+  # This is non-standard, but its use is encouraged to make this more secure.
+  # Omitting this results in the server's public key being blindly accepted.
+  known_hosts: <base64 encoded>
+---
+# For the private container registry.
+# Update the tekton.dev/docker-0 and username/password with the appropriate private registry URL and credentials.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-image-registry
+  namespace: tekton-memories
+  annotations:
+    tekton.dev/docker-0: https://docker.io/jctrimino/video-streaming/
+type: kubernetes.io/basic-auth
+stringData:
+  username: "jctrimino"
+  password: "831a4c51-17d5-4bf9-ae72-0f8bd175d324"
+---
+# For the webhook in the Github repository.
+# Create an access token on the Github site.
+# Update the access token and secret with the appropriate data.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+stringData:
+  token: YOUR-GITHUB-ACCESS-TOKEN
+  secret: random-string-data
+---
+##############################
+# Roles and Service Accounts #
+##############################
+# To create the webhook in the Github repository.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+rules:
+# "" indicates the core API group.
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["tekton.dev"]
+  resources: ["eventlisteners"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "create", "update", "delete"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+secrets:
+  - name: tekton-github-webhook
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-github-webhook
+  namespace: tekton-memories
+subjects:
+  - kind: ServiceAccount
+    name: tekton-github-webhook
+roleRef:
+  kind: Role
+  name: tekton-github-webhook
+  apiGroup: rbac.authorization.k8s.io
+---
+# To run the K8s resources that allow the pipeline to function.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["tekton.dev"]
+  resources: ["eventlisteners", "triggerbindings", "triggertemplates", "pipelineresources"]
+  verbs: ["get"]
+- apiGroups: ["tekton.dev"]
+  resources: ["pipelineruns", "pipelineresources"]
+  verbs: ["create"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+secrets:
+  - name: tekton-github-key
+  - name: tekton-image-registry
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-github-admin
+  namespace: tekton-memories
+subjects:
+  - kind: ServiceAccount
+    name: tekton-github-admin
+roleRef:
+  kind: Role
+  name: tekton-github-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: hello
+spec:
+  params:
+    - name: person
+      description: Name of person to greet.
+      value: World
+  steps:
+    - name: say-hello
+      image: registry.access.redhat.com/ubi8/ubi
+      command:
+        - /bin/bash
+      args: ['-c', 'echo Hello $(params.person)']
+
+---
+###################
+# Tekton Pipeline #
+###################
+# By default, Tekton assumes that pipeline Tasks can be executed concurrently. In this pipeline, each pipeline Task depends on the previous one, meaning they must be executed sequentially. One way that dependencies between pipeline Tasks can be expressed is by using the runAfter key. It specifies that the Task must run after the given list of Tasks has completed.
+# Tasks can be run individually using a Tekton TaskRun, or they can be linked together using a
+# Tekton Pipeline. A pipeline does not need to contain the values of the parameters and resources,
+# although it can if they are static values. A pipeline is executed by a Tekton PipelineRun.
+# Typically the PipelineRun contains the values for the parameters and resources which are then
+# sent down to the TaskRuns.
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: tekton-memories-pipeline
+  namespace: tekton-memories
+spec:
+  workspaces:
+    - name: git-source
+      description: The git repo.
+  params:
+    - name: gitUrl
+      description: Git repository url.
+    - name: gitRevision
+      description: Git revision (branch) to check out.
+      value: master
+    - name: pathToContext
+      description: The path to the build context, used by Kaniko - within the workspace.
+      default: src
+    - name: pathToYamlFile
+      description: The path to the yaml file to deploy within the git source.
+    - name: imageUrl
+      description: Image name including repository.
+    - name: imageTag
+      description: Image tag
+      default: "latest"
+  tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+      worspaces:
+        - name: output
+          workspace: git-source
+      params:
+        - name: url
+          value: $(params.gitUrl)
+        - name: revision
+          value: $(params.gitRevision)
+        - name: subdirectory
+          value: "."
+        - name: deleteExisting
+          value: "true"
+    - name: build-and-push
+      taskRef:
+        name: kaniko
+      runAfter:
+        - clone-repo
+      worspaces:
+        - name: source
+          workspace: git-source
+      params:
+        - name: CONTEXT
+          value: $(params.pathToContext)
+        - name: IMAGE
+          value: $(params.imageUrl):$(params.imageTag)
+    - name: test
+      taskRef:
+        name: echo-hello-world
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: tekton-memories-pr-
+  namespace: tekton-memories
+spec:
+  pipelineRef:
+    name: tekton-memories-pipeline
+  params:
+    - name: gitUrl
+      value: https://github.com/IBM/tekton-tutorialxxxxxxxxxxxxx
+    - name: gitRevision
+      value: master
+    - name: pathToYamlFile
+      value: kubernetes/picalc.yamlxxxxxxxxxxxxx
+    - name: imageUrl
+      value: <REGISTRY>/<NAMESPACE>/picalcxxxxxxxxxxxxxxxxxx
+    - name: imageTag
+      value: "1.0"
+  serviceAccountName: tekton-github-admin
+  workspaces:
+    - name: git-source
+      persistentVolumeClaim:
+        claimName: picalc-source-pvc

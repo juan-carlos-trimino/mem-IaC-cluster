@@ -28,11 +28,11 @@ locals {
 /***
 Import the microservice Terraform module to deploy the ms-gateway.
 ***/
-module "ms-gateway" {
+module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
   # Set input variables to configure the microservice module for the ms-gateway.
-  dir_name = "../../memories/gateway"
+  dir_name = "../../mem-gateway/gateway"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
@@ -68,11 +68,11 @@ module "ms-gateway" {
   service_session_affinity = "ClientIP"
 }
 
-module "ms-rabbitmq" {
+module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
   # Set input variables to configure the microservice module for the ms-rabbitmq.
-  dir_name = "../../memories/rabbitmq"
+  dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
@@ -92,9 +92,9 @@ module "ms-rabbitmq" {
 /***
 Record details and metadata about each video.
 ***/
-module "ms-metadata" {
+module "mem-metadata" {
   source = "./modules/pri-microservice"
-  dir_name = "../../memories/metadata"
+  dir_name = "../../mem-metadata/metadata"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -129,9 +129,9 @@ module "ms-metadata" {
 /***
 Orchestrate upload of videos to storage.
 ***/
-module "ms-video-upload" {
+module "mem-video-upload" {
   source = "./modules/pri-microservice"
-  dir_name = "../../memories/video-upload"
+  dir_name = "../../mem-video-upload/video-upload"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -165,9 +165,9 @@ module "ms-video-upload" {
 /***
 Stream videos from storage to be watched by the user.
 ***/
-module "ms-video-streaming" {
+module "mem-video-streaming" {
   source = "./modules/pri-microservice"
-  dir_name = "../../memories/video-streaming"
+  dir_name = "../../mem-video-streaming/video-streaming"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
@@ -201,9 +201,9 @@ module "ms-video-streaming" {
 /***
 Responsible for storing and retrieving videos from external cloud storage.
 ***/
-module "ms-video-storage" {
+module "mem-video-storage" {
   source = "./modules/pri-microservice"
-  dir_name = "../../memories/video-storage"
+  dir_name = "../../mem-video-storage/video-storage"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -228,9 +228,9 @@ module "ms-video-storage" {
 /***
 Record the user's viewing history.
 ***/
-module "ms-history" {
+module "mem-history" {
   source = "./modules/pri-microservice"
-  dir_name = "../../memories/history"
+  dir_name = "../../mem-history/history"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3

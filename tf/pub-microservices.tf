@@ -22,7 +22,7 @@ module "ms-rabbitmq" {
 }
 */
 
-module "ms-mongodb" {
+module "mem-mongodb" {
   source = "./modules/pub-microservice"
   app_name = var.app_name
   app_version = var.app_version

@@ -29,10 +29,6 @@ tf/modules/*
 !tf/modules/pri-microservice/
 tf/modules/pri-microservice/*
 !tf/modules/pri-microservice/main.tf
-# ... and these directories...
-!tf/modules/
-tf/modules/*
-!tf/modules/.gitkeep
 !tf/modules/pub-microservice/
 tf/modules/pub-microservice/*
 !tf/modules/pub-microservice/main.tf

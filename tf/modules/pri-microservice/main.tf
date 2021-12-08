@@ -23,7 +23,7 @@ To check the app is up and running.
 > kubectl get services
 
 To destroy the infrastructure.
-> terraform destroy -var="app_version=1.0.0" -auto-approve
+> terraform destroy -var="app_version=0.0.0" -auto-approve
 ***/
 /***
 Define input variables to the module.
@@ -135,7 +135,7 @@ resource "null_resource" "docker_build" {
   }
   #
   provisioner "local-exec" {
-    command = "docker build -t ${local.image_tag} --file ../${var.dir_name}/Dockerfile-prod ../${var.dir_name}"
+    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
   }
 }
 

@@ -87,7 +87,7 @@ variable "service_target_port" {
 Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
 used by pods in the same namespace.
 ***/
-resource "kubernetes_persistent_volume_claim" "pvc" {
+resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   metadata {
     name = var.pvc_name
     namespace = var.namespace

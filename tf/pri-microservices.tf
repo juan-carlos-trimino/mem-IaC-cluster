@@ -23,8 +23,6 @@ locals {
   # See rabbitmq.conf
   svc_dns_rabbitmq = "amqp://guest:guest@mem-rabbitmq.${local.namespace}.svc.cluster.local:5672"
   svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
-  #svc_dns_db = "mongodb://guest:guest@mem-mongodb.${local.namespace}.svc.cluster.local:27017/metadata?authSource=metadata&w=1"
-  #svc_dns_db1 = "mongodb://guest:guest@mem-mongodb.${local.namespace}.svc.cluster.local:27017/history?authSource=history&w=1"
 }
 
 /***
@@ -34,7 +32,7 @@ module "ms-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
   # Set input variables to configure the microservice module for the ms-gateway.
-  dir_name = "gateway"
+  dir_name = "../../memories/gateway"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
@@ -74,7 +72,7 @@ module "ms-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
   # Set input variables to configure the microservice module for the ms-rabbitmq.
-  dir_name = "rabbitmq"
+  dir_name = "../../memories/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
@@ -96,7 +94,7 @@ Record details and metadata about each video.
 ***/
 module "ms-metadata" {
   source = "./modules/pri-microservice"
-  dir_name = "metadata"
+  dir_name = "../../memories/metadata"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -133,7 +131,7 @@ Orchestrate upload of videos to storage.
 ***/
 module "ms-video-upload" {
   source = "./modules/pri-microservice"
-  dir_name = "video-upload"
+  dir_name = "../../memories/video-upload"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -169,7 +167,7 @@ Stream videos from storage to be watched by the user.
 ***/
 module "ms-video-streaming" {
   source = "./modules/pri-microservice"
-  dir_name = "video-streaming"
+  dir_name = "../../memories/video-streaming"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
@@ -205,7 +203,7 @@ Responsible for storing and retrieving videos from external cloud storage.
 ***/
 module "ms-video-storage" {
   source = "./modules/pri-microservice"
-  dir_name = "video-storage"
+  dir_name = "../../memories/video-storage"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
@@ -232,7 +230,7 @@ Record the user's viewing history.
 ***/
 module "ms-history" {
   source = "./modules/pri-microservice"
-  dir_name = "history"
+  dir_name = "../../memories/history"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3

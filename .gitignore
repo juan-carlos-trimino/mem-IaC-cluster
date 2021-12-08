@@ -6,7 +6,7 @@
 !LICENSE
 !README.md
 
-# ... and these files under the 'terraform-scripts' directory...
+# ... and these files under the 'tf' directory...
 !tf/
 tf/*
 !tf/data.tf

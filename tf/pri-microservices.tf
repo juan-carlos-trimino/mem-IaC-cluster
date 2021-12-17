@@ -221,6 +221,8 @@ module "mem-video-storage" {
     SERVICE_INSTANCE_ID: var.service_instance_id
     SIGNATURE_VERSION: var.signature_version
     REGION: var.region1
+    HMAC_ACCESS_KEY_ID: var.hmac_access_key_id
+    HMAC_SECRET_ACCESS_KEY: var.hmac_secret_access_key
     MAX_RETRIES: 20
   }
   service_name = "mem-video-storage"

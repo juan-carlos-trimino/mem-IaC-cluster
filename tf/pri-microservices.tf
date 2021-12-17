@@ -220,6 +220,7 @@ module "mem-video-storage" {
     ENDPOINT: var.public_endpoint
     SERVICE_INSTANCE_ID: var.service_instance_id
     SIGNATURE_VERSION: var.signature_version
+    REGION: var.region1
     MAX_RETRIES: 20
   }
   service_name = "mem-video-storage"

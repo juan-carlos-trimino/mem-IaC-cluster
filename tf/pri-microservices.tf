@@ -216,13 +216,18 @@ module "mem-video-storage" {
   cr_password = var.cr_password
   env = {
     BUCKET_NAME: var.bucket_name
+    USE_HMAC: "no"
     API_KEY: var.api_key
-    ENDPOINT: var.public_endpoint
-    SERVICE_INSTANCE_ID: var.service_instance_id
-    SIGNATURE_VERSION: var.signature_version
+    SERVICE_INSTANCE_ID: var.resource_instance_id
     REGION: var.region1
-    HMAC_ACCESS_KEY_ID: var.hmac_access_key_id
-    HMAC_SECRET_ACCESS_KEY: var.hmac_secret_access_key
+    ENDPOINT: var.public_endpoint
+    # SIGNATURE_VERSION: var.signature_version
+    #
+    # HMAC: "true"
+    # REGION: var.region1
+    # HMAC_ACCESS_KEY_ID: var.hmac_access_key_id
+    # HMAC_SECRET_ACCESS_KEY: var.hmac_secret_access_key
+#    ENDPOINT: var.public_endpoint
     MAX_RETRIES: 20
   }
   service_name = "mem-video-storage"

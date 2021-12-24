@@ -25,13 +25,10 @@ locals {
   svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
 }
 
-/***
-Import the microservice Terraform module to deploy the ms-gateway.
-***/
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the ms-gateway.
+  # Set input variables to configure the microservice module for the mem-gateway.
   dir_name = "../../mem-gateway/gateway"
   app_name = var.app_name
   app_version = var.app_version
@@ -42,7 +39,7 @@ module "mem-gateway" {
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
-  # Configure environment variables specific to the ms-gateway.
+  # Configure environment variables specific to the mem-gateway.
   env = {
     SVC_DNS_METADATA: local.svc_dns_metadata
     SVC_DNS_HISTORY: local.svc_dns_history
@@ -52,12 +49,11 @@ module "mem-gateway" {
   }
   readiness_probe = [{
     http_get = [{
-      #host = local.svc_dns_gateway
       path = "/readiness"
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 210
+    initial_delay_seconds = 120
     period_seconds = 20
     timeout_seconds = 2
     failure_threshold = 10
@@ -89,9 +85,6 @@ module "mem-rabbitmq" {
   service_target_port = 5672
 }
 
-/***
-Record details and metadata about each video.
-***/
 module "mem-metadata" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-metadata/metadata"
@@ -112,12 +105,11 @@ module "mem-metadata" {
   }
   readiness_probe = [{
     http_get = [{
-      #host = local.svc_dns_metadata
       path = "/readiness"
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 180
+    initial_delay_seconds = 100
     period_seconds = 15
     timeout_seconds = 2
     failure_threshold = 3
@@ -126,9 +118,6 @@ module "mem-metadata" {
   service_name = "mem-metadata"
 }
 
-/***
-Orchestrate upload of videos to storage.
-***/
 module "mem-video-upload" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-video-upload/video-upload"
@@ -153,7 +142,7 @@ module "mem-video-upload" {
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 180
+    initial_delay_seconds = 100
     period_seconds = 15
     timeout_seconds = 2
     failure_threshold = 3
@@ -162,9 +151,6 @@ module "mem-video-upload" {
   service_name = "mem-video-upload"
 }
 
-/***
-Stream videos from storage to be watched by the user.
-***/
 module "mem-video-streaming" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-video-streaming/video-streaming"
@@ -189,7 +175,7 @@ module "mem-video-streaming" {
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 180
+    initial_delay_seconds = 100
     period_seconds = 15
     timeout_seconds = 2
     failure_threshold = 3
@@ -198,9 +184,6 @@ module "mem-video-streaming" {
   service_name = "mem-video-streaming"
 }
 
-/***
-Responsible for storing and retrieving videos from external cloud storage.
-***/
 module "mem-video-storage" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-video-storage/video-storage"
@@ -233,9 +216,6 @@ module "mem-video-storage" {
   service_name = "mem-video-storage"
 }
 
-/***
-Record the user's viewing history.
-***/
 module "mem-history" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-history/history"
@@ -261,7 +241,7 @@ module "mem-history" {
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 180
+    initial_delay_seconds = 100
     period_seconds = 15
     timeout_seconds = 2
     failure_threshold = 3

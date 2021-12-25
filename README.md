@@ -1,35 +1,56 @@
-# The application and its microservices
+# The application (memories)
+### Acknowledgment
+This project would not have been possible without the book `Bootstrapping Microservices with Docker, Kubernetes and Terraform` by `Ashley Davis`. The book was my motivation to learn `node.js`, but, more importantly, the book was my introduction to `Terraform`. `Terraform` makes building the cloud infrastructure (the Kubernetes cluster and storage requirements) and deploying the application simpler. Needless to say, I highly recommend the book.
 
-This application is based on xxxxxxxx. It is composed of sssss microservices; vis., `a`, `b`, `c`, and `d`.
-The app contains a single RabbitMQ server instance; the RabbitMQ server contains multiple queues
-  with different names.
-Each microservice has its own private database; the databases are hosted on a shared server.
+<br>
+
+This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `MongoDB`, `RabbitMQ`, xxxxxxxxxxxx. The application name is **memories**.
 
 ***
 <br>
 
 # Gateway/Reverse Proxy (mem-gateway)
 
-The gateway is the entry point to the app; it provides a REST API so the front end can interact with the backend.
+In a typical microservices deployment, microservices are not exposed directly to client applications; i.e., microservices are behind a set of APIs that is exposed to the outside world via a gateway. **The gateway is the entry point to the microservices deployment**, which screens all incoming messages for security and other quality of service (QoS) features. Since the gateway deals with north/south traffic, it is mostly about **edge security**. To reiterate, the gateway is **the only entry point to the microservices deployment for requests originating from *outside***.
+
+The current implementation of the gateway **does not provide any *edge security* at all**, but it is **the only entry point to the microservices deployment for requests originating from *outside***. There are many options for reverse proxies available such as `Nginx`, `Zuul`, `HAProxy`, and `Traefik`.
+
+Let's take a closer look at the code for the `mem-gateway` module.
+```
+module "mem-gateway" {
+  source = "./modules/pri-microservice"
+  dir_name = "../../mem-gateway/gateway"
+```
+**source** -> Specify the location of the module, which contains the file main.tf.<br>
+**dir_name** -> Set input variables to configure the microservice module for the mem-gateway.xxxxxxxxxxxxxxxxxx
 
 ```
-/***
-Import the microservice Terraform module to deploy the mem-gateway.
-***/
-module "mem-gateway" {
-  # Specify the location of the module, which contains the file main.tf.
-  source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the mem-gateway.
-  dir_name = "../../mem-gateway/gateway"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
+```
+**app_name** -> Application name.<br>
+**app_version** -> Application version.<br>
+**namespace** -> The namespace.
+
+```
   replicas = 3
   qos_limits_cpu = "400m"
   qos_limits_memory = "400Mi"
+```
+**replicas** -> Redundancy is implemented by replication; use replication for increased performance.<br>
+**qos_limits_cpu/qos_limits_memory** -> QoS class: Guaranteed.
+
+```
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
+```
+**cr_login_server** -> <br>
+**cr_username** -> <br>
+**cr_password** ->
+
+```
   # Configure environment variables specific to the mem-gateway.
   env = {
     SVC_DNS_METADATA: local.svc_dns_metadata

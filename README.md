@@ -4,8 +4,171 @@ This project would not have been possible without the book `Bootstrapping Micros
 
 <br>
 
-This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `MongoDB`, `RabbitMQ`, xxxxxxxxxxxx. The application name is **memories**.
+This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `Docker Hub (container registry)`, `MongoDB`, `RabbitMQ`, xxxxxxxxxxxx. The application name is **memories**.
 
+***
+<br>
+
+# Repos
+
+```
+IaC-cluster
+ ├ tf
+ | ├ cluster_config
+ | | └ .gitkeep
+ | ├ modules
+ | | ├ pri-microservice
+ | | | └ main.tf
+ | | ├ pub-microservice
+ | | | └ main.tf
+ | | └ .gitkeep
+ | ├ data.tf
+ | ├ pri-microservices.tf
+ | ├ providers.tf
+ | ├ pub-microservices.tf
+ | ├ resource-group.tf
+ | ├ variables.tf
+ | └ variables_no_push.tf.template
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+IaC-xxxxxxxxxxxxxxxxxxxxxxxxxx-storage
+ ├ tf
+ | ├ ibm-cos
+ | | ├ create-bucket
+ | | | ├ data.tf
+ | | | ├ input.tfvars
+ | | | ├ main.tf
+ | | | ├ resource-group.tf
+ | | | ├ variables.tf
+ | | | ├ variables.tfvars
+ | | | ├ variables_no_push.tf.template
+ | | | └ versions.tf
+ | | ├ create-instance
+ | | | ├ data.tf
+ | | | ├ input.tfvars
+ | | | ├ main.tf
+ | | | ├ resource-group.tf
+ | | | ├ variables.tf
+ | | | ├ variables.tfvars
+ | | | ├ variables_no_push.tf.template
+ | | | └ versions.tf
+ | | └ modules
+ | | | ├ bucket
+ | | | | ├ main.tf
+ | | | | ├ variables.tf
+ | | | | ├ variables_no_push.tf.template
+ | | | | └ versions.tf
+ | | | ├ instance
+ | | | | ├ main.tf
+ | | | | ├ variables.tf
+ | | | | ├ variables_no_push.tf.template
+ | | | | └ versions.tf
+ | | | └ .gitkeep
+ | └ .gitkeep
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-gateway
+ ├ gateway
+ | ├ public
+ | | ├ css
+ | | | ├ app.css
+ | | | └ tailwind.min.css
+ | | ├ js
+ | | | └ upload.js
+ | ├ src
+ | | ├ views
+ | | | ├ history.hbs
+ | | | ├ play-video.hbs
+ | | | ├ upload-video.hbs
+ | | | └ video-list.hbs
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-history
+ ├ history
+ | ├ src
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-metadata
+ ├ metadata
+ | ├ src
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-rabbitmq
+ ├ rabbitmq
+ | ├ .dockerignore
+ | ├ Dockerfile-prod
+ | └ rabbitmq.conf
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-video-storage
+ ├ video-storage
+ | ├ src
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-video-streaming
+ ├ video-streaming
+ | ├ src
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+
+mem-video-upload
+ ├ video-upload
+ | ├ src
+ | | └ index.js
+ | ├ .dockerignore
+ | ├ Dockerfile-dev
+ | ├ Dockerfile-prod
+ | ├ package-lock.json
+ | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+```
 ***
 <br>
 
@@ -15,7 +178,7 @@ In a typical microservices deployment, microservices are not exposed directly to
 
 The current implementation of the gateway **does not provide any *edge security* at all**, but it is **the only entry point to the microservices deployment for requests originating from *outside***. There are many options for reverse proxies available such as `Nginx`, `Zuul`, `HAProxy`, and `Traefik`.
 
-Let's take a closer look at the code for the `mem-gateway` module.
+**Let's take a closer look at the code for the `mem-gateway` module.**
 ```
 module "mem-gateway" {
   source = "./modules/pri-microservice"
@@ -34,11 +197,11 @@ module "mem-gateway" {
 **namespace** -> The namespace.
 
 ```
-  replicas = 3
+  replicas = 1
   qos_limits_cpu = "400m"
   qos_limits_memory = "400Mi"
 ```
-**replicas** -> Redundancy is implemented by replication; use replication for increased performance.<br>
+**replicas** -> Redundancy is implemented by replication; replication is also used for increased performance.<br>
 **qos_limits_cpu/qos_limits_memory** -> QoS class: Guaranteed.
 
 ```
@@ -46,12 +209,11 @@ module "mem-gateway" {
   cr_username = var.cr_username
   cr_password = var.cr_password
 ```
-**cr_login_server** -> <br>
-**cr_username** -> <br>
-**cr_password** ->
+**cr_login_server** -> The URL of the container registry.<br>
+**cr_username** -> The username for Docker Hub.<br>
+**cr_password** -> The password for Docker Hub.
 
 ```
-  # Configure environment variables specific to the mem-gateway.
   env = {
     SVC_DNS_METADATA: local.svc_dns_metadata
     SVC_DNS_HISTORY: local.svc_dns_history
@@ -59,23 +221,44 @@ module "mem-gateway" {
     SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
     MAX_RETRIES: 20
   }
+```
+**env** -> The environment variables for mem-gateway.<br>
+**SVC_DNS_\*** -> <br>
+**MAX_RETRIES** -> When a microservice connects to an upstream dependency, it must wait for the dependency (e.g., RabbitMQ, MongoDB, or another microservice) to boot up before it can connect and make use of the dependency. If the microservice tries to connect too early, the default behavior is to throw an unhandled exception that most likely aborts the microservice; the microservice will constantly crash and restart while the dependency is down. To avoid wasting resources by constantly restarting the microservice, it is best to let the microservice wait quietly until its dependency becomes available; i.e., the microservice will attempt to connect after a given amount of time has elapsed. This can potentially happen when the application is first booting up, the dependency crashes and Kubernetes automatically restarts it, or the dependency is taken down temporarily for maintenance. This sets the maximum number of attempts to connect.
+
+```
   readiness_probe = [{
     http_get = [{
       path = "/readiness"
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 120
+    initial_delay_seconds = 30
     period_seconds = 20
     timeout_seconds = 2
-    failure_threshold = 10
+    failure_threshold = 4
     success_threshold = 1
   }]
+  ```
+**readiness_probe** -> It determines if the microservice has started and is ready to start accepting requests.<br>
+**http_get.path** -> Path to access on the HTTP server. Defaults to /.<br>
+**http_get.port** -> Name or number of the port to access on the container. Number must be in the range 1 to 65535. To use a *random free port*, set the port to zero (0).<br>
+**http_get.scheme** -> Scheme to use for connecting to the host (HTTP or HTTPS). Defaults to HTTP.<br>
+**initial_delay_seconds** -> Number of seconds after the container has started before liveness or readiness probes are initiated. Defaults to 0 seconds. Minimum value is 0.<br>
+**period_seconds** -> How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.<br>
+**timeout_seconds** -> Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.<br>
+**failure_threshold** -> When a probe fails, Kubernetes will try *failureThreshold* times before giving up. Giving up in case of *liveness probe* means restarting the container. In case of *readiness probe*, the Pod will be marked *Unready*. Defaults to 3. Minimum value is 1.<br>
+**success_threshold** -> Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup Probes. Minimum value is 1.
+
+  ```
   service_name = "mem-gateway"
   service_type = "LoadBalancer"
-  service_session_affinity = "ClientIP"
+  service_session_affinity = "None"
 }
 ```
+**service_name** -> The name of the service.<br>
+**service_type** -> The `ServiceType` specifies what kind of `Service` to use. The `LoadBalancer` exposes the `Service` **externally** using a cloud provider's load balancer. The `ClusterIP` (default) exposes the `Service` on a **cluster-internal** IP; i.e, the `Service` is only reachable from within the cluster.<br>
+**service_session_affinity** -> To have all requests made by a certain client to be redirected to the same pod every time, set the service's `sessionAffinity` property to `ClientIP` instead of `None` (default).
 ***
 <br>
 

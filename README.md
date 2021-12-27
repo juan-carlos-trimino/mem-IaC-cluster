@@ -32,7 +32,9 @@ IaC-cluster
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 IaC-storage
  ├ tf
  | ├ ibm-cos
@@ -70,7 +72,9 @@ IaC-storage
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-gateway
  ├ gateway
  | ├ public
@@ -94,7 +98,9 @@ mem-gateway
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-history
  ├ history
  | ├ src
@@ -107,7 +113,9 @@ mem-history
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-metadata
  ├ metadata
  | ├ src
@@ -120,7 +128,9 @@ mem-metadata
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-rabbitmq
  ├ rabbitmq
  | ├ .dockerignore
@@ -129,7 +139,9 @@ mem-rabbitmq
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-video-storage
  ├ video-storage
  | ├ src
@@ -142,7 +154,9 @@ mem-video-storage
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-video-streaming
  ├ video-streaming
  | ├ src
@@ -155,7 +169,9 @@ mem-video-streaming
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
 
+```
 mem-video-upload
  ├ video-upload
  | ├ src
@@ -266,7 +282,8 @@ module "mem-gateway" {
 
 It records the user's viewing history.
 
-video-streaming -> RabbitMQ('viewed' message) -> history -> mongoDB('history' db)
+The flow is a follows 
+video-streaming >>send message>> RabbitMQ('viewed') >>send mesage>> history >>write>> mongoDB('history')
 
 
 (1) 'viewed' message is how the video-streaming microservice informs the history microservice
@@ -274,6 +291,7 @@ video-streaming -> RabbitMQ('viewed' message) -> history -> mongoDB('history' db
 (2) The history microservice receives messages from the video-streaming microservice, and it
     records them in its own database.
 
+**Let's take a closer look at the code for the `mem-history` module.**
 ```
 module "mem-history" {
   source = "./modules/pri-microservice"
@@ -282,6 +300,10 @@ module "mem-history" {
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
   cr_login_server = local.cr_login_server
@@ -293,21 +315,26 @@ module "mem-history" {
     DB_NAME: local.db_history
     MAX_RETRIES: 20
   }
+```
+xxxxxxxxxxxxxxxxxxxxx
+
+```
   readiness_probe = [{
     http_get = [{
       path = "/readiness"
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 100
-    period_seconds = 15
+    initial_delay_seconds = 30
+    period_seconds = 20
     timeout_seconds = 2
-    failure_threshold = 3
+    failure_threshold = 4
     success_threshold = 1
   }]
   service_name = "mem-history"
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -560,17 +587,6 @@ module "mem-video-upload" {
 ```
 ***
 <br>
-
-
-
-RESOURCEGROUP=Default
-COS_NAME_RANDOM=$(date | md5sum | head -c10)
-COS_NAME=$COS_NAME_RANDOM-cos-1
-COS_CREDENTIALS=$COS_NAME-credentials
-COS_PLAN=Lite
-COS_BUCKET_NAME=$(date | md5sum | head -c10)-bucket-1
-REGION=us-south
-COS_PRIVATE_ENDPOINT=s3.private.$REGION.cloud-object-storage.appdomain.cloud
 
 
 

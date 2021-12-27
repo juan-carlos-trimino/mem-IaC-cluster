@@ -33,7 +33,7 @@ module "mem-gateway" {
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
-  replicas = 3
+  replicas = 1
   qos_limits_cpu = "400m"
   qos_limits_memory = "400Mi"
   cr_login_server = local.cr_login_server
@@ -53,15 +53,15 @@ module "mem-gateway" {
       port = 0
       scheme = "HTTP"
     }]
-    initial_delay_seconds = 120
+    initial_delay_seconds = 30
     period_seconds = 20
     timeout_seconds = 2
-    failure_threshold = 10
+    failure_threshold = 4
     success_threshold = 1
   }]
   service_name = "mem-gateway"
   service_type = "LoadBalancer"
-  service_session_affinity = "ClientIP"
+  service_session_affinity = "None"
 }
 
 module "mem-rabbitmq" {

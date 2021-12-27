@@ -64,25 +64,37 @@ module "mem-gateway" {
   service_session_affinity = "None"
 }
 
-module "mem-rabbitmq" {
-  # Specify the location of the module, which contains the file main.tf.
+module "mem-history" {
   source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the ms-rabbitmq.
-  dir_name = "../../mem-rabbitmq/rabbitmq"
+  dir_name = "../../mem-history/history"
   app_name = var.app_name
   app_version = var.app_version
-  # This image has the RabbitMQ dashboard.
-  # image_tag = "rabbitmq:3.9.7-management-alpine"
-  # image_tag = "rabbitmq:3.9.7-alpine"
+  replicas = 3
   namespace = local.namespace
-  qos_limits_cpu = "400m"
-  qos_limits_memory = "300Mi"
+  qos_requests_memory = "50Mi"
+  qos_limits_memory = "100Mi"
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
-  service_name = "mem-rabbitmq"
-  service_port = 5672
-  service_target_port = 5672
+  env = {
+    SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
+    SVC_DNS_DB: local.svc_dns_db
+    DB_NAME: local.db_history
+    MAX_RETRIES: 20
+  }
+  readiness_probe = [{
+    http_get = [{
+      path = "/readiness"
+      port = 0
+      scheme = "HTTP"
+    }]
+    initial_delay_seconds = 30
+    period_seconds = 20
+    timeout_seconds = 2
+    failure_threshold = 4
+    success_threshold = 1
+  }]
+  service_name = "mem-history"
 }
 
 module "mem-metadata" {
@@ -118,37 +130,57 @@ module "mem-metadata" {
   service_name = "mem-metadata"
 }
 
-module "mem-video-upload" {
+module "mem-rabbitmq" {
+  # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
-  dir_name = "../../mem-video-upload/video-upload"
+  # Set input variables to configure the microservice module for the ms-rabbitmq.
+  dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  # This image has the RabbitMQ dashboard.
+  # image_tag = "rabbitmq:3.9.7-management-alpine"
+  # image_tag = "rabbitmq:3.9.7-alpine"
   namespace = local.namespace
-  qos_requests_memory = "150Mi"
+  qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
+  service_name = "mem-rabbitmq"
+  service_port = 5672
+  service_target_port = 5672
+}
+
+module "mem-video-storage" {
+  source = "./modules/pri-microservice"
+  dir_name = "../../mem-video-storage/video-storage"
+  app_name = var.app_name
+  app_version = var.app_version
+  replicas = 3
+  namespace = local.namespace
+  dns_name = "mem-video-storage"
+  qos_limits_cpu = "300m"
+  qos_limits_memory = "500Mi"
+  cr_login_server = local.cr_login_server
+  cr_username = var.cr_username
+  cr_password = var.cr_password
   env = {
-    SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
-    SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
+    BUCKET_NAME: var.bucket_name
+    #
+    AUTHENTICATION_TYPE: "iam"
+    API_KEY: var.api_key
+    SERVICE_INSTANCE_ID: var.resource_instance_id
+    ENDPOINT: var.public_endpoint
+    #
+    # AUTHENTICATION_TYPE: "hmac"
+    # REGION: var.region1
+    # ACCESS_KEY_ID: var.access_key_id
+    # SECRET_ACCESS_KEY: var.secret_access_key
+    # ENDPOINT: var.public_endpoint
+    #
     MAX_RETRIES: 20
   }
-  readiness_probe = [{
-    http_get = [{
-      host = local.svc_dns_video_upload
-      path = "/readiness"
-      port = 0
-      scheme = "HTTP"
-    }]
-    initial_delay_seconds = 100
-    period_seconds = 15
-    timeout_seconds = 2
-    failure_threshold = 3
-    success_threshold = 1
-  }]
-  service_name = "mem-video-upload"
+  service_name = "mem-video-storage"
 }
 
 module "mem-video-streaming" {
@@ -184,59 +216,26 @@ module "mem-video-streaming" {
   service_name = "mem-video-streaming"
 }
 
-module "mem-video-storage" {
+module "mem-video-upload" {
   source = "./modules/pri-microservice"
-  dir_name = "../../mem-video-storage/video-storage"
+  dir_name = "../../mem-video-upload/video-upload"
   app_name = var.app_name
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
-  dns_name = "mem-video-storage"
-  qos_limits_cpu = "300m"
-  qos_limits_memory = "500Mi"
-  cr_login_server = local.cr_login_server
-  cr_username = var.cr_username
-  cr_password = var.cr_password
-  env = {
-    BUCKET_NAME: var.bucket_name
-    #
-    AUTHENTICATION_TYPE: "iam"
-    API_KEY: var.api_key
-    SERVICE_INSTANCE_ID: var.resource_instance_id
-    ENDPOINT: var.public_endpoint
-    #
-    # AUTHENTICATION_TYPE: "hmac"
-    # REGION: var.region1
-    # ACCESS_KEY_ID: var.access_key_id
-    # SECRET_ACCESS_KEY: var.secret_access_key
-    # ENDPOINT: var.public_endpoint
-    #
-    MAX_RETRIES: 20
-  }
-  service_name = "mem-video-storage"
-}
-
-module "mem-history" {
-  source = "./modules/pri-microservice"
-  dir_name = "../../mem-history/history"
-  app_name = var.app_name
-  app_version = var.app_version
-  replicas = 3
-  namespace = local.namespace
-  qos_requests_memory = "50Mi"
-  qos_limits_memory = "100Mi"
+  qos_requests_memory = "150Mi"
+  qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
-    SVC_DNS_DB: local.svc_dns_db
-    DB_NAME: local.db_history
+    SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
     MAX_RETRIES: 20
   }
   readiness_probe = [{
     http_get = [{
-      #host = local.svc_dns_history
+      host = local.svc_dns_video_upload
       path = "/readiness"
       port = 0
       scheme = "HTTP"
@@ -247,5 +246,5 @@ module "mem-history" {
     failure_threshold = 3
     success_threshold = 1
   }]
-  service_name = "mem-history"
+  service_name = "mem-video-upload"
 }

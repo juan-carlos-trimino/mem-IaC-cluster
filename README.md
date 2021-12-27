@@ -33,7 +33,7 @@ IaC-cluster
  ├ LICENSE
  └ README.md
 
-IaC-xxxxxxxxxxxxxxxxxxxxxxxxxx-storage
+IaC-storage
  ├ tf
  | ├ ibm-cos
  | | ├ create-bucket
@@ -223,7 +223,7 @@ module "mem-gateway" {
   }
 ```
 **env** -> The environment variables for mem-gateway.<br>
-**SVC_DNS_\*** -> <br>
+**SVC_DNS_\*** -> DNS records for services.<br>
 **MAX_RETRIES** -> When a microservice connects to an upstream dependency, it must wait for the dependency (e.g., RabbitMQ, MongoDB, or another microservice) to boot up before it can connect and make use of the dependency. If the microservice tries to connect too early, the default behavior is to throw an unhandled exception that most likely aborts the microservice; the microservice will constantly crash and restart while the dependency is down. To avoid wasting resources by constantly restarting the microservice, it is best to let the microservice wait quietly until its dependency becomes available; i.e., the microservice will attempt to connect after a given amount of time has elapsed. This can potentially happen when the application is first booting up, the dependency crashes and Kubernetes automatically restarts it, or the dependency is taken down temporarily for maintenance. This sets the maximum number of attempts to connect.
 
 ```

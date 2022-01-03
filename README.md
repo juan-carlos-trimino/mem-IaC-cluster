@@ -194,7 +194,21 @@ In a typical microservices deployment, microservices are not exposed directly to
 
 The current implementation of the gateway **does not provide any *edge security* at all**, but it is **the only entry point to the microservices deployment for requests originating from *outside***. There are many options for reverse proxies available such as `Nginx`, `Zuul`, `HAProxy`, and `Traefik`.
 
-**Let's take a closer look at the code for the `mem-gateway` module.**
+## Code
+**`mem-gateway` microservice.**
+- It is the single-entry point to the application.
+- It provides the front-end UI that allows the users to interact with the application.
+- It provides a REST API for the front-end to interact with the backend.
+- The *UI* is implemented as a traditional *server-rendered* web page instead of a *single-page (SPA)* rendered in the browser.
+- Requests:
+  - The list of uploaded videos: `user -> gateway -> metadata`<br>
+    The main page shows the list of uploaded videos. The route handler starts by requesting data from the metadata microservice. It then renders the web page using the video-list template and input the list of videos as the template's data.
+  - The user's viewing history: `user -> gateway -> history`
+  - Stream a video: `user -> gateway -> video-streaming`<br>
+    The streaming video is piped through the video-storage, through the video-streaming, through the gateway, and finally, displayed to the user through the video element in its web browser.
+  - Upload a video: `user -> gateway -> video-upload`
+
+**`mem-gateway` module.**
 ```
 module "mem-gateway" {
   source = "./modules/pri-microservice"
@@ -213,7 +227,7 @@ module "mem-gateway" {
 **namespace** -> The namespace.
 
 ```
-  replicas = 1
+  replicas = 2
   qos_limits_cpu = "400m"
   qos_limits_memory = "400Mi"
 ```
@@ -269,7 +283,7 @@ module "mem-gateway" {
   ```
   service_name = "mem-gateway"
   service_type = "LoadBalancer"
-  service_session_affinity = "None"
+  service_session_affinity = "ClientIP"
 }
 ```
 **service_name** -> The name of the service.<br>
@@ -282,16 +296,13 @@ module "mem-gateway" {
 
 It records the user's viewing history.
 
-The flow is a follows 
-video-streaming >>send message>> RabbitMQ('viewed') >>send mesage>> history >>write>> mongoDB('history')
+## Code
+**`mem-history` microservice.**
+- It uses the `MongoDB` server to store the viewing history in the `histroy` database.
+- It subscribes to the `viewed queue` of `RabbitMQ` to receive `viewed messages`.
+- The *history* microservice receives messages from the *video-streaming* microservice, and it records them in its database.
 
-
-(1) 'viewed' message is how the video-streaming microservice informs the history microservice
-     that the user has watched a video.
-(2) The history microservice receives messages from the video-streaming microservice, and it
-    records them in its own database.
-
-**Let's take a closer look at the code for the `mem-history` module.**
+**`mem-history` module.**
 ```
 module "mem-history" {
   source = "./modules/pri-microservice"
@@ -342,10 +353,13 @@ See **mem-gateway** for an explanation of these variables.
 
 It records details and metadata about each video.
 
-* The app contains a single RabbitMQ server instance; the RabbitMQ server contains multiple queues
-  with different names.
-* Each microservice has its own private database; the databases are hosted on a shared server.
+## Code
+**`mem-metadata` microservice.**
+- It uses the `MongoDB` server to store the data in the `metadata` database.
+- It subscribes to the `uploaded queue` of `RabbitMQ` to receive `uploaded messages`.
+- The *metadata* microservice receives messages from the *video-upload* microservice, and it records them in its database.
 
+**`mem-metadata` module.**
 ```
 module "mem-metadata" {
   source = "./modules/pri-microservice"
@@ -385,6 +399,13 @@ module "mem-metadata" {
 
 # MongoDB (mem-mongodb)
 
+A **single** instance of `MongoDB`, a `NoSQL` database, is used for the application.
+
+## Code
+**`mem-mongodb` microservice.**
+- Each microservice has its own private database; the databases are hosted on a shared server.
+
+**`mem-mongodb` module.**
 ```
 module "mem-mongodb" {
   source = "./modules/pub-microservice"
@@ -429,6 +450,13 @@ module "mem-mongodb" {
 
 # RabbitMQ (mem-rabbitmq)
 
+A **single** instance of `RabbitMQ` is used for the application.
+
+## Code
+**`mem-rabbitmq` microservice.**
+- The RabbitMQ server contains multiple queues with different names.
+
+**`mem-rabbitmq` module.**
 ```
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
@@ -456,11 +484,16 @@ module "mem-rabbitmq" {
 
 # Video-Storage (mem-video-storage)
 
-An abstraction of the file storage provider. One advantage of this architecture (separation of concerns and single responsibility principle) is that the video storage microservice can be easily swapped out and be replaced with an alternative.
+It stores and retrieves videos from an external cloud storage.
 
 #### `Note`
 IBM's Cloud Object Storage (COS) is `S3 (Simple Storage Service)` compatible and can, thus, be used with any S3-compatible tooling. The fundamental unit of object storage is called a `bucket`.
 
+## Code
+**`mem-video-storage` microservice.**
+- An abstraction of the file storage provider. One advantage of this architecture (separation of concerns and single responsibility principle) is that the video storage microservice can be easily swapped out and be replaced with an alternative.
+
+**`mem-video-storage` module.**
 ```
 module "mem-video-storage" {
   source = "./modules/pri-microservice"
@@ -501,10 +534,13 @@ module "mem-video-storage" {
 
 It streams videos from storage to be watched by the user.
 
-external cloud storage -> video-storage -> video-streaming -> gateway -> user UI
-                                                |
-                         												-> RabbitMQ (viewed message) -> history
+## Code
+**`mem-video-streaming` microservice.**
+- It receives requests from the gateway.
+- It forwards the requests to the video storage microservice.
+- It sends `viewed messages` to `RabbbitMQ`.
 
+**`mem-video-streaming` module.**
 ```
 module "mem-video-streaming" {
   source = "./modules/pri-microservice"
@@ -544,13 +580,15 @@ module "mem-video-streaming" {
 
 # Video-Upload (mem-video-upload)
 
-It orchestrates upload of videos to storage.
+It uploads the videos to storage.
 
+## Code
+**`mem-video-upload` microservice.**
+- It receives requests from the gateway.
+- It forwards the requests to the video storage microservice.
+- It sends `uploaded messages` to `RabbbitMQ`.
 
-user UI -> gateway -> video-upload -> video-storage -> external cloud storage
-                           |
-                           -> RabbitMQ (uploaded message) -> metadata
-
+**`mem-video-upload` module.**
 ```
 module "mem-video-upload" {
   source = "./modules/pri-microservice"
@@ -587,18 +625,3 @@ module "mem-video-upload" {
 ```
 ***
 <br>
-
-
-
-emptyDir
-An emptyDir volume is first created when a Pod is assigned to a node, and exists as long as that Pod is running on that node. As the name says, the emptyDir volume is initially empty. All containers in the Pod can read and write the same files in the emptyDir volume, though that volume can be mounted at the same or different paths in each container. When a Pod is removed from a node for any reason, the data in the emptyDir is deleted permanently.
-Note: A container crashing does not remove a Pod from a node. The data in an emptyDir volume is safe across container crashes.
-
-
-
-Data is available to all nodes within the availability zone where the file storage exists, but the accessMode parameter on the PersistentVolumeClaim determines if multiple pods are able to mount a volume specificed by a PVC. The possible values for this parameter are:
-
-ReadWriteMany: The PVC can be mounted by multiple pods. All pods can read from and write to the volume.
-ReadOnlyMany: The PVC can be mounted by multiple pods. All pods have read-only access.
-ReadWriteOnce: The PVC can be mounted by one pod only. This pod can read from and write to the volume.
-

@@ -4,7 +4,7 @@ This project would not have been possible without the book `Bootstrapping Micros
 
 <br>
 
-This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `Docker Hub (container registry)`, `MongoDB`, `RabbitMQ`, xxxxxxxxxxxx. The application name is **memories**.
+This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `Node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `Docker Hub (container registry)`, `MongoDB`, and `RabbitMQ`. The name of the application is **memories**.
 
 ***
 <br>
@@ -195,7 +195,7 @@ In a typical microservices deployment, microservices are not exposed directly to
 The current implementation of the gateway **does not provide any *edge security* at all**, but it is **the only entry point to the microservices deployment for requests originating from *outside***. There are many options for reverse proxies available such as `Nginx`, `Zuul`, `HAProxy`, and `Traefik`.
 
 ## Code
-**`mem-gateway` microservice.**
+**`mem-gateway` microservice (index.js).**
 - It is the single-entry point to the application.
 - It provides the front-end UI that allows the users to interact with the application.
 - It provides a REST API for the front-end to interact with the backend.
@@ -208,14 +208,14 @@ The current implementation of the gateway **does not provide any *edge security*
     The streaming video is piped through the video-storage, through the video-streaming, through the gateway, and finally, displayed to the user through the video element in its web browser.
   - Upload a video: `user -> gateway -> video-upload`
 
-**`mem-gateway` module.**
+**`mem-gateway` module (pri-microservices.tf).**
 ```
 module "mem-gateway" {
   source = "./modules/pri-microservice"
   dir_name = "../../mem-gateway/gateway"
 ```
 **source** -> Specify the location of the module, which contains the file main.tf.<br>
-**dir_name** -> Set input variables to configure the microservice module for the mem-gateway.xxxxxxxxxxxxxxxxxx
+**dir_name** -> Specify the path use in the building of the Docker image.
 
 ```
   app_name = var.app_name
@@ -297,12 +297,12 @@ module "mem-gateway" {
 It records the user's viewing history.
 
 ## Code
-**`mem-history` microservice.**
+**`mem-history` microservice (index.js).**
 - It uses the `MongoDB` server to store the viewing history in the `histroy` database.
 - It subscribes to the `viewed queue` of `RabbitMQ` to receive `viewed messages`.
 - The *history* microservice receives messages from the *video-streaming* microservice, and it records them in its database.
 
-**`mem-history` module.**
+**`mem-history` module (pri-microservices.tf).**
 ```
 module "mem-history" {
   source = "./modules/pri-microservice"
@@ -327,7 +327,8 @@ See **mem-gateway** for an explanation of these variables.
     MAX_RETRIES: 20
   }
 ```
-xxxxxxxxxxxxxxxxxxxxx
+**qos_limits_cpu/qos_limits_memory** -> QoS class: Burstable.
+See **mem-gateway** for an explanation of these variables.
 
 ```
   readiness_probe = [{
@@ -354,12 +355,12 @@ See **mem-gateway** for an explanation of these variables.
 It records details and metadata about each video.
 
 ## Code
-**`mem-metadata` microservice.**
+**`mem-metadata` microservice (index.js).**
 - It uses the `MongoDB` server to store the data in the `metadata` database.
 - It subscribes to the `uploaded queue` of `RabbitMQ` to receive `uploaded messages`.
 - The *metadata* microservice receives messages from the *video-upload* microservice, and it records them in its database.
 
-**`mem-metadata` module.**
+**`mem-metadata` module (pri-microservices.tf).**
 ```
 module "mem-metadata" {
   source = "./modules/pri-microservice"
@@ -368,6 +369,10 @@ module "mem-metadata" {
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
   cr_login_server = local.cr_login_server
@@ -379,6 +384,11 @@ module "mem-metadata" {
     DB_NAME: local.db_metadata
     MAX_RETRIES: 20
   }
+```
+**qos_limits_cpu/qos_limits_memory** -> QoS class: Burstable.
+See **mem-gateway** for an explanation of these variables.
+
+```
   readiness_probe = [{
     http_get = [{
       path = "/readiness"
@@ -394,6 +404,7 @@ module "mem-metadata" {
   service_name = "mem-metadata"
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -405,7 +416,7 @@ A **single** instance of `MongoDB`, a `NoSQL` database, is used for the applicat
 **`mem-mongodb` microservice.**
 - Each microservice has its own private database; the databases are hosted on a shared server.
 
-**`mem-mongodb` module.**
+**`mem-mongodb` module (pub-microservices.tf).**
 ```
 module "mem-mongodb" {
   source = "./modules/pub-microservice"
@@ -414,6 +425,11 @@ module "mem-mongodb" {
   image_tag = "mongo:4.2.8"
   # image_tag = "rhscl/mongodb-36-rhel7"
   namespace = local.namespace
+```
+**image_tag** -> The image to use.
+See **mem-gateway** for an explanation of these variables.
+
+```
   /*
   Limits and request for CPU resources are measured in millicores. If the container needs one full
   core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
@@ -422,6 +438,10 @@ module "mem-mongodb" {
   qos_limits_cpu = "400m"
   #qos_limits_memory = "1Gi"
   qos_limits_memory = "500Mi"
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   pvc_name = "mongodb-pvc"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "5Gi"
@@ -431,20 +451,16 @@ module "mem-mongodb" {
   #private_endpoint = var.private_endpoint
   #api_key = var.api_key
   #service_instance_id = var.service_instance_id
+```
+Persistent Volume Claim (pvc).
+
+```
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
-  # env = {
-  #   #MONGO_INITDB_ROOT_USERNAME = "root"
-  #   #MONGO_INITDB_ROOT_PASSWORD = "example"
-  #   MONGODB_ADMIN_PASSWORD = "jct123"
-  #   MONGODB_USER = "guest"
-  #   MONGODB_PASSWORD = "guest"
-  #   #MONGODB_DATABASE = "history"
-  #   MONGODB_DATABASE = "metadata"
-  # }
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -452,16 +468,18 @@ module "mem-mongodb" {
 
 A **single** instance of `RabbitMQ` is used for the application.
 
+#### `Note`
+By default, the `guest` user is prohibited from connecting from remote hosts; it can only connect over a loopback interface (i.e. localhost). This applies to connections regardless of the protocol. Any other users will not (by default) be restricted in this way. It is possible to allow the guest user to connect from a remote host by setting the loopback_users configuration to none. See rabbitmq.conf.
+
 ## Code
 **`mem-rabbitmq` microservice.**
 - The RabbitMQ server contains multiple queues with different names.
 
-**`mem-rabbitmq` module.**
+**`mem-rabbitmq` module (pri-microservices.tf).**
 ```
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the ms-rabbitmq.
   dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
@@ -469,16 +487,25 @@ module "mem-rabbitmq" {
   # image_tag = "rabbitmq:3.9.7-management-alpine"
   # image_tag = "rabbitmq:3.9.7-alpine"
   namespace = local.namespace
+```
+See **mem-mongodb** for an explanation of these variables.
+
+```
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
+```
+See **mem-mongodb** for an explanation of these variables.
+
+```
   service_name = "mem-rabbitmq"
   service_port = 5672
   service_target_port = 5672
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -503,6 +530,11 @@ module "mem-video-storage" {
   replicas = 3
   namespace = local.namespace
   dns_name = "mem-video-storage"
+```
+**dns_name** -> The DNS entry for this service.
+See **mem-gateway** for an explanation of these variables.
+
+```
   qos_limits_cpu = "300m"
   qos_limits_memory = "500Mi"
   cr_login_server = local.cr_login_server
@@ -510,12 +542,12 @@ module "mem-video-storage" {
   cr_password = var.cr_password
   env = {
     BUCKET_NAME: var.bucket_name
-    #
+    # Without HMAC.
     AUTHENTICATION_TYPE: "iam"
     API_KEY: var.api_key
     SERVICE_INSTANCE_ID: var.resource_instance_id
     ENDPOINT: var.public_endpoint
-    #
+    # With HMAC
     # AUTHENTICATION_TYPE: "hmac"
     # REGION: var.region1
     # ACCESS_KEY_ID: var.access_key_id
@@ -524,9 +556,15 @@ module "mem-video-storage" {
     #
     MAX_RETRIES: 20
   }
+```
+Without and with *HMAC*. *Uncomment* the desired *authentication type* and *comment* the other type.<br>
+See **mem-gateway** for an explanation of these variables.
+
+```
   service_name = "mem-video-storage"
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -549,6 +587,10 @@ module "mem-video-streaming" {
   app_version = var.app_version
   namespace = local.namespace
   replicas = 3
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
@@ -559,6 +601,10 @@ module "mem-video-streaming" {
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
     MAX_RETRIES: 20
   }
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   readiness_probe = [{
     http_get = [{
       host = local.svc_dns_video_streaming
@@ -575,6 +621,7 @@ module "mem-video-streaming" {
   service_name = "mem-video-streaming"
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>
 
@@ -597,6 +644,10 @@ module "mem-video-upload" {
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
@@ -607,6 +658,10 @@ module "mem-video-upload" {
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
     MAX_RETRIES: 20
   }
+```
+See **mem-gateway** for an explanation of these variables.
+
+```
   readiness_probe = [{
     http_get = [{
       host = local.svc_dns_video_upload
@@ -623,5 +678,6 @@ module "mem-video-upload" {
   service_name = "mem-video-upload"
 }
 ```
+See **mem-gateway** for an explanation of these variables.
 ***
 <br>

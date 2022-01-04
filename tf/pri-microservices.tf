@@ -28,7 +28,6 @@ locals {
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the mem-gateway.
   dir_name = "../../mem-gateway/gateway"
   app_name = var.app_name
   app_version = var.app_version
@@ -61,7 +60,7 @@ module "mem-gateway" {
   }]
   service_name = "mem-gateway"
   service_type = "LoadBalancer"
-  service_session_affinity = "None"
+  service_session_affinity = "ClientIP"
 }
 
 module "mem-history" {
@@ -133,7 +132,6 @@ module "mem-metadata" {
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
-  # Set input variables to configure the microservice module for the ms-rabbitmq.
   dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
@@ -158,7 +156,6 @@ module "mem-video-storage" {
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
-  dns_name = "mem-video-storage"
   qos_limits_cpu = "300m"
   qos_limits_memory = "500Mi"
   cr_login_server = local.cr_login_server
@@ -166,12 +163,12 @@ module "mem-video-storage" {
   cr_password = var.cr_password
   env = {
     BUCKET_NAME: var.bucket_name
-    #
+    # Without HMAC.
     AUTHENTICATION_TYPE: "iam"
     API_KEY: var.api_key
     SERVICE_INSTANCE_ID: var.resource_instance_id
     ENDPOINT: var.public_endpoint
-    #
+    # With HMAC.
     # AUTHENTICATION_TYPE: "hmac"
     # REGION: var.region1
     # ACCESS_KEY_ID: var.access_key_id

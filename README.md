@@ -529,9 +529,7 @@ module "mem-video-storage" {
   app_version = var.app_version
   replicas = 3
   namespace = local.namespace
-  dns_name = "mem-video-storage"
 ```
-**dns_name** -> The DNS entry for this service.
 See **mem-gateway** for an explanation of these variables.
 
 ```

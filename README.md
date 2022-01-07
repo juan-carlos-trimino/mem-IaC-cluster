@@ -12,6 +12,12 @@ This is a video-streaming `distributed application` composed of the following **
 # Repos
 
 ```
+memories-meta-repo
+ ├ .gitignore
+ └ .meta
+```
+
+```
 IaC-cluster
  ├ tf
  | ├ cluster_config
@@ -184,6 +190,51 @@ mem-video-upload
  ├ .gitignore
  ├ LICENSE
  └ README.md
+```
+***
+<br>
+
+# Meta Repo (memories-meta-repo)
+
+A `meta repo` tracks multiple repositories as a single aggregate repository thereby making the management of multiple repositories easier. The `meta` tool is available here:
+
+* https://github.com/mateodelnorte/meta
+
+To install `meta`:
+```
+>$ npm i -g meta
+```
+
+To create a `meta-repo` project:
+```
+>$ mkdir memories-meta-repo && cd memories-meta-repo
+>$ git init
+```
+
+To initialize the new repository as a `meta repo`:<br>
+(`meta` will create a `.meta` file that contains a collection of separate repositories.)
+```
+>$ meta init
+```
+
+`meta` performs `Git` commands against the entire collection of repositories.<br>
+Listed below are some useful `meta` commands
+
+```
+To clone the meta repo and all of its children repositories:
+>$ meta git clone https://github.com/juan-carlos-trimino/memories-meta-repo.git
+
+To get meta project updates, first get the .meta file and then get the missing projects:
+>$ git pull origin master
+>$ meta git update
+
+To list all of the files in each project:
+>$ meta exec "ls -al"
+
+To pull code changes for all repositories:
+>$ meta git pull
+
+>$ meta git status
 ```
 ***
 <br>

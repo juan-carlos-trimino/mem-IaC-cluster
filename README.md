@@ -231,10 +231,14 @@ To get meta project updates, first get the .meta file and then get the missing p
 To list all of the files in each project:
 >$ meta exec "ls -al"
 
+To get the status for all repositories:
+>$ meta git status
+
 To pull code changes for all repositories:
 >$ meta git pull
 
->$ meta git status
+To push code changes for all repositories:
+>$ meta git push
 ```
 ***
 <br>

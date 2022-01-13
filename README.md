@@ -6,6 +6,22 @@ This project would not have been possible without the book `Bootstrapping Micros
 
 This is a video-streaming `distributed application` composed of the following **eight** microservices: *gateway/reverse proxy*, *history*, *metadata*, *video storage*, *video streaming*, *video upload*, *MongoDB*, and *RabbitMQ*; MongoDB and RabbitMQ are third-party servers. The application was developed and tested using `Node.js`, `Terraform`, `Red Hat OpenShift (Kubernetes)`, `IBM Cloud Storage Object (COS)`, `Docker`, `Docker Hub (container registry)`, `MongoDB`, and `RabbitMQ`. The name of the application is **memories**.
 
+## Deploying the app (memories)
+**Dependencies**
+- [Terraform](https://www.terraform.io/downloads.html)<br>
+  To install `Terraform`, download the binary executable for the Operating System (OS) being used to a directory in the system's PATH environment variable.
+- A private `Container Registry`; e.g., `Docker Hub`, `Quay.io`, et at.
+- Make a copy of the file `variables_no_push.tf.template`.
+  >$ cp variables_no_push.tf.template variables_no_push.tf<br>
+  The file `variables_no_push.tf` will **not** be pushed to the repository.
+- In the `variables_no_push.tf` file, add the appropriate information to each variable.
+
+To bootstrap the app:
+>$ terraform apply -var="app_version=1.0.0" -auto-approve
+
+To remove the app:
+>$ terraform destroy -var="app_version=0" -auto-approve
+
 ***
 <br>
 

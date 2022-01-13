@@ -15,16 +15,6 @@ variable ibmcloud_api_key {
   default = "<required>"
 }
 
-#variable iaas_classic_api_key {
-#  description = "The IBM Cloud Classic Infrastructure API key."
-#  default = "<not used>"
-#}
-
-variable iaas_classic_username {
-  description = "The IBM Cloud Classic Infrastructure (SoftLayer) user name."
-  default = "<required>"
-}
-
 variable cluster_name {
   description = "The name of an existing IBM Cloud cluster."
   default = "<required>"
@@ -52,21 +42,13 @@ variable region {
 
 variable ibmcloud_timeout {
   description = "The timeout, expressed in seconds, for interacting with IBM Cloud APIs."
-  default = "<optional>"
+  default = "900"
 }
 
 ################
 # Storage info #
 ################
-variable api_key {
-  default = "<required>"
-}
-
-variable service_instance_id {
-  default = "<required>"
-}
-
-variable signature_version {
+variable storage_api_key {
   default = "<required>"
 }
 
@@ -79,5 +61,9 @@ variable public_endpoint {
 }
 
 variable bucket_name {
+  default = "<required>"
+}
+
+variable resource_instance_id {
   default = "<required>"
 }

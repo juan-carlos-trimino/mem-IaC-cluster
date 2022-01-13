@@ -44,7 +44,7 @@ module "mem-mongodb" {
   #pvc_storage_class_name = "ibmc-s3fs-standard-regional"
   #bucket_name = var.bucket_name
   #private_endpoint = var.private_endpoint
-  #api_key = var.api_key
+  #api_key = var.storage_api_key
   #service_instance_id = var.service_instance_id
   service_name = "mem-mongodb"
   service_port = 27017

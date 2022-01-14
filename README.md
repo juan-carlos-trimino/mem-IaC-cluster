@@ -18,6 +18,12 @@ This is a video-streaming `distributed application` composed of the following **
   The file `variables_no_push.tf` will **not** be pushed to the repository.
 - In the `variables_no_push.tf` file, add the appropriate information to each variable.
 
+To initialize a working directory containing `Terraform` configuration files:
+(It is safe to run this command multiple times.)
+```
+>$ terraform init
+```
+
 To bootstrap the app:
 ```
 >$ terraform apply -var="app_version=1.0.0" -auto-approve

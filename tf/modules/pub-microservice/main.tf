@@ -2,8 +2,6 @@
 -------------------------------------------------------
 A Terraform reusable module for deploying microservices
 -------------------------------------------------------
-***/
-/***
 Define input variables to the module.
 ***/
 variable "app_name" {}
@@ -51,17 +49,12 @@ variable "pvc_storage_size" {
 variable "bucket_name" {
   default = ""
 }
-
-
 variable "service_instance_id" {
   default = ""
 }
 variable "api_key" {
   default = ""
 }
-
-
-
 variable "private_endpoint" {
   default = "s3.us-south.cloud-object-storage.appdomain.cloud"
 }
@@ -117,10 +110,6 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 
-
-
-
-
 /*
 # For Identity and Access Management (IAM) key authentication.
 resource "kubernetes_secret" "cos_credentials" {
@@ -154,8 +143,6 @@ resource "kubernetes_secret" "cos_credentials" {
   type = "ibm/ibmc-s3fs"
 }
 
-
-
 resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   metadata {
     name = var.pvc_name
@@ -188,13 +175,6 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 */
-
-
-
-
-
-
-
 
 /***
 Declare a K8s deployment to deploy a microservice; it instantiates the container for the

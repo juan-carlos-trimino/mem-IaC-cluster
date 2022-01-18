@@ -96,11 +96,22 @@ variable "replicas" {
 variable "service_name" {
   default = ""
 }
+# The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
+# NodePort, LoadBalancer, and ExternalName.
 variable "service_type" {
   default = "ClusterIP"
 }
-# To have all requests made by a certain client to be redirected to the same pod every time,
+# The service normally forwards each connection to a randomly selected backing pod. To
+# ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
+# Session affinity and Web Browsers (for LoadBalancer Services)
+# Since the service is now exposed externally, accessing it with a web browser will hit
+# the same pod every time. If the sessionAffinity is set to None, then why? The browser
+# is using keep-alive connections and sends all its requests through a single connection.
+# Services work at the connection level, and when a connection to a service is initially
+# open, a random pod is selected and then all network packets belonging to that connection
+# are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
+# always get hit (until the connection is closed).
 variable "service_session_affinity" {
   default = "None"
 }

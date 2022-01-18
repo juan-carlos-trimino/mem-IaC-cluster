@@ -60,7 +60,7 @@ module "mem-gateway" {
   }]
   service_name = "mem-gateway"
   service_type = "LoadBalancer"
-  service_session_affinity = "ClientIP"
+  service_session_affinity = "None"
 }
 
 module "mem-history" {

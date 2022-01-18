@@ -49,4 +49,13 @@ module "mem-mongodb" {
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
+  env = {
+    MONGO_INITDB_ROOT_USERNAME = "root"
+    MONGO_INITDB_ROOT_PASSWORD = "example"
+  #   MONGODB_ADMIN_PASSWORD = "jct123"
+  #   MONGODB_USER = "guest"
+  #   MONGODB_PASSWORD = "guest"
+  #   #MONGODB_DATABASE = "history"
+  #   MONGODB_DATABASE = "metadata"
+  }
 }

@@ -18,18 +18,25 @@ This is a video-streaming `distributed application` composed of the following **
   The file `variables_no_push.tf` will **not** be pushed to the repository.
 - In the `variables_no_push.tf` file, add the appropriate information to each variable.
 
-To initialize a working directory containing `Terraform` configuration files:
+To initialize `Terraform` and install the various providers:
 (It is safe to run this command multiple times.)
 ```
 >$ terraform init
 ```
 
-To bootstrap the app:
+To create the infrastructure and deploy the app:<br>
+`app_version` - Provide a value for this variable; increment this value in subsequent runs.<br>
+`-auto-approve` - Enable automatic approval; no human intervention is required.
 ```
 >$ terraform apply -var="app_version=1.0.0" -auto-approve
 ```
 
-To remove the app:
+To check if the app is up and running:
+```
+>$ kubectl get services -n memories
+```
+
+To destroy the infrastructure:
 ```
 >$ terraform destroy -var="app_version=0" -auto-approve
 ```

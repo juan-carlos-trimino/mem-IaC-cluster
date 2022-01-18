@@ -18,7 +18,6 @@ tf/*
 !tf/tekton_Copy.yaml
 !tf/variables.tf
 !tf/variables_no_push.tf.template
-!tf/mongodb.conf
 # ... and this directory...
 !tf/cluster_config/
 tf/cluster_config/*
@@ -36,3 +35,4 @@ tf/modules/pub-microservice/*
 !tf/modules/mongodb/
 tf/modules/mongodb/*
 !tf/modules/mongodb/main.tf
+!tf/modules/mongodb/mongodb.conf

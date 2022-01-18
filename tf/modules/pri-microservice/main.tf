@@ -2,30 +2,6 @@
 -------------------------------------------------------
 A Terraform reusable module for deploying microservices
 -------------------------------------------------------
-
-Using Terraform to deploy an app from the development workstation to production
--------------------------------------------------------------------------------
-(1) Use Terraform to create the infrastructure in the cloud.
-(2) Use Docker to package and publish the images.
-(3) Use Terraform to deploy containers to the K8s cluster.
-
-Use Terraform
--------------
-To initialize Terraform and install the various providers.
-> terraform init
-
-To create the infrastructure and deploy the app.
-app_version - Provide a value for this variable; increment this value in subsequent runs.
--auto-approve - Enable automatic approval; no human intervention is required.
-> terraform apply -var="app_version=1.0.0" -auto-approve
-
-To check the app is up and running.
-> kubectl get services
-
-To destroy the infrastructure.
-> terraform destroy -var="app_version=0.0.0" -auto-approve
-***/
-/***
 Define input variables to the module.
 ***/
 variable "app_name" {}

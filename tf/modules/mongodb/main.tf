@@ -6,16 +6,10 @@ Define input variables to the module.
 ***/
 variable "app_name" {}
 variable "app_version" {}
-variable "image_tag" {
-  default = ""
-}
+variable "image_tag" {}
 variable "namespace" {
   default = "default"
 }
-variable "dir_name" {}
-variable "cr_login_server" {}
-variable "cr_username" {}
-variable "cr_password" {}
 variable "dns_name" {
   default = ""
 }
@@ -69,8 +63,36 @@ variable "replicas" {
   default = 1
   type = number
 }
+variable "pvc_name" {
+  default = ""
+}
+variable "pvc_access_modes" {
+  default = []
+  type = list
+}
+variable "pvc_storage_class_name" {
+  default = ""
+}
+variable "pvc_storage_size" {
+  default = "1Gi"
+}
+variable "bucket_name" {
+  default = ""
+}
+variable "service_instance_id" {
+  default = ""
+}
+variable "api_key" {
+  default = ""
+}
+variable "private_endpoint" {
+  default = "s3.us-south.cloud-object-storage.appdomain.cloud"
+}
 variable "service_name" {
   default = ""
+}
+variable "service_type" {
+  default = "ClusterIP"
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
@@ -88,98 +110,48 @@ variable "service_session_affinity" {
 }
 variable "service_port" {
   type = number
-  default = 80
 }
 variable "service_target_port" {
   type = number
-  default = 8080
-}
-/***
-Define local variables.
-***/
-locals {
-  image_tag = (
-                var.image_tag == "" ?
-                "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
-                var.image_tag
-              )
 }
 
 /***
-Build the Docker image.
-Use null_resource to create Terraform resources that do not have any particular resourse type.
-Use local-exec to invoke commands on the local workstation.
-Use timestamp to force the Docker image to build.
+Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
+used by pods in the same namespace.
 ***/
-resource "null_resource" "docker_build" {
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  provisioner "local-exec" {
-    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
-  }
-}
-
-/***
-Login to the Container Registry.
-***/
-resource "null_resource" "docker_login" {
-  depends_on = [
-    null_resource.docker_build
-  ]
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  # provisioner "local-exec" {
-  #   command = "echo ${var.cr_password} >> pw.txt"
-  # }
-  provisioner "local-exec" {
-    # command = "docker login ${var.cr_login_server} -T -u ${var.cr_username} --password-stdin"
-    command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
-  }
-}
-
-/***
-Push the image to the Container Registry.
-***/
-resource "null_resource" "docker_push" {
-  depends_on = [
-    null_resource.docker_login
-  ]
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  provisioner "local-exec" {
-    command = "docker push ${local.image_tag}"
-  }
-}
-
-resource "kubernetes_secret" "registry_credentials" {
+resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   metadata {
-    name = "${var.service_name}-registry-credentials"
+    name = var.pvc_name
     namespace = var.namespace
     labels = {
       app = var.app_name
     }
   }
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "${var.cr_login_server}" = {
-          auth = base64encode("${var.cr_username}:${var.cr_password}")
-        }
+  spec {
+    # Empty string must be explicitly set otherwise default StorageClass will be set.
+    # -------------------------------------------------------------------------------
+    # StorageClass enables dynamic provisioning of PersistentVolumes (PV).
+    # (1) When creating a claim, the PV is created by the provisioner referenced in the
+    #     StorageClass resource; the provisioner is used even if an existing manually
+    #     provisioned PV matches the PVC.
+    # (2) The default storage class is used to dynamically provision a PV if the PVC does not
+    #     explicitly state which storage class name to use.
+    # (3) To bind the PVC to a pre-provisioned PV instead of dynamically provisioning a new one,
+    #     specify an empty string as the storage class name; effectively disable dynamic
+    #     provisioning.
+    storage_class_name = var.pvc_storage_class_name
+    access_modes = var.pvc_access_modes
+    resources {
+      requests = {
+        storage = var.pvc_storage_size
       }
-    })
+    }
   }
-  type = "kubernetes.io/dockerconfigjson"
 }
 
 resource "kubernetes_secret" "secret_basic_auth" {
   metadata {
-    name = "${var.service_name}-username-password-credentials"
+    name = "${var.service_name}-secret-basic-auth"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -192,14 +164,24 @@ resource "kubernetes_secret" "secret_basic_auth" {
   type = "kubernetes.io/basic-auth"
 }
 
+resource "kubernetes_config_map" "mongodb_conf" {
+  metadata {
+    name = "${var.service_name}-mongodb-conf"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data {
+    conf = "${file("${path.module}/mongodb.conf")}"
+  }
+}
+
 /***
 Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.
 ***/
-resource "kubernetes_stateful_set" "stateful_set" {
-  depends_on = [
-    null_resource.docker_push
-  ]
+resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   metadata {
     name = var.service_name
     namespace = var.namespace
@@ -281,9 +263,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
               memory = var.qos_limits_memory
             }
           }
-          env {
-            name = "PORT"
-            value = "8080"
+          volume_mount {
+            name = "mongodb-storage"
+            mount_path = "/data/db"
           }
           dynamic "env" {
             for_each = var.env
@@ -294,8 +276,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         #
-        image_pull_secrets {
-          name = kubernetes_secret.registry_credentials.metadata[0].name
+        volume {
+          name = "mongodb-storage"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
+          }
         }
       }
     }

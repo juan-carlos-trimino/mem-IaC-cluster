@@ -99,6 +99,7 @@ variable "service_target_port" {
   type = number
   default = 8080
 }
+
 /***
 Define local variables.
 ***/

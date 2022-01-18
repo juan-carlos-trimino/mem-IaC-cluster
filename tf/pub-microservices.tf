@@ -24,6 +24,7 @@ module "ms-rabbitmq" {
 
 module "mem-mongodb" {
   source = "./modules/pub-microservice"
+  # source = "./modules/mongodb"
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:4.2.8"

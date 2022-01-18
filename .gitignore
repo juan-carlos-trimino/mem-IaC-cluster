@@ -33,6 +33,6 @@ tf/modules/pri-microservice/*
 !tf/modules/pub-microservice/
 tf/modules/pub-microservice/*
 !tf/modules/pub-microservice/main.tf
-!tf/modules/StatefulSet/
-tf/modules/StatefulSet/*
-!tf/modules/StatefulSet/main.tf
+!tf/modules/mongodb/
+tf/modules/mongodb/*
+!tf/modules/mongodb/main.tf

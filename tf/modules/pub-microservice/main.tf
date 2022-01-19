@@ -7,6 +7,8 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
+variable "mongodb_username" {}
+variable "mongodb_password" {}
 variable "namespace" {
   default = "default"
 }
@@ -46,18 +48,18 @@ variable "pvc_storage_class_name" {
 variable "pvc_storage_size" {
   default = "1Gi"
 }
-variable "bucket_name" {
-  default = ""
-}
-variable "service_instance_id" {
-  default = ""
-}
-variable "api_key" {
-  default = ""
-}
-variable "private_endpoint" {
-  default = "s3.us-south.cloud-object-storage.appdomain.cloud"
-}
+# variable "bucket_name" {
+#   default = ""
+# }
+# variable "service_instance_id" {
+#   default = ""
+# }
+# variable "api_key" {
+#   default = ""
+# }
+# variable "private_endpoint" {
+#   default = "s3.us-south.cloud-object-storage.appdomain.cloud"
+# }
 variable "service_name" {
   default = ""
 }
@@ -185,6 +187,21 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
 }
 */
 
+resource "kubernetes_secret" "secret_basic_auth" {
+  metadata {
+    name = "${var.service_name}-secret-basic-auth"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    username = base64encode(var.mongodb_username)
+    password = base64encode(var.mongodb_password)
+  }
+  type = "kubernetes.io/basic-auth"
+}
+
 /***
 Declare a K8s deployment to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.
@@ -242,6 +259,31 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
+          env {
+            name = "MONGO_INITDB_ROOT_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret_basic_auth.metadata[0].name
+                key = "username"
+              }
+            }
+          }
+          env {
+            name = "MONGO_INITDB_ROOT_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret_basic_auth.metadata[0].name
+                key = "password"
+              }
+            }
+          }
+          dynamic "env" {
+            for_each = var.env
+            content {
+              name = env.key
+              value = env.value
+            }
+          }
           # *** emptyDir ***
           # The simplest volume type, emptyDir. is an empty directory used for storing transient
           # data. It is useful for sharing files between containers running on the same pod, or for
@@ -259,13 +301,13 @@ resource "kubernetes_deployment" "deployment" {
             mount_path = "/data/db"
           }
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
-          dynamic "env" {
-            for_each = var.env
-            content {
-              name = env.key
-              value = env.value
-            }
-          }
+          # dynamic "env" {
+          #   for_each = var.env
+          #   content {
+          #     name = env.key
+          #     value = env.value
+          #   }
+          # }
         }
         # *** emptyDir ***
         # volume {

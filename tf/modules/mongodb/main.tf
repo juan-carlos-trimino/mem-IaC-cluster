@@ -76,18 +76,18 @@ variable "pvc_storage_class_name" {
 variable "pvc_storage_size" {
   default = "1Gi"
 }
-variable "bucket_name" {
-  default = ""
-}
-variable "service_instance_id" {
-  default = ""
-}
-variable "api_key" {
-  default = ""
-}
-variable "private_endpoint" {
-  default = "s3.us-south.cloud-object-storage.appdomain.cloud"
-}
+# variable "bucket_name" {
+#   default = ""
+# }
+# variable "service_instance_id" {
+#   default = ""
+# }
+# variable "api_key" {
+#   default = ""
+# }
+# variable "private_endpoint" {
+#   default = "s3.us-south.cloud-object-storage.appdomain.cloud"
+# }
 variable "service_name" {
   default = ""
 }
@@ -158,8 +158,8 @@ resource "kubernetes_secret" "secret_basic_auth" {
     }
   }
   data = {
-    username = base64encode(var.username)
-    password = base64encode(var.password)
+    username = base64encode(var.mongodb_username)
+    password = base64encode(var.mongodb_password)
   }
   type = "kubernetes.io/basic-auth"
 }
@@ -266,6 +266,24 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           volume_mount {
             name = "mongodb-storage"
             mount_path = "/data/db"
+          }
+          env_from {
+            name = "MONGO_INITDB_ROOT_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = "secret_basic_auth"
+                key = "username"
+              }
+            }
+          }
+          env_from {
+            name = "MONGO_INITDB_ROOT_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = "secret_basic_auth"
+                key = "password"
+              }
+            }
           }
           dynamic "env" {
             for_each = var.env

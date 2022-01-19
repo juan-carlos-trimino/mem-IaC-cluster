@@ -28,6 +28,8 @@ module "mem-mongodb" {
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:4.2.8"
+  mongodb_username = var.mongodb_username
+  mongodb_password = var.mongodb_password
   # image_tag = "rhscl/mongodb-36-rhel7"
   namespace = local.namespace
   /*
@@ -51,8 +53,8 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    MONGO_INITDB_ROOT_USERNAME = "root"
-    MONGO_INITDB_ROOT_PASSWORD = "example"
+    # MONGO_INITDB_ROOT_USERNAME = "root"
+    # MONGO_INITDB_ROOT_PASSWORD = "example"
   #   MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"

@@ -60,5 +60,6 @@ module "mem-mongodb" {
   #   MONGODB_PASSWORD = "guest"
   #   #MONGODB_DATABASE = "history"
   #   MONGODB_DATABASE = "metadata"
+    ME_CONFIG_MONGODB_ENABLE_ADMIN = true
   }
 }

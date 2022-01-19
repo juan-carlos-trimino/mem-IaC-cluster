@@ -7,6 +7,9 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
+variable "mongodb_database" {}
+variable "mongodb_root_username" {}
+variable "mongodb_root_password" {}
 variable "mongodb_username" {}
 variable "mongodb_password" {}
 variable "namespace" {
@@ -196,6 +199,9 @@ resource "kubernetes_secret" "secret_basic_auth" {
     }
   }
   data = {
+    database = base64encode(var.mongodb_database)
+    root_username = base64encode(var.mongodb_root_username)
+    root_password = base64encode(var.mongodb_root_password)
     username = base64encode(var.mongodb_username)
     password = base64encode(var.mongodb_password)
   }
@@ -260,7 +266,34 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
           env {
+            name = "MONGO_INITDB_DATABASE"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret_basic_auth.metadata[0].name
+                key = "database"
+              }
+            }
+          }
+          env {
             name = "MONGO_INITDB_ROOT_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret_basic_auth.metadata[0].name
+                key = "root_username"
+              }
+            }
+          }
+          env {
+            name = "MONGO_INITDB_ROOT_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret_basic_auth.metadata[0].name
+                key = "root_password"
+              }
+            }
+          }
+          env {
+            name = "MONGO_USERNAME"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.secret_basic_auth.metadata[0].name

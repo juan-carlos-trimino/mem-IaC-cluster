@@ -11,7 +11,7 @@
 tf/*
 !tf/data.tf
 !tf/pri-microservices.tf
-!tf/mongodb-microservice.tf
+!tf/microservice-mongodb.tf
 !tf/providers.tf
 !tf/resource-group.tf
 !tf/tekton.yaml

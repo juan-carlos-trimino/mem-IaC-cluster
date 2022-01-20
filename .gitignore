@@ -11,7 +11,7 @@
 tf/*
 !tf/data.tf
 !tf/pri-microservices.tf
-!tf/pub-microservices.tf
+!tf/mongodb-microservice.tf
 !tf/providers.tf
 !tf/resource-group.tf
 !tf/tekton.yaml
@@ -29,10 +29,10 @@ tf/modules/*
 !tf/modules/pri-microservice/
 tf/modules/pri-microservice/*
 !tf/modules/pri-microservice/main.tf
-!tf/modules/pub-microservice/
-tf/modules/pub-microservice/*
-!tf/modules/pub-microservice/main.tf
-!tf/modules/mongodb/
-tf/modules/mongodb/*
-!tf/modules/mongodb/main.tf
-!tf/modules/mongodb/mongodb.conf
+!tf/modules/mongodb-microservice-deploy/
+tf/modules/mongodb-microservice-deploy/*
+!tf/modules/mongodb-microservice-deploy/main.tf
+!tf/modules/mongodb-microservice-stateful/
+tf/modules/mongodb-microservice-stateful/*
+!tf/modules/mongodb-microservice-stateful/main.tf
+!tf/modules/mongodb-microservice-stateful/mongodb.conf

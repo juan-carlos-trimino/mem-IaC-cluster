@@ -112,56 +112,6 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 
-/*
-# For Hash-based Message Authentication Code (HMAC) authentication.
-resource "kubernetes_secret" "cos_credentials" {
-  metadata {
-    name = "cos-access"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    access-key = base64encode("${var.hmac_access_key_id}")
-    secret-key = base64encode("${var.hmac_secret_access_key}")
-  }
-  type = "ibm/ibmc-s3fs"
-}
-
-resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
-  metadata {
-    name = var.pvc_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-    annotations = {
-      # "ibm.io/auto-create-bucket" = false
-      "ibm.io/auto-create-bucket" = true
-      "ibm.io/auto-delete-bucket" = false
-      "ibm.io/auto_cache" = true
-      # "ibm.io/bucket" = var.bucket_name
-      "ibm.io/secret-name" = kubernetes_secret.cos_credentials.metadata[0].name
-      # The private service endpoint.
-      "ibm.io/endpoint" = "https://${var.private_endpoint}"
-      # "ibm.io/region" = "us-standard"
-      #"volume.beta.kubernetes.io/storage-class" = "ibmc-s3fs-standard"
-      #"ibm.io/stat-cache-expire-seconds" = ""  # in seconds - default is no expire.
-    }
-  }
-  spec {
-    storage_class_name = var.pvc_storage_class_name
-    access_modes = var.pvc_access_modes
-    resources {
-      requests = {
-        storage = var.pvc_storage_size
-      }
-    }
-  }
-}
-*/
-
 locals {
   secret_basic_auths = [{
       env_name = "MONGO_INITDB_DATABASE"

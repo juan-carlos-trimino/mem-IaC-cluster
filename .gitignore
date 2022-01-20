@@ -29,10 +29,10 @@ tf/modules/*
 !tf/modules/pri-microservice/
 tf/modules/pri-microservice/*
 !tf/modules/pri-microservice/main.tf
-!tf/modules/mongodb-microservice-deploy/
-tf/modules/mongodb-microservice-deploy/*
-!tf/modules/mongodb-microservice-deploy/main.tf
-!tf/modules/mongodb-microservice-stateful/
-tf/modules/mongodb-microservice-stateful/*
-!tf/modules/mongodb-microservice-stateful/main.tf
-!tf/modules/mongodb-microservice-stateful/mongodb.conf
+!tf/modules/microservice-mongodb-deploy/
+tf/modules/microservice-mongodb-deploy/*
+!tf/modules/microservice-mongodb-deploy/main.tf
+!tf/modules/microservice-mongodb-stateful/
+tf/modules/microservice-mongodb-stateful/*
+!tf/modules/microservice-mongodb-stateful/main.tf
+!tf/modules/microservice-mongodb-stateful/mongodb.conf

@@ -28,7 +28,7 @@ tf/config-files/*
 !tf/config-files/.gitkeep
 !tf/config-files/mongodb/
 tf/config-files/mongodb/*
-!tf/config-files/mongodb/mongodb.conf
+!tf/config-files/mongodb/mongod.conf
 # ... and these directories...
 !tf/modules/
 tf/modules/*

@@ -22,6 +22,13 @@ tf/*
 !tf/cluster_config/
 tf/cluster_config/*
 !tf/cluster_config/.gitkeep
+#
+!tf/config-files/
+tf/config-files/*
+!tf/config-files/.gitkeep
+!tf/config-files/mongodb/
+tf/config-files/mongodb/*
+!tf/config-files/mongodb/mongodb.conf
 # ... and these directories...
 !tf/modules/
 tf/modules/*
@@ -35,4 +42,3 @@ tf/modules/microservice-mongodb-deploy/*
 !tf/modules/microservice-mongodb-stateful/
 tf/modules/microservice-mongodb-stateful/*
 !tf/modules/microservice-mongodb-stateful/main.tf
-!tf/modules/microservice-mongodb-stateful/mongodb.conf

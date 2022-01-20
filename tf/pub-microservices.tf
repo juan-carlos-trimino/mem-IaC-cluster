@@ -27,7 +27,10 @@ module "mem-mongodb" {
   # source = "./modules/mongodb"
   app_name = var.app_name
   app_version = var.app_version
-  image_tag = "mongo:4.2.8"
+  image_tag = "mongo:5.0"
+  mongodb_database = var.mongodb_database
+  mongodb_root_username = var.mongodb_root_username
+  mongodb_root_password = var.mongodb_root_password
   mongodb_username = var.mongodb_username
   mongodb_password = var.mongodb_password
   # image_tag = "rhscl/mongodb-36-rhel7"
@@ -60,6 +63,6 @@ module "mem-mongodb" {
   #   MONGODB_PASSWORD = "guest"
   #   #MONGODB_DATABASE = "history"
   #   MONGODB_DATABASE = "metadata"
-    ME_CONFIG_MONGODB_ENABLE_ADMIN = true
+ #   ME_CONFIG_MONGODB_ENABLE_ADMIN = true
   }
 }

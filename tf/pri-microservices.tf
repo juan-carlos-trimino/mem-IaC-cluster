@@ -22,7 +22,8 @@ locals {
   # loopback_users configuration to none.
   # See rabbitmq.conf
   svc_dns_rabbitmq = "amqp://guest:guest@mem-rabbitmq.${local.namespace}.svc.cluster.local:5672"
-  svc_dns_db = "mongodb://${var.mongodb_username}:${var.mongodb_password}@mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  //svc_dns_db = "mongodb://${var.mongodb_username}:${var.mongodb_password}@mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
 }
 
 module "mem-gateway" {

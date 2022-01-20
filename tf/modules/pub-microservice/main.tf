@@ -51,18 +51,6 @@ variable "pvc_storage_class_name" {
 variable "pvc_storage_size" {
   default = "1Gi"
 }
-# variable "bucket_name" {
-#   default = ""
-# }
-# variable "service_instance_id" {
-#   default = ""
-# }
-# variable "api_key" {
-#   default = ""
-# }
-# variable "private_endpoint" {
-#   default = "s3.us-south.cloud-object-storage.appdomain.cloud"
-# }
 variable "service_name" {
   default = ""
 }
@@ -125,22 +113,6 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
 }
 
 /*
-# For Identity and Access Management (IAM) key authentication.
-resource "kubernetes_secret" "cos_credentials" {
-  metadata {
-    name = "cos-access"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    api-key = base64encode("${var.api_key}")
-    service-instance-id = base64encode("${var.service_instance_id}")
-  }
-  type = "ibm/ibmc-s3fs"
-}
-
 # For Hash-based Message Authentication Code (HMAC) authentication.
 resource "kubernetes_secret" "cos_credentials" {
   metadata {
@@ -190,6 +162,29 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
 }
 */
 
+locals {
+  secret_basic_auths = [{
+      env_name = "MONGO_INITDB_DATABASE"
+      data_name = "database"
+    },
+    {
+      env_name = "MONGO_INITDB_ROOT_USERNAME"
+      data_name = "root_username"
+    },
+    {
+      env_name = "MONGO_INITDB_ROOT_PASSWORD"
+      data_name = "root_password"
+    },
+    {
+      env_name = "MONGO_USERNAME"
+      data_name = "username"
+    },
+    {
+      env_name = "MONGO_PASSWORD"
+      data_name = "password"
+    }]
+}
+
 resource "kubernetes_secret" "secret_basic_auth" {
   metadata {
     name = "${var.service_name}-secret-basic-auth"
@@ -199,11 +194,11 @@ resource "kubernetes_secret" "secret_basic_auth" {
     }
   }
   data = {
-    database = base64encode(var.mongodb_database)
-    root_username = base64encode(var.mongodb_root_username)
-    root_password = base64encode(var.mongodb_root_password)
-    username = base64encode(var.mongodb_username)
-    password = base64encode(var.mongodb_password)
+    database = base64encode("${var.mongodb_database}")
+    root_username = base64encode("${var.mongodb_root_username}")
+    root_password = base64encode("${var.mongodb_root_password}")
+    username = base64encode("${var.mongodb_username}")
+    password = base64encode("${var.mongodb_password}")
   }
   type = "kubernetes.io/basic-auth"
 }
@@ -265,51 +260,18 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          env {
-            name = "MONGO_INITDB_DATABASE"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret_basic_auth.metadata[0].name
-                key = "database"
-              }
-            }
-          }
-          env {
-            name = "MONGO_INITDB_ROOT_USERNAME"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret_basic_auth.metadata[0].name
-                key = "root_username"
-              }
-            }
-          }
-          env {
-            name = "MONGO_INITDB_ROOT_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret_basic_auth.metadata[0].name
-                key = "root_password"
-              }
-            }
-          }
-          env {
-            name = "MONGO_USERNAME"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret_basic_auth.metadata[0].name
-                key = "username"
-              }
-            }
-          }
-          env {
-            name = "MONGO_INITDB_ROOT_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret_basic_auth.metadata[0].name
-                key = "password"
-              }
-            }
-          }
+          # dynamic "env" {
+          #   for_each = local.secret_basic_auths
+          #   content {
+          #     name = env.value.env_name
+          #     value_from {
+          #       secret_key_ref {
+          #         name = kubernetes_secret.secret_basic_auth.metadata[0].name
+          #         key = env.value.data_name
+          #       }
+          #     }
+          #   }
+          # }
           dynamic "env" {
             for_each = var.env
             content {

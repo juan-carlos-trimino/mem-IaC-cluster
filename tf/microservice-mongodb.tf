@@ -23,8 +23,8 @@ module "ms-rabbitmq" {
 */
 
 module "mem-mongodb" {
-  source = "./modules/mongodb-microservice-deploy"
-  # source = "./modules/mongodb-microservice-stateful"
+  source = "./modules/microservice-mongodb-deploy"
+  # source = "./modules/microservice-mongodb-stateful"
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"

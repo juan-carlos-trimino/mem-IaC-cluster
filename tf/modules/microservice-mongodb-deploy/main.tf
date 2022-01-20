@@ -153,6 +153,28 @@ resource "kubernetes_secret" "secret_basic_auth" {
   type = "kubernetes.io/basic-auth"
 }
 
+resource "kubernetes_config_map" "mongodb_conf" {
+  metadata {
+    name = "${var.service_name}-mongodb-conf"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+
+  data = {
+    api_host             = "myhost:443"
+    db_host              = "dbhost:5432"
+    "my_config_file.yml" = "${file("${path.module}/my_config_file.yml")}"
+  }
+
+  binary_data = {
+    "my_payload.bin" = "${filebase64("${path.module}/my_payload.bin")}"
+  }
+}
+
+
+
 /***
 Declare a K8s deployment to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.

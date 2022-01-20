@@ -28,6 +28,7 @@ module "mem-mongodb" {
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
+  config_file_path = "./config-files/mongodb/mongodb.conf"
   mongodb_database = var.mongodb_database
   mongodb_root_username = var.mongodb_root_username
   mongodb_root_password = var.mongodb_root_password
@@ -55,7 +56,7 @@ module "mem-mongodb" {
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
-  env = {
+  # env = {
     # MONGO_INITDB_ROOT_USERNAME = "root"
     # MONGO_INITDB_ROOT_PASSWORD = "example"
   #   MONGODB_ADMIN_PASSWORD = "jct123"
@@ -64,5 +65,5 @@ module "mem-mongodb" {
   #   #MONGODB_DATABASE = "history"
   #   MONGODB_DATABASE = "metadata"
  #   ME_CONFIG_MONGODB_ENABLE_ADMIN = true
-  }
+  # }
 }

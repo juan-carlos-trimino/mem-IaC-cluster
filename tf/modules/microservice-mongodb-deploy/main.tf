@@ -7,6 +7,7 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
+variable "config_file_path" {}
 variable "mongodb_database" {}
 variable "mongodb_root_username" {}
 variable "mongodb_root_password" {}
@@ -161,19 +162,10 @@ resource "kubernetes_config_map" "mongodb_conf" {
       app = var.app_name
     }
   }
-
   data = {
-    api_host             = "myhost:443"
-    db_host              = "dbhost:5432"
-    "my_config_file.yml" = "${file("${path.module}/my_config_file.yml")}"
-  }
-
-  binary_data = {
-    "my_payload.bin" = "${filebase64("${path.module}/my_payload.bin")}"
+    "mongodb.conf" = "${file("${var.config_file_path}")}"
   }
 }
-
-
 
 /***
 Declare a K8s deployment to deploy a microservice; it instantiates the container for the

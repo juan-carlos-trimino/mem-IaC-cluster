@@ -28,7 +28,7 @@ module "mem-mongodb" {
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
-  config_file_path = "./config-files/mongodb/mongodb.conf"
+  config_file_path = "./config-files/mongodb/mongod.conf"
   mongodb_database = var.mongodb_database
   mongodb_root_username = var.mongodb_root_username
   mongodb_root_password = var.mongodb_root_password

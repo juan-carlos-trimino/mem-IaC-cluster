@@ -8,6 +8,9 @@ variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
 variable "config_file_path" {}
+variable "config_file" {
+  default = "/etc/mongod.conf"
+}
 variable "mongodb_database" {}
 variable "mongodb_root_username" {}
 variable "mongodb_root_password" {}
@@ -154,9 +157,9 @@ resource "kubernetes_secret" "secret_basic_auth" {
   type = "kubernetes.io/basic-auth"
 }
 
-resource "kubernetes_config_map" "mongodb_conf" {
+resource "kubernetes_config_map" "mongod_conf" {
   metadata {
-    name = "${var.service_name}-mongodb-conf"
+    name = "${var.service_name}-mongod-conf"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -199,6 +202,7 @@ resource "kubernetes_deployment" "deployment" {
       spec {
         container {
           image = var.image_tag
+          args = ["--config", "${var.config_file}"]
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -224,6 +228,20 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
+          env {
+            name = DATA_FILE_PATH
+            value_from {
+              config_map_key_ref {
+                name = kubernetes_config_map.mongod_conf.metadata[0].name
+                key = dbPath
+              }
+            }
+          }
+          # env_from {
+          #   config_map_ref {
+          #     name = kubernetes_config_map.mongod_conf.metadata[0].name
+          #   }
+          # }
           # dynamic "env" {
           #   for_each = local.secret_basic_auths
           #   content {
@@ -243,6 +261,11 @@ resource "kubernetes_deployment" "deployment" {
               value = env.value
             }
           }
+          volume_mount {
+            name = "config"
+            mount_path = var.config_file  # Name of file in /etc
+            sub_path = "mongodb.conf"
+          }
           # *** emptyDir ***
           # The simplest volume type, emptyDir. is an empty directory used for storing transient
           # data. It is useful for sharing files between containers running on the same pod, or for
@@ -257,16 +280,9 @@ resource "kubernetes_deployment" "deployment" {
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "/data/db"
+            mount_path = "$(DATA_FILE_PATH)"  #"/aaa/data/db"
           }
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
-          # dynamic "env" {
-          #   for_each = var.env
-          #   content {
-          #     name = env.key
-          #     value = env.value
-          #   }
-          # }
         }
         # *** emptyDir ***
         # volume {
@@ -280,6 +296,13 @@ resource "kubernetes_deployment" "deployment" {
           name = "mongodb-storage"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
+          }
+        }
+        volume {
+          name = "config"
+          config_map {
+            name = kubernetes_config_map.mongod_conf.metadata[0].name
+            default_mode = "0660"
           }
         }
         # *** Mount external storage in a volume to persist pod data across pod restarts ***

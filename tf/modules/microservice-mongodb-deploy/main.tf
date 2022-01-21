@@ -166,7 +166,7 @@ resource "kubernetes_config_map" "mongod_conf" {
     }
   }
   data = {
-    "mongodb.conf" = "${file("${var.config_file_path}")}"
+    "mongod.conf" = "${file("${var.config_file_path}")}"
   }
 }
 
@@ -228,20 +228,20 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          env {
-            name = DATA_FILE_PATH
-            value_from {
-              config_map_key_ref {
-                name = kubernetes_config_map.mongod_conf.metadata[0].name
-                key = dbPath
-              }
-            }
-          }
-          # env_from {
-          #   config_map_ref {
-          #     name = kubernetes_config_map.mongod_conf.metadata[0].name
+          # env {
+          #   name = "DATA_FILE_PATH"
+          #   value_from {
+          #     config_map_key_ref {
+          #       name = kubernetes_config_map.mongod_conf.metadata[0].name
+          #       key = mongodb_conf_key.storage.dbPath
+          #     }
           #   }
           # }
+          env_from {
+            config_map_ref {
+              name = kubernetes_config_map.mongod_conf.metadata[0].name
+            }
+          }
           # dynamic "env" {
           #   for_each = local.secret_basic_auths
           #   content {
@@ -264,7 +264,7 @@ resource "kubernetes_deployment" "deployment" {
           volume_mount {
             name = "config"
             mount_path = var.config_file  # Name of file in /etc
-            sub_path = "mongodb.conf"
+            sub_path = "mongod.conf"
           }
           # *** emptyDir ***
           # The simplest volume type, emptyDir. is an empty directory used for storing transient
@@ -280,7 +280,7 @@ resource "kubernetes_deployment" "deployment" {
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "$(DATA_FILE_PATH)"  #"/aaa/data/db"
+            mount_path = "/aaa/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
           }
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
         }

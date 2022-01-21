@@ -23,12 +23,12 @@ tf/*
 tf/cluster_config/*
 !tf/cluster_config/.gitkeep
 #
-!tf/config-files/
-tf/config-files/*
-!tf/config-files/.gitkeep
-!tf/config-files/mongodb/
-tf/config-files/mongodb/*
-!tf/config-files/mongodb/mongod.conf
+!tf/configmap-files/
+tf/configmap-files/*
+!tf/configmap-files/.gitkeep
+!tf/configmap-files/mongodb/
+tf/configmap-files/mongodb/*
+!tf/configmap-files/mongodb/mongod.conf
 # ... and these directories...
 !tf/modules/
 tf/modules/*

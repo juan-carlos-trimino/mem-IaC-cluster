@@ -147,12 +147,19 @@ resource "kubernetes_secret" "secret_basic_auth" {
       app = var.app_name
     }
   }
+  # Plain-text data.
   data = {
-    database = base64encode("${var.mongodb_database}")
-    root_username = base64encode("${var.mongodb_root_username}")
-    root_password = base64encode("${var.mongodb_root_password}")
-    username = base64encode("${var.mongodb_username}")
-    password = base64encode("${var.mongodb_password}")
+    database = "${var.mongodb_database}"
+    root_username = "${var.mongodb_root_username}"
+    root_password = "${var.mongodb_root_password}"
+    username = "${var.mongodb_username}"
+    password = "${var.mongodb_password}"
+  # binary_data = {
+  #   database = base64encode("${var.mongodb_database}")
+  #   root_username = base64encode("${var.mongodb_root_username}")
+  #   root_password = base64encode("${var.mongodb_root_password}")
+  #   username = base64encode("${var.mongodb_username}")
+  #   password = base64encode("${var.mongodb_password}")
   }
   type = "kubernetes.io/basic-auth"
 }
@@ -166,7 +173,7 @@ resource "kubernetes_config_map" "mongod_conf" {
     }
   }
   data = {
-    "mongod.conf" = "${file("${var.config_file_path}")}"
+    "mongod_conf" = "${file("${var.config_file_path}")}"
   }
 }
 
@@ -261,10 +268,12 @@ resource "kubernetes_deployment" "deployment" {
               value = env.value
             }
           }
+          # Mounting an individual ConfigMap entry as a file without hiding other files in the
+          # directory.
           volume_mount {
             name = "config"
             mount_path = var.config_file  # Name of file in /etc
-            sub_path = "mongod.conf"
+            sub_path = "mongod_conf"
           }
           # *** emptyDir ***
           # The simplest volume type, emptyDir. is an empty directory used for storing transient
@@ -302,7 +311,9 @@ resource "kubernetes_deployment" "deployment" {
           name = "config"
           config_map {
             name = kubernetes_config_map.mongod_conf.metadata[0].name
-            default_mode = "0660"
+            # Although ConfigMap should be used for non-sensitive configuration data, make the file
+            # readable and writable only by the user and group that owns it.
+            default_mode = "0660"  # Octal
           }
         }
         # *** Mount external storage in a volume to persist pod data across pod restarts ***

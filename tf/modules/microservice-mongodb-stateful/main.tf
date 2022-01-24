@@ -7,41 +7,20 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
+variable "config_file_path" {}
+variable "config_file" {
+  default = "/etc/mongod.conf"
+}
+variable "mongodb_database" {}
+variable "mongodb_root_username" {}
+variable "mongodb_root_password" {}
+variable "mongodb_username" {}
+variable "mongodb_password" {}
 variable "namespace" {
   default = "default"
 }
 variable "dns_name" {
   default = ""
-}
-variable "readiness_probe" {
-  default = []
-  type = list(object({
-    http_get = list(object({
-      # Host name to connect to, defaults to the pod IP.
-      #host = string
-      # Path to access on the HTTP server. Defaults to /.
-      path = string
-      # Name or number of the port to access on the container. Number must be in the range 1 to
-      # 65535.
-      port = number
-      # Scheme to use for connecting to the host (HTTP or HTTPS). Defaults to HTTP.
-      scheme = string
-    }))
-    # Number of seconds after the container has started before liveness or readiness probes are
-    # initiated. Defaults to 0 seconds. Minimum value is 0.
-    initial_delay_seconds = number
-    # How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.
-    period_seconds = number
-    # Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
-    timeout_seconds = number
-    # When a probe fails, Kubernetes will try failureThreshold times before giving up. Giving up in
-    # case of liveness probe means restarting the container. In case of readiness probe the Pod
-    # will be marked Unready. Defaults to 3. Minimum value is 1.
-    failure_threshold = number
-    # Minimum consecutive successes for the probe to be considered successful after having failed.
-    # Defaults to 1. Must be 1 for liveness and startup Probes. Minimum value is 1.
-    success_threshold = number
-  }))
 }
 variable "env" {
   default = {}
@@ -74,20 +53,8 @@ variable "pvc_storage_class_name" {
   default = ""
 }
 variable "pvc_storage_size" {
-  default = "1Gi"
+  default = "20Gi"
 }
-# variable "bucket_name" {
-#   default = ""
-# }
-# variable "service_instance_id" {
-#   default = ""
-# }
-# variable "api_key" {
-#   default = ""
-# }
-# variable "private_endpoint" {
-#   default = "s3.us-south.cloud-object-storage.appdomain.cloud"
-# }
 variable "service_name" {
   default = ""
 }
@@ -149,7 +116,30 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 
-resource "kubernetes_secret" "secret_basic_auth" {
+locals {
+  mongodb_secret = [{
+      env_name = "MONGO_INITDB_DATABASE"
+      data_name = "database"
+    },
+    {
+      env_name = "MONGO_INITDB_ROOT_USERNAME"
+      data_name = "root_username"
+    },
+    {
+      env_name = "MONGO_INITDB_ROOT_PASSWORD"
+      data_name = "root_password"
+    },
+    {
+      env_name = "MONGO_USERNAME"
+      data_name = "username"
+    },
+    {
+      env_name = "MONGO_PASSWORD"
+      data_name = "password"
+    }]
+}
+
+resource "kubernetes_secret" "mongodb_secret" {
   metadata {
     name = "${var.service_name}-secret-basic-auth"
     namespace = var.namespace
@@ -157,11 +147,38 @@ resource "kubernetes_secret" "secret_basic_auth" {
       app = var.app_name
     }
   }
+  # Plain-text data.
   data = {
-    username = base64encode(var.mongodb_username)
-    password = base64encode(var.mongodb_password)
+    #database = "${var.mongodb_database}"
+    #root_username = "${var.mongodb_root_username}"
+    root_password = "${var.mongodb_root_password}"
+    #username = "${var.mongodb_username}"
+    password = "${var.mongodb_password}"
+  # binary_data = {
+  #   database = base64encode("${var.mongodb_database}")
+  #   root_username = base64encode("${var.mongodb_root_username}")
+  #   root_password = base64encode("${var.mongodb_root_password}")
+  #   username = base64encode("${var.mongodb_username}")
+  #   password = base64encode("${var.mongodb_password}")
   }
   type = "kubernetes.io/basic-auth"
+}
+
+# A ServiceAccount is used by an application running inside a pod to authenticate itself with the
+# API server. A default ServiceAccount is automatically created for each namespace; each pod is
+# associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
+# pod can only use a ServiceAccount from the same namespace.
+resource "kubernetes_service_account" "mongodb_service_account" {
+  metadata {
+    name = "${var.service_name}-service-account"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  secret {
+    name = "${kubernetes_secret.mongodb_secret.metadata[0].name}"
+  }
 }
 
 resource "kubernetes_config_map" "mongodb_conf" {
@@ -207,8 +224,10 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
+        # termination_grace_period_seconds = 10
         container {
           image = local.image_tag
+          args = ["--config", "${var.config_file}"]
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -216,38 +235,9 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          # port {
-          #   name = "http"
-          #   container_port = 8080  # The port the container (app) is listening.
-          #   protocol = "TCP"
-          # }
-          # port {
-          #   name = "https"
-          #   container_port = 8443  # The port the container (app) is listening.
-          #   protocol = "TCP"
-          # }
           port {
             container_port = var.service_target_port  # The port the app is listening.
             protocol = "TCP"
-          }
-          dynamic "readiness_probe" {
-            for_each = var.readiness_probe
-            content {
-              initial_delay_seconds = readiness_probe.value["initial_delay_seconds"]
-              period_seconds = readiness_probe.value["period_seconds"]
-              timeout_seconds = readiness_probe.value["timeout_seconds"]
-              failure_threshold = readiness_probe.value["failure_threshold"]
-              success_threshold = readiness_probe.value["success_threshold"]
-              dynamic "http_get" {
-                for_each = readiness_probe.value.http_get
-                content {
-                  #host = http_get.value["host"]
-                  path = http_get.value["path"]
-                  port = http_get.value["port"] != 0 ? http_get.value["port"] : var.service_target_port
-                  scheme = http_get.value["scheme"]
-                }
-              }
-            }
           }
           resources {
             requests = {
@@ -263,28 +253,32 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               memory = var.qos_limits_memory
             }
           }
-          volume_mount {
-            name = "mongodb-storage"
-            mount_path = "/data/db"
-          }
+          # env {
+          #   name = "DATA_FILE_PATH"
+          #   value_from {
+          #     config_map_key_ref {
+          #       name = kubernetes_config_map.mongod_conf.metadata[0].name
+          #       key = mongodb_conf_key.storage.dbPath
+          #     }
+          #   }
+          # }
           env_from {
-            name = "MONGO_INITDB_ROOT_USERNAME"
-            value_from {
-              secret_key_ref {
-                name = "secret_basic_auth"
-                key = "username"
-              }
+            config_map_ref {
+              name = kubernetes_config_map.mongod_conf.metadata[0].name
             }
           }
-          env_from {
-            name = "MONGO_INITDB_ROOT_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = "secret_basic_auth"
-                key = "password"
-              }
-            }
-          }
+          # dynamic "env" {
+          #   for_each = local.mongodb_secret
+          #   content {
+          #     name = env.value.env_name
+          #     value_from {
+          #       secret_key_ref {
+          #         name = kubernetes_secret.mongodb_secret.metadata[0].name
+          #         key = env.value.data_name
+          #       }
+          #     }
+          #   }
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -292,12 +286,32 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               value = env.value
             }
           }
+          # Mounting an individual ConfigMap entry as a file without hiding other files in the
+          # directory.
+          volume_mount {
+            name = "config"
+            mount_path = var.config_file  # Name of file in /etc
+            sub_path = "mongod_conf"
+          }
+          volume_mount {
+            name = "mongodb-storage"
+            mount_path = "/aaa/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+          }
         }
         #
         volume {
           name = "mongodb-storage"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
+          }
+        }
+        volume {
+          name = "config"
+          config_map {
+            name = kubernetes_config_map.mongod_conf.metadata[0].name
+            # Although ConfigMap should be used for non-sensitive configuration data, make the file
+            # readable and writable only by the user and group that owns it.
+            default_mode = "0660"  # Octal
           }
         }
       }
@@ -326,17 +340,11 @@ resource "kubernetes_service" "service" {
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
     }
-    # port {
-    #   name = "http"
-    #   port = 80  # Service port.
-    #   target_port = "http"  # Pod port.
-    # }
-    # port {
-    #   name = "https"
-    #   port = 443
-    #   target_port = "https"
-    # }
     type = "ClusterIP"
     ClusterIP = "None"  # Headless Service.
+    # The primary use case for setting this field is to use a StatefulSet's Headless Service to
+    # propagate SRV records for its Pods without respect to their readiness for purpose of peer
+    # discovery.
+    publish_not_ready_addresses = true
   }
 }

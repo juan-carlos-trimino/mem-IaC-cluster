@@ -13,7 +13,7 @@ tf/*
 !tf/pri-microservices.tf
 !tf/microservice-mongodb.tf
 !tf/providers.tf
-!tf/resource-group.tf
+!tf/namespace.tf
 !tf/tekton.yaml
 !tf/tekton_Copy.yaml
 !tf/variables.tf

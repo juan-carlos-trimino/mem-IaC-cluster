@@ -71,9 +71,9 @@ IaC-cluster
  | | └ .gitkeep
  | ├ data.tf
  | ├ microservice-mongodb.tf
+ | ├ namespace.tf
  | ├ pri-microservices.tf
  | ├ providers.tf
- | ├ resource-group.tf
  | ├ variables.tf
  | └ variables_no_push.tf.template
  ├ .gitignore

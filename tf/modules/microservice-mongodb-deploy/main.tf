@@ -117,7 +117,7 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
 }
 
 locals {
-  secret_basic_auths = [{
+  mongodb_secret = [{
       env_name = "MONGO_INITDB_DATABASE"
       data_name = "database"
     },
@@ -139,7 +139,7 @@ locals {
     }]
 }
 
-resource "kubernetes_secret" "secret_basic_auth" {
+resource "kubernetes_secret" "mongodb_secret" {
   metadata {
     name = "${var.service_name}-secret-basic-auth"
     namespace = var.namespace
@@ -149,10 +149,10 @@ resource "kubernetes_secret" "secret_basic_auth" {
   }
   # Plain-text data.
   data = {
-    database = "${var.mongodb_database}"
-    root_username = "${var.mongodb_root_username}"
+    #database = "${var.mongodb_database}"
+    #root_username = "${var.mongodb_root_username}"
     root_password = "${var.mongodb_root_password}"
-    username = "${var.mongodb_username}"
+    #username = "${var.mongodb_username}"
     password = "${var.mongodb_password}"
   # binary_data = {
   #   database = base64encode("${var.mongodb_database}")
@@ -162,6 +162,23 @@ resource "kubernetes_secret" "secret_basic_auth" {
   #   password = base64encode("${var.mongodb_password}")
   }
   type = "kubernetes.io/basic-auth"
+}
+
+# A ServiceAccount is used by an application running inside a pod to authenticate itself with the
+# API server. A default ServiceAccount is automatically created for each namespace; each pod is
+# associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
+# pod can only use a ServiceAccount from the same namespace.
+resource "kubernetes_service_account" "mongodb_service_account" {
+  metadata {
+    name = "${var.service_name}-service-account"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  secret {
+    name = "${kubernetes_secret.mongodb_secret.metadata[0].name}"
+  }
 }
 
 resource "kubernetes_config_map" "mongod_conf" {
@@ -250,12 +267,12 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
           # dynamic "env" {
-          #   for_each = local.secret_basic_auths
+          #   for_each = local.mongodb_secret
           #   content {
           #     name = env.value.env_name
           #     value_from {
           #       secret_key_ref {
-          #         name = kubernetes_secret.secret_basic_auth.metadata[0].name
+          #         name = kubernetes_secret.mongodb_secret.metadata[0].name
           #         key = env.value.data_name
           #       }
           #     }

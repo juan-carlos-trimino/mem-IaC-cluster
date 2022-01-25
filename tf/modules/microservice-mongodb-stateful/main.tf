@@ -58,28 +58,28 @@ variable "pvc_storage_size" {
 variable "service_name" {
   default = ""
 }
-variable "service_type" {
-  default = "ClusterIP"
-}
-# The service normally forwards each connection to a randomly selected backing pod. To
-# ensure that connections from a particular client are passed to the same Pod each time,
-# set the service's sessionAffinity property to ClientIP instead of None (default).
-# Session affinity and Web Browsers (for LoadBalancer Services)
-# Since the service is now exposed externally, accessing it with a web browser will hit
-# the same pod every time. If the sessionAffinity is set to None, then why? The browser
-# is using keep-alive connections and sends all its requests through a single connection.
-# Services work at the connection level, and when a connection to a service is initially
-# open, a random pod is selected and then all network packets belonging to that connection
-# are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-# always get hit (until the connection is closed).
-variable "service_session_affinity" {
-  default = "None"
-}
 variable "service_port" {
   type = number
 }
 variable "service_target_port" {
   type = number
+}
+#
+locals {
+  service_name = "service-mongodb"
+  # The service normally forwards each connection to a randomly selected backing pod. To
+  # ensure that connections from a particular client are passed to the same Pod each time,
+  # set the service's sessionAffinity property to ClientIP instead of None (default).
+  # Session affinity and Web Browsers (for LoadBalancer Services)
+  # Since the service is now exposed externally, accessing it with a web browser will hit
+  # the same pod every time. If the sessionAffinity is set to None, then why? The browser
+  # is using keep-alive connections and sends all its requests through a single connection.
+  # Services work at the connection level, and when a connection to a service is initially
+  # open, a random pod is selected and then all network packets belonging to that connection
+  # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
+  # always get hit (until the connection is closed).
+  session_affinity = "None"
+  service_type = "ClusterIP"
 }
 
 /***
@@ -141,7 +141,7 @@ locals {
 
 resource "kubernetes_secret" "mongodb_secret" {
   metadata {
-    name = "${var.service_name}-secret-basic-auth"
+    name = "${var.service_name}-secret"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -150,10 +150,10 @@ resource "kubernetes_secret" "mongodb_secret" {
   # Plain-text data.
   data = {
     #database = "${var.mongodb_database}"
-    #root_username = "${var.mongodb_root_username}"
+    root_username = "${var.mongodb_root_username}"
     root_password = "${var.mongodb_root_password}"
-    #username = "${var.mongodb_username}"
-    password = "${var.mongodb_password}"
+    # username = "${var.mongodb_username}"
+    # password = "${var.mongodb_password}"
   # binary_data = {
   #   database = base64encode("${var.mongodb_database}")
   #   root_username = base64encode("${var.mongodb_root_username}")
@@ -181,7 +181,7 @@ resource "kubernetes_service_account" "mongodb_service_account" {
   }
 }
 
-resource "kubernetes_config_map" "mongodb_conf" {
+resource "kubernetes_config_map" "mongod_conf" {
   metadata {
     name = "${var.service_name}-mongodb-conf"
     namespace = var.namespace
@@ -189,8 +189,8 @@ resource "kubernetes_config_map" "mongodb_conf" {
       app = var.app_name
     }
   }
-  data {
-    conf = "${file("${path.module}/mongodb.conf")}"
+  data = {
+    "mongod.conf" = "${file("${var.config_file_path}/mongod.conf")}"
   }
 }
 
@@ -210,6 +210,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   #
   spec {
     replicas = var.replicas
+    service_name = local.service_name
     selector {
       match_labels = {
         pod = var.service_name
@@ -224,9 +225,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
+        # jct
+        # automount_service_account_token = false
         # termination_grace_period_seconds = 10
         container {
-          image = local.image_tag
+          image = var.image_tag
           args = ["--config", "${var.config_file}"]
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -253,15 +256,14 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               memory = var.qos_limits_memory
             }
           }
-          # env {
-          #   name = "DATA_FILE_PATH"
-          #   value_from {
-          #     config_map_key_ref {
-          #       name = kubernetes_config_map.mongod_conf.metadata[0].name
-          #       key = mongodb_conf_key.storage.dbPath
-          #     }
-          #   }
-          # }
+          env {
+            name = "MONGO_INITDB_ROOT_USERNAME_FILE"
+            value = "/etc/mongodb_secrets/MONGO_ROOT_USERNAME"
+          }
+          env {
+            name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
+            value = "/etc/mongodb_secrets/MONGO_ROOT_PASSWORD"
+          }
           env_from {
             config_map_ref {
               name = kubernetes_config_map.mongod_conf.metadata[0].name
@@ -286,16 +288,22 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               value = env.value
             }
           }
+          volume_mount {
+            name = "mongodb-storage"
+            mount_path = "/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+          }
           # Mounting an individual ConfigMap entry as a file without hiding other files in the
           # directory.
           volume_mount {
             name = "config"
             mount_path = var.config_file  # Name of file in /etc
             sub_path = "mongod_conf"
+            read_only = true
           }
           volume_mount {
-            name = "mongodb-storage"
-            mount_path = "/aaa/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+            name = "secrets"
+            mount_path = "/etc/mongodb_secrets/"
+            read_only = true
           }
         }
         #
@@ -314,6 +322,21 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0660"  # Octal
           }
         }
+        volume {
+          name = "secrets"
+          secret {
+            secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
+            default_mode = "0440"  # Octal
+            items {
+              key = "root_username"
+              path = "MONGO_ROOT_USERNAME"
+            }
+            items {
+              key = "root_password"
+              path = "MONGO_ROOT_PASSWORD"
+            }
+          }
+        }
       }
     }
   }
@@ -324,7 +347,7 @@ Declare a K8s service to create a DNS record to make the microservice accessible
 ***/
 resource "kubernetes_service" "service" {
   metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
+    name = local.service_name
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -333,15 +356,15 @@ resource "kubernetes_service" "service" {
   #
   spec {
     selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+      pod = kubernetes_stateful_set.mongodb_stateful_set.metadata[0].labels.pod
     }
-    session_affinity = "None"
+    session_affinity = local.session_affinity
     port {
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
     }
-    type = "ClusterIP"
-    ClusterIP = "None"  # Headless Service.
+    type = local.service_type
+    cluster_ip = "None"  # Headless Service.
     # The primary use case for setting this field is to use a StatefulSet's Headless Service to
     # propagate SRV records for its Pods without respect to their readiness for purpose of peer
     # discovery.

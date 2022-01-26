@@ -23,19 +23,25 @@ module "ms-rabbitmq" {
 */
 
 module "mem-mongodb" {
-  # source = "./modules/microservice-mongodb-deploy"
-  source = "./modules/microservice-mongodb-stateful"
+  source = "./modules/microservice-mongodb-deploy"
+  # Stateful stuff
+  # source = "./modules/microservice-mongodb-stateful"
+  # Stateful stuff
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
-  config_file_path = "./configmap-files/mongodb"
-  mongodb_database = var.mongodb_database
-  mongodb_root_username = var.mongodb_root_username
-  mongodb_root_password = var.mongodb_root_password
-  mongodb_username = var.mongodb_username
-  mongodb_password = var.mongodb_password
+  # Stateful stuff
+  ## config_file_path = "./utility-files/mongodb"
+  ## mongodb_database = var.mongodb_database
+  ## mongodb_root_username = var.mongodb_root_username
+  ## mongodb_root_password = var.mongodb_root_password
+  ## mongodb_username = var.mongodb_username
+  ## mongodb_password = var.mongodb_password
   # image_tag = "rhscl/mongodb-36-rhel7"
-  namespace = local.namespace
+  # Stateful stuff
+  namespace = kubernetes_namespace.ns.metadata[0].name
+  # namespace = local.namespace
+  replicas = 1
   /*
   Limits and request for CPU resources are measured in millicores. If the container needs one full
   core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
@@ -46,7 +52,7 @@ module "mem-mongodb" {
   qos_limits_memory = "500Mi"
   pvc_name = "mongodb-pvc"
   pvc_access_modes = ["ReadWriteOnce"]
-  pvc_storage_size = "5Gi"
+  pvc_storage_size = "25Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   #pvc_storage_class_name = "ibmc-s3fs-standard-regional"
   #bucket_name = var.bucket_name
@@ -57,8 +63,8 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    # MONGO_INITDB_ROOT_USERNAME_FILE = "/etc/mongodb_secrets/MONGO_ROOT_USERNAME"
-    # MONGO_INITDB_ROOT_PASSWORD_FILE = "/etc/mongodb_secrets/MONGO_ROOT_PASSWORD"
+  # MONGO_INITDB_ROOT_USERNAME_FILE = "/etc/mongodb_secrets/MONGO_ROOT_USERNAME"
+  # MONGO_INITDB_ROOT_PASSWORD_FILE = "/etc/mongodb_secrets/MONGO_ROOT_PASSWORD"
   #   MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"

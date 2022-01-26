@@ -8,9 +8,6 @@ variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
 variable "config_file_path" {}
-variable "config_file" {
-  default = "/etc/mongod.conf"
-}
 variable "mongodb_database" {}
 variable "mongodb_root_username" {}
 variable "mongodb_root_password" {}
@@ -18,9 +15,6 @@ variable "mongodb_username" {}
 variable "mongodb_password" {}
 variable "namespace" {
   default = "default"
-}
-variable "dns_name" {
-  default = ""
 }
 variable "env" {
   default = {}
@@ -66,7 +60,7 @@ variable "service_target_port" {
 }
 #
 locals {
-  service_name = "service-mongodb"
+  # service_name = "service-mongodb"
   # The service normally forwards each connection to a randomly selected backing pod. To
   # ensure that connections from a particular client are passed to the same Pod each time,
   # set the service's sessionAffinity property to ClientIP instead of None (default).
@@ -80,41 +74,42 @@ locals {
   # always get hit (until the connection is closed).
   session_affinity = "None"
   service_type = "ClusterIP"
+  config_file = "/usr/mongodb/config/mongod.conf"
 }
 
 /***
 Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
 used by pods in the same namespace.
 ***/
-resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
-  metadata {
-    name = var.pvc_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  spec {
-    # Empty string must be explicitly set otherwise default StorageClass will be set.
-    # -------------------------------------------------------------------------------
-    # StorageClass enables dynamic provisioning of PersistentVolumes (PV).
-    # (1) When creating a claim, the PV is created by the provisioner referenced in the
-    #     StorageClass resource; the provisioner is used even if an existing manually
-    #     provisioned PV matches the PVC.
-    # (2) The default storage class is used to dynamically provision a PV if the PVC does not
-    #     explicitly state which storage class name to use.
-    # (3) To bind the PVC to a pre-provisioned PV instead of dynamically provisioning a new one,
-    #     specify an empty string as the storage class name; effectively disable dynamic
-    #     provisioning.
-    storage_class_name = var.pvc_storage_class_name
-    access_modes = var.pvc_access_modes
-    resources {
-      requests = {
-        storage = var.pvc_storage_size
-      }
-    }
-  }
-}
+# resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
+#   metadata {
+#     name = var.pvc_name
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   spec {
+#     # Empty string must be explicitly set otherwise default StorageClass will be set.
+#     # -------------------------------------------------------------------------------
+#     # StorageClass enables dynamic provisioning of PersistentVolumes (PV).
+#     # (1) When creating a claim, the PV is created by the provisioner referenced in the
+#     #     StorageClass resource; the provisioner is used even if an existing manually
+#     #     provisioned PV matches the PVC.
+#     # (2) The default storage class is used to dynamically provision a PV if the PVC does not
+#     #     explicitly state which storage class name to use.
+#     # (3) To bind the PVC to a pre-provisioned PV instead of dynamically provisioning a new one,
+#     #     specify an empty string as the storage class name; effectively disable dynamic
+#     #     provisioning.
+#     storage_class_name = var.pvc_storage_class_name
+#     access_modes = var.pvc_access_modes
+#     resources {
+#       requests = {
+#         storage = var.pvc_storage_size
+#       }
+#     }
+#   }
+# }
 
 locals {
   mongodb_secret = [{
@@ -152,14 +147,9 @@ resource "kubernetes_secret" "mongodb_secret" {
     #database = "${var.mongodb_database}"
     root_username = "${var.mongodb_root_username}"
     root_password = "${var.mongodb_root_password}"
-    # username = "${var.mongodb_username}"
-    # password = "${var.mongodb_password}"
-  # binary_data = {
-  #   database = base64encode("${var.mongodb_database}")
-  #   root_username = base64encode("${var.mongodb_root_username}")
-  #   root_password = base64encode("${var.mongodb_root_password}")
-  #   username = base64encode("${var.mongodb_username}")
-  #   password = base64encode("${var.mongodb_password}")
+    username = "${var.mongodb_username}"
+    password = "${var.mongodb_password}"
+    users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
   }
   type = "kubernetes.io/basic-auth"
 }
@@ -190,7 +180,20 @@ resource "kubernetes_config_map" "mongod_conf" {
     }
   }
   data = {
-    "mongod.conf" = "${file("${var.config_file_path}/mongod.conf")}"
+    "mongod.conf" = "${file("${var.config_file_path}/configmaps/mongod.conf")}"
+  }
+}
+
+resource "kubernetes_config_map" "ensure_users" {
+  metadata {
+    name = "${var.service_name}-ensure-users"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    "ensure-users.js" = "${file("${var.config_file_path}/scripts/ensure-users.js")}"
   }
 }
 
@@ -210,7 +213,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   #
   spec {
     replicas = var.replicas
-    service_name = local.service_name
+    service_name = var.service_name
     selector {
       match_labels = {
         pod = var.service_name
@@ -225,12 +228,37 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
+        affinity {
+          # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+          # https://docs.openshift.com/container-platform/3.11/admin_guide/scheduling/pod_affinity.html
+          # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
+          # that node is already running a pod with label having key 'security' and value 'S2'.
+          pod_anti_affinity {
+            # Defines a preferred rule.
+            preferred_during_scheduling_ignored_during_execution {
+              # Specifies a weight for a preferred rule. The node with the highest weight is preferred.
+              weight = 100
+              pod_affinity_term {
+                label_selector {
+                  match_expressions {
+                    # Description of the pod label that determines when the anti-affinity rule applies. Specify a key and value for the label.
+                    key = "security"
+                    # The operator represents the relationship between the label on the existing pod and the set of values in the matchExpression parameters in the specification for the new pod. Can be In, NotIn, Exists, or DoesNotExist.
+                    operator = "In"
+                    values = ["S2"]
+                  }
+                }
+                topology_key = "kubernetes.io/hostname"
+              }
+            }
+          }
+        }
         # jct
         # automount_service_account_token = false
         # termination_grace_period_seconds = 10
         container {
           image = var.image_tag
-          args = ["--config", "${var.config_file}"]
+          args = ["--config", "${local.config_file}"]
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -258,16 +286,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           }
           env {
             name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-            value = "/etc/mongodb_secrets/MONGO_ROOT_USERNAME"
+            value = "/usr/mongodb/secrets/MONGO_ROOT_USERNAME"
           }
           env {
             name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-            value = "/etc/mongodb_secrets/MONGO_ROOT_PASSWORD"
-          }
-          env_from {
-            config_map_ref {
-              name = kubernetes_config_map.mongod_conf.metadata[0].name
-            }
+            value = "/usr/mongodb/secrets/MONGO_ROOT_PASSWORD"
           }
           # dynamic "env" {
           #   for_each = local.mongodb_secret
@@ -290,29 +313,35 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           }
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+            mount_path = "/usr/mongodb/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
           }
           # Mounting an individual ConfigMap entry as a file without hiding other files in the
           # directory.
           volume_mount {
             name = "config"
-            mount_path = var.config_file  # Name of file in /etc
-            sub_path = "mongod_conf"
+            mount_path = local.config_file
+            sub_path = "mongod.conf"
             read_only = true
           }
+          # volume_mount {
+          #   name = "scripts"
+          #   mount_path = "/usr/mongodb/docker-entrypoint-initdb.d"
+          #   sub_path = "ensure-users.js"
+          #   read_only = true
+          # }
           volume_mount {
             name = "secrets"
-            mount_path = "/etc/mongodb_secrets/"
+            mount_path = "/usr/mongodb/secrets"
             read_only = true
           }
         }
         #
-        volume {
-          name = "mongodb-storage"
-          persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
-          }
-        }
+        # volume {
+        #   name = "mongodb-storage"
+        #   persistent_volume_claim {
+        #     claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
+        #   }
+        # }
         volume {
           name = "config"
           config_map {
@@ -322,6 +351,15 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0660"  # Octal
           }
         }
+        # volume {
+        #   name = "scrips"
+        #   config_map {
+        #     name = kubernetes_config_map.ensure_users.metadata[0].name
+        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
+        #     # readable and writable only by the user and group that owns it.
+        #     default_mode = "0660"  # Octal
+        #   }
+        # }
         volume {
           name = "secrets"
           secret {
@@ -335,6 +373,25 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               key = "root_password"
               path = "MONGO_ROOT_PASSWORD"
             }
+            items {
+              key = "users_list"
+              path = "MONGO_USERS_LIST"
+            }
+          }
+        }
+      }
+    }
+    # This template will be used to create a PersistentVolumeClaim for each pod.
+    volume_claim_template {
+      metadata {
+        name = "mongodb-storage"
+      }
+      spec {
+        access_modes = ["ReadWriteOnce"]
+        # storage_class_name = "standard"
+        resources {
+          requests = {
+            storage = var.pvc_storage_size
           }
         }
       }
@@ -343,11 +400,21 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
 }
 
 /***
-Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
+A StatefulSet requires a corresponding governing headless Service that's used to provide the actual
+network identity to each pod. Through this Service, each pod gets its own DNS entry thereby
+allowing its peers in the cluster to address the pod by its hostname. For example, if the governing
+Service belongs to the default namespace and is called service1, and the pod name is pod-0, the pod
+can be reached by its fully qualified domain name of pod-0.service1.default.svc.cluster.local.
+
+To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
+the cluster:
+$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-mongodb.memories.svc.cluster.local
+
+where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
 ***/
 resource "kubernetes_service" "service" {
   metadata {
-    name = local.service_name
+    name = var.service_name
     namespace = var.namespace
     labels = {
       app = var.app_name

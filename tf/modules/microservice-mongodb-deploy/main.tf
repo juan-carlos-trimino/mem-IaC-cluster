@@ -7,15 +7,6 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
-variable "config_file_path" {}
-variable "config_file" {
-  default = "/etc/mongod.conf"
-}
-variable "mongodb_database" {}
-variable "mongodb_root_username" {}
-variable "mongodb_root_password" {}
-variable "mongodb_username" {}
-variable "mongodb_password" {}
 variable "namespace" {
   default = "default"
 }
@@ -116,84 +107,6 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 
-locals {
-  mongodb_secret = [{
-      env_name = "MONGO_INITDB_DATABASE"
-      data_name = "database"
-    },
-    {
-      env_name = "MONGO_INITDB_ROOT_USERNAME"
-      data_name = "root_username"
-    },
-    {
-      env_name = "MONGO_INITDB_ROOT_PASSWORD"
-      data_name = "root_password"
-    },
-    {
-      env_name = "MONGO_USERNAME"
-      data_name = "username"
-    },
-    {
-      env_name = "MONGO_PASSWORD"
-      data_name = "password"
-    }]
-}
-
-resource "kubernetes_secret" "mongodb_secret" {
-  metadata {
-    name = "${var.service_name}-secret-basic-auth"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  # Plain-text data.
-  data = {
-    #database = "${var.mongodb_database}"
-    #root_username = "${var.mongodb_root_username}"
-    root_password = "${var.mongodb_root_password}"
-    #username = "${var.mongodb_username}"
-    password = "${var.mongodb_password}"
-  # binary_data = {
-  #   database = base64encode("${var.mongodb_database}")
-  #   root_username = base64encode("${var.mongodb_root_username}")
-  #   root_password = base64encode("${var.mongodb_root_password}")
-  #   username = base64encode("${var.mongodb_username}")
-  #   password = base64encode("${var.mongodb_password}")
-  }
-  type = "kubernetes.io/basic-auth"
-}
-
-# A ServiceAccount is used by an application running inside a pod to authenticate itself with the
-# API server. A default ServiceAccount is automatically created for each namespace; each pod is
-# associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
-# pod can only use a ServiceAccount from the same namespace.
-resource "kubernetes_service_account" "mongodb_service_account" {
-  metadata {
-    name = "${var.service_name}-service-account"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  secret {
-    name = "${kubernetes_secret.mongodb_secret.metadata[0].name}"
-  }
-}
-
-resource "kubernetes_config_map" "mongod_conf" {
-  metadata {
-    name = "${var.service_name}-mongod-conf"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    "mongod_conf" = "${file("${var.config_file_path}")}"
-  }
-}
-
 /***
 Declare a K8s deployment to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.
@@ -226,7 +139,6 @@ resource "kubernetes_deployment" "deployment" {
       spec {
         container {
           image = var.image_tag
-          args = ["--config", "${var.config_file}"]
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -252,32 +164,6 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          # env {
-          #   name = "DATA_FILE_PATH"
-          #   value_from {
-          #     config_map_key_ref {
-          #       name = kubernetes_config_map.mongod_conf.metadata[0].name
-          #       key = mongodb_conf_key.storage.dbPath
-          #     }
-          #   }
-          # }
-          env_from {
-            config_map_ref {
-              name = kubernetes_config_map.mongod_conf.metadata[0].name
-            }
-          }
-          # dynamic "env" {
-          #   for_each = local.mongodb_secret
-          #   content {
-          #     name = env.value.env_name
-          #     value_from {
-          #       secret_key_ref {
-          #         name = kubernetes_secret.mongodb_secret.metadata[0].name
-          #         key = env.value.data_name
-          #       }
-          #     }
-          #   }
-          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -287,11 +173,6 @@ resource "kubernetes_deployment" "deployment" {
           }
           # Mounting an individual ConfigMap entry as a file without hiding other files in the
           # directory.
-          volume_mount {
-            name = "config"
-            mount_path = var.config_file  # Name of file in /etc
-            sub_path = "mongod_conf"
-          }
           # *** emptyDir ***
           # The simplest volume type, emptyDir. is an empty directory used for storing transient
           # data. It is useful for sharing files between containers running on the same pod, or for
@@ -306,7 +187,7 @@ resource "kubernetes_deployment" "deployment" {
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "/aaa/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+            mount_path = "/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
           }
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
         }
@@ -322,15 +203,6 @@ resource "kubernetes_deployment" "deployment" {
           name = "mongodb-storage"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
-          }
-        }
-        volume {
-          name = "config"
-          config_map {
-            name = kubernetes_config_map.mongod_conf.metadata[0].name
-            # Although ConfigMap should be used for non-sensitive configuration data, make the file
-            # readable and writable only by the user and group that owns it.
-            default_mode = "0660"  # Octal
           }
         }
         # *** Mount external storage in a volume to persist pod data across pod restarts ***

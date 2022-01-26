@@ -24,6 +24,9 @@ locals {
   svc_dns_rabbitmq = "amqp://guest:guest@mem-rabbitmq.${local.namespace}.svc.cluster.local:5672"
   //svc_dns_db = "mongodb://${var.mongodb_username}:${var.mongodb_password}@mem-mongodb.${local.namespace}.svc.cluster.local:27017"
   svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  # Stateful stuff
+  #svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  # Stateful stuff
 }
 
 module "mem-gateway" {
@@ -69,7 +72,7 @@ module "mem-history" {
   dir_name = "../../mem-history/history"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -102,7 +105,7 @@ module "mem-metadata" {
   dir_name = "../../mem-metadata/metadata"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -155,7 +158,7 @@ module "mem-video-storage" {
   dir_name = "../../mem-video-storage/video-storage"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_limits_cpu = "300m"
   qos_limits_memory = "500Mi"
@@ -187,7 +190,7 @@ module "mem-video-streaming" {
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
-  replicas = 3
+  replicas = 1
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
@@ -219,7 +222,7 @@ module "mem-video-upload" {
   dir_name = "../../mem-video-upload/video-upload"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"

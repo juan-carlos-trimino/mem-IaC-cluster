@@ -1,10 +1,3 @@
-/***
-How to use the module to deploy the microservices.
-***/
-
-/***
-Import the microservice Terraform module to deploy the ms-gateway.
-***/
 /*
 module "ms-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
@@ -22,31 +15,19 @@ module "ms-rabbitmq" {
 }
 */
 
+/*
+# Deployment.
 module "mem-mongodb" {
-  # source = "./modules/microservice-mongodb-deploy"
-  # Stateful stuff
-  source = "./modules/microservice-mongodb-stateful"
-  # Stateful stuff
+  source = "./modules/microservice-mongodb-deploy"
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
-  # Stateful stuff
-  config_file_path = "./utility-files/mongodb"
-  mongodb_database = var.mongodb_database
-  mongodb_root_username = var.mongodb_root_username
-  mongodb_root_password = var.mongodb_root_password
-  mongodb_username = var.mongodb_username
-  mongodb_password = var.mongodb_password
-  # Stateful stuff
-  # image_tag = "rhscl/mongodb-36-rhel7"
   namespace = kubernetes_namespace.ns.metadata[0].name
   # namespace = local.namespace
   replicas = 3
-  /*
-  Limits and request for CPU resources are measured in millicores. If the container needs one full
-  core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
-  '250m.'
-  */
+  # Limits and request for CPU resources are measured in millicores. If the container needs one full
+  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
+  # '250m.'
   qos_limits_cpu = "400m"
   #qos_limits_memory = "1Gi"
   qos_limits_memory = "500Mi"
@@ -54,18 +35,50 @@ module "mem-mongodb" {
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "25Gi"
   pvc_storage_class_name = "ibmc-block-silver"
-  #pvc_storage_class_name = "ibmc-s3fs-standard-regional"
-  #bucket_name = var.bucket_name
-  #private_endpoint = var.private_endpoint
-  #api_key = var.storage_api_key
-  #service_instance_id = var.service_instance_id
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
   env = {
-  # MONGO_INITDB_ROOT_USERNAME_FILE = "/etc/mongodb_secrets/MONGO_ROOT_USERNAME"
-  # MONGO_INITDB_ROOT_PASSWORD_FILE = "/etc/mongodb_secrets/MONGO_ROOT_PASSWORD"
-  #   MONGODB_ADMIN_PASSWORD = "jct123"
+    # MONGO_INITIAL_PRIMARY_HOST = "mem-mongodb-0.mem-mongodb.${var.app_name}.svc.cluster.local"
+    # MONGO_ENABLE_IPV6 = "no"
+  }
+}
+*/
+
+# Stateful.
+module "mem-mongodb" {
+  source = "./modules/microservice-mongodb-stateful"
+  app_name = var.app_name
+  app_version = var.app_version
+  image_tag = "mongo:5.0"
+  mongodb_files = "./utility-files/mongodb"
+  #
+  mongodb_database = var.mongodb_database
+  mongodb_root_username = var.mongodb_root_username
+  mongodb_root_password = var.mongodb_root_password
+  mongodb_username = var.mongodb_username
+  mongodb_password = var.mongodb_password
+  #
+  publish_not_ready_addresses = true
+  namespace = kubernetes_namespace.ns.metadata[0].name
+  # namespace = local.namespace
+  replicas = 3
+  # Limits and request for CPU resources are measured in millicores. If the container needs one full
+  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
+  # '250m.'
+  qos_limits_cpu = "400m"
+  #qos_limits_memory = "1Gi"
+  qos_limits_memory = "500Mi"
+  pvc_access_modes = ["ReadWriteOnce"]
+  pvc_storage_size = "25Gi"
+  pvc_storage_class_name = "ibmc-block-silver"
+  service_name = "mem-mongodb"
+  service_port = 27017
+  service_target_port = 27017
+  env = {
+    MONGO_INITIAL_PRIMARY_HOST = "mem-mongodb-0.mem-mongodb.${var.app_name}.svc.cluster.local"
+    MONGO_ENABLE_IPV6 = "no"
+    # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"
   #   #MONGODB_DATABASE = "history"

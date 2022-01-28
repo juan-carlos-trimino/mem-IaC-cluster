@@ -69,6 +69,10 @@ variable "replicas" {
   default = 1
   type = number
 }
+variable "terminationGracePeriodSeconds" {
+  default = 30
+  type = number
+}
 variable "service_name" {
   default = ""
 }
@@ -216,6 +220,7 @@ resource "kubernetes_deployment" "deployment" {
       }
       #
       spec {
+        termination_grace_period_seconds = var.terminationGracePeriodSeconds
         container {
           image = local.image_tag
           name = var.service_name

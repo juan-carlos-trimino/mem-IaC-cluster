@@ -388,7 +388,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       spec {
         access_modes = ["ReadWriteOnce"]
-        # storage_class_name = "standard"
+        storage_class_name = var.pvc_storage_class_name
         resources {
           requests = {
             storage = var.pvc_storage_size

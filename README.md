@@ -57,10 +57,6 @@ IaC-cluster
  ├ tf
  | ├ cluster_config
  | | └ .gitkeep
- | ├ config-files
- | | ├ mongodb
- | | | └ mongod.conf
- | | └ .gitkeep
  | ├ modules
  | | ├ microservice-mongodb-deploy
  | | | └ main.tf
@@ -68,6 +64,14 @@ IaC-cluster
  | | | └ main.tf
  | | ├ pri-microservice
  | | | └ main.tf
+ | | └ .gitkeep
+ | ├ utility-files
+ | | ├ mongodb
+ | | | ├ configmaps
+ | | | | └ mongod.conf
+ | | | ├ scripts
+ | | | | └ mongod.confxxxxxxxxxxxxx
+ | | | └ .gitkeep
  | | └ .gitkeep
  | ├ data.tf
  | ├ microservice-mongodb.tf

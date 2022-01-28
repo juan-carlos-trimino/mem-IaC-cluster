@@ -23,25 +23,25 @@ module "ms-rabbitmq" {
 */
 
 module "mem-mongodb" {
-  source = "./modules/microservice-mongodb-deploy"
+  # source = "./modules/microservice-mongodb-deploy"
   # Stateful stuff
-  # source = "./modules/microservice-mongodb-stateful"
+  source = "./modules/microservice-mongodb-stateful"
   # Stateful stuff
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
   # Stateful stuff
-  ## config_file_path = "./utility-files/mongodb"
-  ## mongodb_database = var.mongodb_database
-  ## mongodb_root_username = var.mongodb_root_username
-  ## mongodb_root_password = var.mongodb_root_password
-  ## mongodb_username = var.mongodb_username
-  ## mongodb_password = var.mongodb_password
-  # image_tag = "rhscl/mongodb-36-rhel7"
+  config_file_path = "./utility-files/mongodb"
+  mongodb_database = var.mongodb_database
+  mongodb_root_username = var.mongodb_root_username
+  mongodb_root_password = var.mongodb_root_password
+  mongodb_username = var.mongodb_username
+  mongodb_password = var.mongodb_password
   # Stateful stuff
+  # image_tag = "rhscl/mongodb-36-rhel7"
   namespace = kubernetes_namespace.ns.metadata[0].name
   # namespace = local.namespace
-  replicas = 1
+  replicas = 3
   /*
   Limits and request for CPU resources are measured in millicores. If the container needs one full
   core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of

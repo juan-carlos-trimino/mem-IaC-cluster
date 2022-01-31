@@ -83,7 +83,7 @@ locals {
   session_affinity = "None"
   service_type = "ClusterIP"
   config_files = "/usr/mongodb/configs"
-  script_files = "/usr/mongodb/scripts"
+  script_files = "/docker-entrypoint-initdb.d/"
 }
 
 locals {
@@ -188,6 +188,7 @@ resource "kubernetes_config_map" "ensure_users" {
 /***
 Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.
+$ kubectl get sts -n memories
 ***/
 resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   metadata {
@@ -216,6 +217,26 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
+
+        
+        # init_container {
+        #   name = "tbd"
+        #   image = "busybox:1.35"
+        #   image_pull_policy = "IfNotPresent"
+        #   # command = ["/bin/sh"]
+        #   # args = ["-c", "chgrp -R 0 /var/log/mongodb && chmod -R g=u /var/log/mongodb"]
+        #   # command = ["/bin/chgrp -R 0 /var/log/mongodb && /bin/chmod -R g=u /var/log/mongodb"]
+        #   command = ["sh", "-c", "echo abc"]
+        #   # volume_mount {
+        #   #   name = "var-dir"
+        #   #   mount_path = "/var/log/mongodb"
+        #   #   # sub_path   = ""
+        #   # }
+        # }
+
+
+
+
         affinity {
           # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
           # that node is already running a pod with label having key 'replicaset' and value
@@ -254,9 +275,13 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         #   run_as_group = 1001
         # }
         container {
-          image = var.image_tag
-          args = ["--config", "${local.config_files}/mongod.conf"]
           name = var.service_name
+          image = var.image_tag
+          # image_pull_policy = "IfNotPresent"
+          # Docker (ENTRYPOINT)
+          #command = [ "${local.script_files}/entrypoint.sh" ]
+          # Docker (CMD)
+          args = ["--config", "${local.config_files}/mongod.conf"]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -286,7 +311,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             name = "POD_NAME"
             value_from {
               field_ref {
-                field_path = metadata.name
+                field_path = "metadata.name"
               }
             }
           }
@@ -317,9 +342,19 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               value = env.value
             }
           }
+
+
+          # volume_mount {
+          #   name = "var-dir"
+          #   mount_path = "/var/log/mongodb"
+          #   # sub_path   = ""
+          # }
+
+
+
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "/usr/mongodb/data/db"
+            mount_path = "/data/db"
           }
           # Mounting an individual ConfigMap entry as a file without hiding other files in the
           # directory.
@@ -341,6 +376,13 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             read_only = true
           }
         }
+
+        # volume {
+        #   name = "var-dir"
+        #   empty_dir {}
+        # }
+
+
         volume {
           name = "configs"
           config_map {

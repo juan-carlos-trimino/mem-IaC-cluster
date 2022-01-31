@@ -15,6 +15,8 @@ module "ms-rabbitmq" {
 }
 */
 
+# kubectl exec -it --rm mem-mongodb-0 -n memories -- mongo
+# > rs.status()
 /*
 # Deployment.
 module "mem-mongodb" {
@@ -77,7 +79,11 @@ module "mem-mongodb" {
   service_target_port = 27017
   env = {
     MONGO_INITIAL_PRIMARY_HOST = "mem-mongodb-0.mem-mongodb.${var.app_name}.svc.cluster.local"
-    MONGO_ENABLE_IPV6 = "no"
+    # When a container is started for the first time, it will execute files with extensions .sh and
+    # .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
+    # order. .js files will be executed by mongo using the database specified by the
+    # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
+    MONGO_INITDB_DATABASE = "test"
     # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"

@@ -47,7 +47,14 @@ module "mem-mongodb" {
 }
 */
 
-# Stateful.
+# StatefulSet.
+# (1) When a container is started for the first time it will execute files with extensions .sh and
+#     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
+#     order. .js files will be executed by mongo using the database specified by the
+#     MONGO_INITDB_DATABASE variable, if it is present, or 'test' otherwise. You may also switch
+#     databases within the .js script.
+# (2) mongod does not read a configuration file by default, so the --config option with the path to
+#     the configuration file needs to be specified.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-stateful"
   app_name = var.app_name
@@ -78,17 +85,34 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    MONGO_INITIAL_PRIMARY_HOST = "mem-mongodb-0.mem-mongodb.${var.app_name}.svc.cluster.local"
     # When a container is started for the first time, it will execute files with extensions .sh and
     # .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
     # order. .js files will be executed by mongo using the database specified by the
     # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
-    MONGO_INITDB_DATABASE = "test"
+    MONGO_INITDB_DATABASE = "admin"  # 'test' is the default db.
+    /*
+            - name: MONGODB_DISABLE_SYSTEM_LOG
+              value: "false"
+            - name: MONGODB_SYSTEM_LOG_VERBOSITY
+              value: "1"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MONGODB_REPLICA_SET_NAME
+              value: "replicaset"
+            - name: MONGODB_INITIAL_PRIMARY_HOST
+              value: "mongodb-0.mongodb"
+            - name: MONGODB_ADVERTISED_HOSTNAME
+              value: "$(POD_NAME).mongodb"
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "yes"
+    */
     # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"
-  #   #MONGODB_DATABASE = "history"
-  #   MONGODB_DATABASE = "metadata"
- #   ME_CONFIG_MONGODB_ENABLE_ADMIN = true
+    MONGODB_DATABASE = "history"
+    # MONGODB_DATABASE = "metadata"
+    MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }

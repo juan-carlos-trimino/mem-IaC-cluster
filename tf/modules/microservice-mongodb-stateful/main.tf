@@ -83,31 +83,31 @@ locals {
   session_affinity = "None"
   service_type = "ClusterIP"
   config_files = "/usr/mongodb/configs"
-  script_files = "/docker-entrypoint-initdb.d/"
+  script_files = "/docker-entrypoint-initdb.d"
 }
 
-locals {
-  mongodb_secret = [{
-      env_name = "MONGO_INITDB_DATABASE"
-      data_name = "database"
-    },
-    {
-      env_name = "MONGO_INITDB_ROOT_USERNAME"
-      data_name = "root_username"
-    },
-    {
-      env_name = "MONGO_INITDB_ROOT_PASSWORD"
-      data_name = "root_password"
-    },
-    {
-      env_name = "MONGO_USERNAME"
-      data_name = "username"
-    },
-    {
-      env_name = "MONGO_PASSWORD"
-      data_name = "password"
-    }]
-}
+# locals {
+#   mongodb_secret = [{
+#       env_name = "MONGO_INITDB_DATABASE"
+#       data_name = "database"
+#     },
+#     {
+#       env_name = "MONGO_INITDB_ROOT_USERNAME"
+#       data_name = "root_username"
+#     },
+#     {
+#       env_name = "MONGO_INITDB_ROOT_PASSWORD"
+#       data_name = "root_password"
+#     },
+#     {
+#       env_name = "MONGO_USERNAME"
+#       data_name = "mongo_username"
+#     },
+#     {
+#       env_name = "MONGO_PASSWORD"
+#       data_name = "mongo_password"
+#     }]
+# }
 
 resource "kubernetes_secret" "mongodb_secret" {
   metadata {
@@ -119,14 +119,13 @@ resource "kubernetes_secret" "mongodb_secret" {
   }
   # Plain-text data.
   data = {
-    #database = "${var.mongodb_database}"
     root_username = "${var.mongodb_root_username}"
     root_password = "${var.mongodb_root_password}"
-    username = "${var.mongodb_username}"
-    password = "${var.mongodb_password}"
-    users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
+    mongodb_username = "${var.mongodb_username}"
+    mongodb_password = "${var.mongodb_password}"
+    # users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
   }
-  type = "kubernetes.io/basic-auth"
+  type = "Opaque"
 }
 
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
@@ -217,8 +216,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
-
-        
         # init_container {
         #   name = "tbd"
         #   image = "busybox:1.35"
@@ -233,10 +230,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         #   #   # sub_path   = ""
         #   # }
         # }
-
-
-
-
         affinity {
           # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
           # that node is already running a pod with label having key 'replicaset' and value
@@ -260,7 +253,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
                     values = ["running_one"]
                   }
                 }
-                # namespaces = ["${var.namespace}"]
                 topology_key = "kubernetes.io/hostname"
               }
             }
@@ -271,15 +263,20 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         termination_grace_period_seconds = var.termination_grace_period_seconds
         # The security settings that is specified for a Pod apply to all Containers in the Pod.
         # security_context {
-        #   run_as_user = 1010
-        #   run_as_group = 1001
+        #   # run_as_user = 1010
+        #   # run_as_group = 1001
+        #   fs_group = 0
         # }
         container {
           name = var.service_name
           image = var.image_tag
+          # security_context {
+          #   run_as_non_root = true
+          #   # run_as_user = 1001
+          # }
           # image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
-          #command = [ "${local.script_files}/entrypoint.sh" ]
+          command = [ "${local.script_files}/entrypoint.sh" ]
           # Docker (CMD)
           args = ["--config", "${local.config_files}/mongod.conf"]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -317,11 +314,23 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           }
           env {
             name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-            value = "/usr/mongodb/secrets/MONGO_ROOT_USERNAME"
+            value = "/usr/mongodb/secrets/MONGODB_ROOT_USERNAME"
           }
           env {
             name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-            value = "/usr/mongodb/secrets/MONGO_ROOT_PASSWORD"
+            value = "/usr/mongodb/secrets/MONGODB_ROOT_PASSWORD"
+          }
+          env {
+            name = "MONGODB_INITIAL_PRIMARY_HOST"
+            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
+          }
+          env {
+            name = "MONGODB_ADVERTISED_HOSTNAME"
+            value = "$(MONGODB_INITIAL_PRIMARY_HOST)"
+          }
+          env {
+            name = "MONGODB_PORT_NUMBER"
+            value = "${var.service_target_port}"
           }
           # dynamic "env" {
           #   for_each = local.mongodb_secret
@@ -343,14 +352,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
 
-
           # volume_mount {
           #   name = "var-dir"
           #   mount_path = "/var/log/mongodb"
           #   # sub_path   = ""
           # }
-
-
 
           volume_mount {
             name = "mongodb-storage"
@@ -408,16 +414,24 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
             items {
               key = "root_username"
-              path = "MONGO_ROOT_USERNAME"
+              path = "MONGODB_ROOT_USERNAME"
             }
             items {
               key = "root_password"
-              path = "MONGO_ROOT_PASSWORD"
+              path = "MONGODB_ROOT_PASSWORD"
             }
             items {
-              key = "users_list"
-              path = "MONGO_USERS_LIST"
+              key = "mongodb_username"
+              path = "MONGODB_USERNAME"
             }
+            items {
+              key = "mongodb_password"
+              path = "MONGODB_PASSWORD"
+            }
+            # items {
+            #   key = "users_list"
+            #   path = "MONGODB_USERS_LIST"
+            # }
           }
         }
       }

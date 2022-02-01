@@ -15,9 +15,7 @@ module "ms-rabbitmq" {
 }
 */
 
-# kubectl exec -it --rm mem-mongodb-0 -n memories -- mongo
-# > rs.status()
-/*
+
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-deploy"
@@ -26,7 +24,7 @@ module "mem-mongodb" {
   image_tag = "mongo:5.0"
   namespace = kubernetes_namespace.ns.metadata[0].name
   # namespace = local.namespace
-  replicas = 3
+  replicas = 1
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
@@ -45,8 +43,8 @@ module "mem-mongodb" {
     # MONGO_ENABLE_IPV6 = "no"
   }
 }
-*/
 
+/*
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -90,24 +88,22 @@ module "mem-mongodb" {
     # order. .js files will be executed by mongo using the database specified by the
     # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
     MONGO_INITDB_DATABASE = "admin"  # 'test' is the default db.
-    /*
-            - name: MONGODB_DISABLE_SYSTEM_LOG
-              value: "false"
-            - name: MONGODB_SYSTEM_LOG_VERBOSITY
-              value: "1"
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: MONGODB_REPLICA_SET_NAME
-              value: "replicaset"
-            - name: MONGODB_INITIAL_PRIMARY_HOST
-              value: "mongodb-0.mongodb"
-            - name: MONGODB_ADVERTISED_HOSTNAME
-              value: "$(POD_NAME).mongodb"
-            - name: ALLOW_EMPTY_PASSWORD
-              value: "yes"
-    */
+            # - name: MONGODB_DISABLE_SYSTEM_LOG
+            #   value: "false"
+            # - name: MONGODB_SYSTEM_LOG_VERBOSITY
+            #   value: "1"
+            # - name: POD_NAME
+            #   valueFrom:
+            #     fieldRef:
+            #       fieldPath: metadata.name
+            # - name: MONGODB_REPLICA_SET_NAME
+            #   value: "replicaset"
+            # - name: MONGODB_INITIAL_PRIMARY_HOST
+            #   value: "mongodb-0.mongodb"
+            # - name: MONGODB_ADVERTISED_HOSTNAME
+            #   value: "$(POD_NAME).mongodb"
+            # - name: ALLOW_EMPTY_PASSWORD
+            #   value: "yes"
     # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"
@@ -116,3 +112,4 @@ module "mem-mongodb" {
     MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }
+*/

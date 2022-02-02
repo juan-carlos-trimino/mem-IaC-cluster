@@ -15,6 +15,7 @@ module "ms-rabbitmq" {
 }
 */
 
+/*
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-deploy"
@@ -42,8 +43,8 @@ module "mem-mongodb" {
     # MONGO_ENABLE_IPV6 = "no"
   }
 }
+*/
 
-/*
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -54,6 +55,7 @@ module "mem-mongodb" {
 #     the configuration file needs to be specified.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-stateful"
+  dir_name = "../../mem-mongodb/mongodb"
   app_name = var.app_name
   app_version = var.app_version
   # image_tag = "mongo:5.0"
@@ -75,6 +77,9 @@ module "mem-mongodb" {
   qos_limits_cpu = "400m"
   #qos_limits_memory = "1Gi"
   qos_limits_memory = "500Mi"
+  cr_login_server = local.cr_login_server
+  cr_username = var.cr_username
+  cr_password = var.cr_password
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "25Gi"
   pvc_storage_class_name = "ibmc-block-silver"
@@ -111,4 +116,3 @@ module "mem-mongodb" {
     MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }
-*/

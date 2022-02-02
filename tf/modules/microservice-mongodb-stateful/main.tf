@@ -6,7 +6,13 @@ Define input variables to the module.
 ***/
 variable "app_name" {}
 variable "app_version" {}
-variable "image_tag" {}
+variable "image_tag" {
+  default = ""
+}
+variable "dir_name" {}
+variable "cr_login_server" {}
+variable "cr_username" {}
+variable "cr_password" {}
 variable "mongodb_files" {}
 variable "mongodb_database" {}
 variable "mongodb_root_username" {}
@@ -86,6 +92,69 @@ locals {
   script_files = "/docker-entrypoint-initdb.d"
 }
 
+/***
+Define local variables.
+***/
+locals {
+  image_tag = (
+                var.image_tag == "" ?
+                "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
+                var.image_tag
+              )
+}
+
+/***
+Build the Docker image.
+Use null_resource to create Terraform resources that do not have any particular resourse type.
+Use local-exec to invoke commands on the local workstation.
+Use timestamp to force the Docker image to build.
+***/
+resource "null_resource" "docker_build" {
+  triggers = {
+    always_run = timestamp()
+  }
+  #
+  provisioner "local-exec" {
+    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
+  }
+}
+
+/***
+Login to the Container Registry.
+***/
+resource "null_resource" "docker_login" {
+  depends_on = [
+    null_resource.docker_build
+  ]
+  triggers = {
+    always_run = timestamp()
+  }
+  #
+  # provisioner "local-exec" {
+  #   command = "echo ${var.cr_password} >> pw.txt"
+  # }
+  provisioner "local-exec" {
+    # command = "docker login ${var.cr_login_server} -T -u ${var.cr_username} --password-stdin"
+    command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
+  }
+}
+
+/***
+Push the image to the Container Registry.
+***/
+resource "null_resource" "docker_push" {
+  depends_on = [
+    null_resource.docker_login
+  ]
+  triggers = {
+    always_run = timestamp()
+  }
+  #
+  provisioner "local-exec" {
+    command = "docker push ${local.image_tag}"
+  }
+}
+
 # locals {
 #   mongodb_secret = [{
 #       env_name = "MONGO_INITDB_DATABASE"
@@ -158,18 +227,18 @@ resource "kubernetes_config_map" "conf_files" {
   }
 }
 
-resource "kubernetes_config_map" "script_files" {
-  metadata {
-    name = "${var.service_name}-script-files"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    "entrypoint.sh" = "${file("${var.mongodb_files}/scripts/entrypoint.sh")}"
-  }
-}
+# resource "kubernetes_config_map" "script_files" {
+#   metadata {
+#     name = "${var.service_name}-script-files"
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   data = {
+#     "entrypoint.sh" = "${file("${var.mongodb_files}/scripts/entrypoint.sh")}"
+#   }
+# }
 
 resource "kubernetes_config_map" "ensure_users" {
   metadata {
@@ -269,7 +338,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         # }
         container {
           name = var.service_name
-          image = var.image_tag
+          image = local.image_tag
           # security_context {
           #   run_as_non_root = true
           #   # run_as_user = 1001
@@ -370,12 +439,12 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             sub_path = "mongod.conf"
             read_only = true
           }
-          volume_mount {
-            name = "scripts"
-            mount_path = "${local.script_files}/entrypoint.sh"
-            sub_path = "entrypoint.sh"
-            read_only = true
-          }
+          # volume_mount {
+          #   name = "scripts"
+          #   mount_path = "${local.script_files}/entrypoint.sh"
+          #   sub_path = "entrypoint.sh"
+          #   read_only = true
+          # }
           volume_mount {
             name = "secrets"
             mount_path = "/usr/mongodb/secrets"
@@ -398,15 +467,15 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
           }
         }
-        volume {
-          name = "scripts"
-          config_map {
-            name = kubernetes_config_map.script_files.metadata[0].name
-            # Although ConfigMap should be used for non-sensitive configuration data, make the file
-            # readable and writable only by the user and group that owns it.
-            default_mode = "0440"  # Octal
-          }
-        }
+        # volume {
+        #   name = "scripts"
+        #   config_map {
+        #     name = kubernetes_config_map.script_files.metadata[0].name
+        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
+        #     # readable and writable only by the user and group that owns it.
+        #     default_mode = "0440"  # Octal
+        #   }
+        # }
         volume {
           name = "secrets"
           secret {

@@ -34,7 +34,7 @@ tf/utility-files/mongodb/configmaps/*
 !tf/utility-files/mongodb/configmaps/mongod.conf
 !tf/utility-files/mongodb/scripts/
 tf/utility-files/mongodb/scripts/*
-#!tf/utility-files/mongodb/scripts/hhhhhhhhhhhh
+!tf/utility-files/mongodb/scripts/entrypoint.sh
 # ... and these directories...
 !tf/modules/
 tf/modules/*

@@ -70,7 +70,7 @@ IaC-cluster
  | | | ├ configmaps
  | | | | └ mongod.conf
  | | | ├ scripts
- | | | | └ mongod.confxxxxxxxxxxxxx
+ | | | | └ entrypoint.sh
  | | | └ .gitkeep
  | | └ .gitkeep
  | ├ data.tf
@@ -176,6 +176,18 @@ mem-metadata
  | ├ Dockerfile-prod
  | ├ package-lock.json
  | └ package.json
+ ├ .gitignore
+ ├ LICENSE
+ └ README.md
+```
+
+```
+mem-mongodb
+ ├ mongodb
+ | ├ scripts
+ | | └ entrypoint.sh
+ | ├ .dockerignore
+ | └ Dockerfile-prod
  ├ .gitignore
  ├ LICENSE
  └ README.md

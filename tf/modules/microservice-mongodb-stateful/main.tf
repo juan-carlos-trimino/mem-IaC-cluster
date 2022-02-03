@@ -155,6 +155,26 @@ resource "null_resource" "docker_push" {
   }
 }
 
+resource "kubernetes_secret" "registry_credentials" {
+  metadata {
+    name = "${var.service_name}-registry-credentials"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "${var.cr_login_server}" = {
+          auth = base64encode("${var.cr_username}:${var.cr_password}")
+        }
+      }
+    })
+  }
+  type = "kubernetes.io/dockerconfigjson"
+}
+
 # locals {
 #   mongodb_secret = [{
 #       env_name = "MONGO_INITDB_DATABASE"
@@ -285,20 +305,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
-        # init_container {
-        #   name = "tbd"
-        #   image = "busybox:1.35"
-        #   image_pull_policy = "IfNotPresent"
-        #   # command = ["/bin/sh"]
-        #   # args = ["-c", "chgrp -R 0 /var/log/mongodb && chmod -R g=u /var/log/mongodb"]
-        #   # command = ["/bin/chgrp -R 0 /var/log/mongodb && /bin/chmod -R g=u /var/log/mongodb"]
-        #   command = ["sh", "-c", "echo abc"]
-        #   # volume_mount {
-        #   #   name = "var-dir"
-        #   #   mount_path = "/var/log/mongodb"
-        #   #   # sub_path   = ""
-        #   # }
-        # }
+        service_account_name = kubernetes_service_account.mongodb_service_account.metadata[0].name
         affinity {
           # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
           # that node is already running a pod with label having key 'replicaset' and value
@@ -333,9 +340,12 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         # The security settings that is specified for a Pod apply to all Containers in the Pod.
         # security_context {
         #   # run_as_user = 1010
-        #   # run_as_group = 1001
+        #   # run_as_group = 1010
         #   fs_group = 0
         # }
+        image_pull_secrets {
+          name = kubernetes_secret.registry_credentials.metadata[0].name
+        }
         container {
           name = var.service_name
           image = local.image_tag
@@ -345,7 +355,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           # }
           # image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
-          command = [ "${local.script_files}/entrypoint.sh" ]
+          command = ["${local.script_files}/entrypoint.sh"]
           # Docker (CMD)
           args = ["--config", "${local.config_files}/mongod.conf"]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -420,13 +430,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               value = env.value
             }
           }
-
-          # volume_mount {
-          #   name = "var-dir"
-          #   mount_path = "/var/log/mongodb"
-          #   # sub_path   = ""
-          # }
-
           volume_mount {
             name = "mongodb-storage"
             mount_path = "/data/db"
@@ -451,13 +454,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             read_only = true
           }
         }
-
-        # volume {
-        #   name = "var-dir"
-        #   empty_dir {}
-        # }
-
-
         volume {
           name = "configs"
           config_map {

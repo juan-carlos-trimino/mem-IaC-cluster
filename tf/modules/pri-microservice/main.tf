@@ -221,6 +221,9 @@ resource "kubernetes_deployment" "deployment" {
       #
       spec {
         termination_grace_period_seconds = var.terminationGracePeriodSeconds
+        image_pull_secrets {
+          name = kubernetes_secret.registry_credentials.metadata[0].name
+        }
         container {
           image = local.image_tag
           name = var.service_name
@@ -288,10 +291,6 @@ resource "kubernetes_deployment" "deployment" {
               value = env.value
             }
           }
-        }
-        #
-        image_pull_secrets {
-          name = kubernetes_secret.registry_credentials.metadata[0].name
         }
       }
     }

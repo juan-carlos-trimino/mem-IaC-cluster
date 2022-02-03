@@ -221,6 +221,8 @@ resource "kubernetes_secret" "mongodb_secret" {
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
 # pod can only use a ServiceAccount from the same namespace.
+#
+# For cluster security, let’s constrain the cluster metadata this pod  may read.
 resource "kubernetes_service_account" "mongodb_service_account" {
   metadata {
     name = "${var.service_name}-service-account"
@@ -329,6 +331,10 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
                     values = ["running_one"]
                   }
                 }
+                # By default, the label selector only matches pods in the same namespace as the pod
+                # that is being scheduled. To select pods from other namespaces, add the
+                # appropriate namespace(s) in the namespaces field.
+                namespaces = ["${var.namespace}"]
                 topology_key = "kubernetes.io/hostname"
               }
             }

@@ -62,8 +62,8 @@ module "mem-mongodb" {
   mongodb_files = "./utility-files/mongodb"
   #
   mongodb_database = var.mongodb_database
-  mongodb_root_username = var.mongodb_root_username
-  mongodb_root_password = var.mongodb_root_password
+  mongo_initdb_root_username = var.mongo_initdb_root_username
+  mongo_initdb_root_password = var.mongo_initdb_root_password
   mongodb_username = var.mongodb_username
   mongodb_password = var.mongodb_password
   #
@@ -91,7 +91,7 @@ module "mem-mongodb" {
     # .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
     # order. .js files will be executed by mongo using the database specified by the
     # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
-    MONGO_INITDB_DATABASE = "admin"  # 'test' is the default db.
+    MONGO_INITDB_DATABASE = "testxxx"  # 'test' is the default db.
             # - name: MONGODB_DISABLE_SYSTEM_LOG
             #   value: "false"
             # - name: MONGODB_SYSTEM_LOG_VERBOSITY

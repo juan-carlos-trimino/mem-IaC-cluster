@@ -15,8 +15,8 @@ variable "cr_username" {}
 variable "cr_password" {}
 variable "mongodb_files" {}
 variable "mongodb_database" {}
-variable "mongodb_root_username" {}
-variable "mongodb_root_password" {}
+variable "mongo_initdb_root_username" {}
+variable "mongo_initdb_root_password" {}
 variable "mongodb_username" {}
 variable "mongodb_password" {}
 variable "namespace" {
@@ -208,8 +208,8 @@ resource "kubernetes_secret" "mongodb_secret" {
   }
   # Plain-text data.
   data = {
-    root_username = "${var.mongodb_root_username}"
-    root_password = "${var.mongodb_root_password}"
+    mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
+    mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
     mongodb_username = "${var.mongodb_username}"
     mongodb_password = "${var.mongodb_password}"
     # users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
@@ -399,11 +399,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           }
           env {
             name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-            value = "/usr/mongodb/secrets/MONGODB_ROOT_USERNAME"
+            value = "/usr/mongodb/secrets/MONGO_INITDB_ROOT_USERNAME"
           }
           env {
             name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-            value = "/usr/mongodb/secrets/MONGODB_ROOT_PASSWORD"
+            value = "/usr/mongodb/secrets/MONGO_INITDB_ROOT_PASSWORD"
           }
           env {
             name = "MONGODB_INITIAL_PRIMARY_HOST"
@@ -484,12 +484,12 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
             default_mode = "0440"  # Octal
             items {
-              key = "root_username"
-              path = "MONGODB_ROOT_USERNAME"
+              key = "mongo_initdb_root_username"
+              path = "MONGO_INITDB_ROOT_USERNAME"
             }
             items {
-              key = "root_password"
-              path = "MONGODB_ROOT_PASSWORD"
+              key = "mongo_initdb_root_password"
+              path = "MONGO_INITDB_ROOT_PASSWORD"
             }
             items {
               key = "mongodb_username"

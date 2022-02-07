@@ -175,29 +175,6 @@ resource "kubernetes_secret" "registry_credentials" {
   type = "kubernetes.io/dockerconfigjson"
 }
 
-# locals {
-#   mongodb_secret = [{
-#       env_name = "MONGO_INITDB_DATABASE"
-#       data_name = "database"
-#     },
-#     {
-#       env_name = "MONGO_INITDB_ROOT_USERNAME"
-#       data_name = "root_username"
-#     },
-#     {
-#       env_name = "MONGO_INITDB_ROOT_PASSWORD"
-#       data_name = "root_password"
-#     },
-#     {
-#       env_name = "MONGO_USERNAME"
-#       data_name = "mongo_username"
-#     },
-#     {
-#       env_name = "MONGO_PASSWORD"
-#       data_name = "mongo_password"
-#     }]
-# }
-
 resource "kubernetes_secret" "mongodb_secret" {
   metadata {
     name = "${var.service_name}-secret"
@@ -208,11 +185,12 @@ resource "kubernetes_secret" "mongodb_secret" {
   }
   # Plain-text data.
   data = {
-    mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
-    mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
-    mongodb_username = "${var.mongodb_username}"
-    mongodb_password = "${var.mongodb_password}"
+    # mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
+    # mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
+    # mongodb_username = "${var.mongodb_username}"
+    # mongodb_password = "${var.mongodb_password}"
     # users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
+    mongo_replicaset_key = "${file("${var.mongodb_files}/certs/mongo-replicaset-key")}"
   }
   type = "Opaque"
 }
@@ -262,18 +240,18 @@ resource "kubernetes_config_map" "conf_files" {
 #   }
 # }
 
-resource "kubernetes_config_map" "ensure_users" {
-  metadata {
-    name = "${var.service_name}-ensure-users"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    "ensure-users.js" = "${file("${var.mongodb_files}/scripts/ensure-users.js")}"
-  }
-}
+# resource "kubernetes_config_map" "ensure_users" {
+#   metadata {
+#     name = "${var.service_name}-ensure-users"
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   data = {
+#     "ensure-users.js" = "${file("${var.mongodb_files}/scripts/ensure-users.js")}"
+#   }
+# }
 
 /***
 Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
@@ -362,8 +340,10 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           # image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
           command = ["${local.script_files}/entrypoint.sh"]
+          # command = ["/usr/local/bin/docker-entrypoint.sh"]
           # Docker (CMD)
-          args = ["--config", "${local.config_files}/mongod.conf"]
+          # args = ["--config", "${local.config_files}/mongod.conf"]
+          args = ["--config", "${local.config_files}/mongod.conf", "--replSet", "rs0"]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -397,14 +377,14 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
               }
             }
           }
-          env {
-            name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-            value = "/usr/mongodb/secrets/MONGO_INITDB_ROOT_USERNAME"
-          }
-          env {
-            name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-            value = "/usr/mongodb/secrets/MONGO_INITDB_ROOT_PASSWORD"
-          }
+          # env {
+          #   name = "MONGO_INITDB_ROOT_USERNAME_FILE"
+          #   value = "/usr/mongodb/secrets/mongo-initdb-root-username"
+          # }
+          # env {
+          #   name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
+          #   value = "/usr/mongodb/secrets/mongo-initdb-root-password"
+          # }
           env {
             name = "MONGODB_INITIAL_PRIMARY_HOST"
             value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
@@ -417,18 +397,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             name = "MONGODB_PORT_NUMBER"
             value = "${var.service_target_port}"
           }
-          # dynamic "env" {
-          #   for_each = local.mongodb_secret
-          #   content {
-          #     name = env.value.env_name
-          #     value_from {
-          #       secret_key_ref {
-          #         name = kubernetes_secret.mongodb_secret.metadata[0].name
-          #         key = env.value.data_name
-          #       }
-          #     }
-          #   }
-          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -483,26 +451,26 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           secret {
             secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
             default_mode = "0440"  # Octal
-            items {
-              key = "mongo_initdb_root_username"
-              path = "MONGO_INITDB_ROOT_USERNAME"
-            }
-            items {
-              key = "mongo_initdb_root_password"
-              path = "MONGO_INITDB_ROOT_PASSWORD"
-            }
-            items {
-              key = "mongodb_username"
-              path = "MONGODB_USERNAME"
-            }
-            items {
-              key = "mongodb_password"
-              path = "MONGODB_PASSWORD"
-            }
             # items {
-            #   key = "users_list"
-            #   path = "MONGODB_USERS_LIST"
+            #   key = "mongo_initdb_root_username"
+            #   path = "mongo-initdb-root-username"
             # }
+            # items {
+            #   key = "mongo_initdb_root_password"
+            #   path = "mongo-initdb-root-password"
+            # }
+            # items {
+            #   key = "mongodb_username"
+            #   path = "MONGODB_USERNAME"
+            # }
+            # items {
+            #   key = "mongodb_password"
+            #   path = "MONGODB_PASSWORD"
+            # }
+            items {
+              key = "mongo_replicaset_key"
+              path = "replicaset-key"
+            }
           }
         }
       }

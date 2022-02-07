@@ -111,8 +111,7 @@ module "mem-mongodb" {
     # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"
-    MONGODB_DATABASE = "history"
-    # MONGODB_DATABASE = "metadata"
-    MONGODB_REPLICA_SET_NAME = "rs0"
+    MONGODB_DATABASE = "admin"
+    #MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }

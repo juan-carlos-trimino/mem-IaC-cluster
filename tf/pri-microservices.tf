@@ -23,9 +23,9 @@ locals {
   # See rabbitmq.conf
   svc_dns_rabbitmq = "amqp://guest:guest@mem-rabbitmq.${local.namespace}.svc.cluster.local:5672"
   //svc_dns_db = "mongodb://${var.mongodb_username}:${var.mongodb_password}@mem-mongodb.${local.namespace}.svc.cluster.local:27017"
-  svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  #svc_dns_db = "mongodb://mem-mongodb.${local.namespace}.svc.cluster.local:27017"
   # Stateful stuff
-  #svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
+  svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-1.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-2.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
   # Stateful stuff
 }
 

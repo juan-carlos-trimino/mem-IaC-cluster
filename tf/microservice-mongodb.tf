@@ -59,7 +59,7 @@ module "mem-mongodb" {
   app_name = var.app_name
   app_version = var.app_version
   # image_tag = "mongo:5.0"
-  mongodb_files = "./utility-files/mongodb"
+  path_mongodb_files = "./utility-files/mongodb"
   #
   mongodb_database = var.mongodb_database
   mongo_initdb_root_username = var.mongo_initdb_root_username
@@ -68,8 +68,7 @@ module "mem-mongodb" {
   mongodb_password = var.mongodb_password
   #
   publish_not_ready_addresses = true
-  namespace = kubernetes_namespace.ns.metadata[0].name
-  # namespace = local.namespace
+  namespace = local.namespace
   replicas = 3
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
@@ -87,9 +86,9 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    # When a container is started for the first time, it will execute files with extensions .sh and
-    # .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
-    # order. .js files will be executed by mongo using the database specified by the
+    # When a mongod container is started for the first time, it will execute files with extensions
+    # .sh and .js that are found in /docker-entrypoint-initdb.d. Files will be executed in
+    # alphabetical order. .js files will be executed by mongo using the database specified by the
     # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
     MONGO_INITDB_DATABASE = "testxxx"  # 'test' is the default db.
             # - name: MONGODB_DISABLE_SYSTEM_LOG
@@ -111,7 +110,7 @@ module "mem-mongodb" {
     # MONGODB_ADMIN_PASSWORD = "jct123"
   #   MONGODB_USER = "guest"
   #   MONGODB_PASSWORD = "guest"
-    MONGODB_DATABASE = "admin"
+    # MONGODB_DATABASE = "admin"
     #MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }

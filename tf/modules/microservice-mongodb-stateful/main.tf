@@ -13,7 +13,7 @@ variable "dir_name" {}
 variable "cr_login_server" {}
 variable "cr_username" {}
 variable "cr_password" {}
-variable "mongodb_files" {}
+variable "path_mongodb_files" {}
 variable "mongodb_database" {}
 variable "mongo_initdb_root_username" {}
 variable "mongo_initdb_root_password" {}
@@ -88,8 +88,9 @@ locals {
   # always get hit (until the connection is closed).
   session_affinity = "None"
   service_type = "ClusterIP"
-  config_files = "/usr/mongodb/configs"
-  script_files = "/docker-entrypoint-initdb.d"
+  path_to_secrets = "/usr/mongodb/secrets"
+  path_to_config = "/usr/mongodb/configs"
+  path_to_scripts = "/docker-entrypoint-initdb.d"
 }
 
 /***
@@ -177,7 +178,7 @@ resource "kubernetes_secret" "registry_credentials" {
 
 resource "kubernetes_secret" "mongodb_secret" {
   metadata {
-    name = "${var.service_name}-secret"
+    name = "${var.service_name}-secrets"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -185,12 +186,9 @@ resource "kubernetes_secret" "mongodb_secret" {
   }
   # Plain-text data.
   data = {
-    # mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
-    # mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
-    # mongodb_username = "${var.mongodb_username}"
-    # mongodb_password = "${var.mongodb_password}"
-    # users_list = "${var.mongodb_database}:${var.mongodb_root_username},readWrite:${var.mongodb_root_password}"
-    mongo_replicaset_key = "${file("${var.mongodb_files}/certs/mongo-replicaset-key")}"
+    mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
+    mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
+    mongo_replicaset_key = "${file("${var.path_mongodb_files}/certs/mongo-replicaset.key")}"
   }
   type = "Opaque"
 }
@@ -200,7 +198,7 @@ resource "kubernetes_secret" "mongodb_secret" {
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
 # pod can only use a ServiceAccount from the same namespace.
 #
-# For cluster security, let’s constrain the cluster metadata this pod  may read.
+# For cluster security, let’s constrain the cluster metadata this pod may read.
 resource "kubernetes_service_account" "mongodb_service_account" {
   metadata {
     name = "${var.service_name}-service-account"
@@ -223,22 +221,23 @@ resource "kubernetes_config_map" "conf_files" {
     }
   }
   data = {
-    "mongod.conf" = "${file("${var.mongodb_files}/configmaps/mongod.conf")}"
+    "mongod.conf" = "${file("${var.path_mongodb_files}/configmaps/mongod.conf")}"
   }
 }
 
-# resource "kubernetes_config_map" "script_files" {
-#   metadata {
-#     name = "${var.service_name}-script-files"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   data = {
-#     "entrypoint.sh" = "${file("${var.mongodb_files}/scripts/entrypoint.sh")}"
-#   }
-# }
+resource "kubernetes_config_map" "scripts_files" {
+  metadata {
+    name = "${var.service_name}-script-files"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    "entrypoint.sh" = "${file("${var.path_mongodb_files}/scripts/entrypoint.sh")}"
+    "start-replication.js" = "${file("${var.path_mongodb_files}/scripts/start-replication.js")}"
+  }
+}
 
 # resource "kubernetes_config_map" "ensure_users" {
 #   metadata {
@@ -249,7 +248,7 @@ resource "kubernetes_config_map" "conf_files" {
 #     }
 #   }
 #   data = {
-#     "ensure-users.js" = "${file("${var.mongodb_files}/scripts/ensure-users.js")}"
+#     "ensure-users.js" = "${file("${var.path_mongodb_files}/scripts/ensure-users.js")}"
 #   }
 # }
 
@@ -337,13 +336,29 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           #   run_as_non_root = true
           #   # run_as_user = 1001
           # }
+          env {
+            name = "POD_NAME"
+            value_from {
+              field_ref {
+                field_path = "metadata.name"
+              }
+            }
+          }
+          env {
+            name = "MONGODB_INITIAL_PRIMARY_HOST"
+            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
+          }
           # image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
-          command = ["${local.script_files}/entrypoint.sh"]
           # command = ["/usr/local/bin/docker-entrypoint.sh"]
           # Docker (CMD)
-          # args = ["--config", "${local.config_files}/mongod.conf"]
-          args = ["--config", "${local.config_files}/mongod.conf", "--replSet", "rs0"]
+          args = [
+            "--config", "${local.path_to_config}/mongod.conf",
+            "--replSet", "rs0",
+          #   # "--port", "27017",
+          #   # "--ipv6", "false",
+            "--bind_ip", "$(POD_NAME).${var.service_name}.${var.namespace}"
+          ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -369,26 +384,32 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
           # Using the Pod field as a value for the environment variable.
-          env {
-            name = "POD_NAME"
-            value_from {
-              field_ref {
-                field_path = "metadata.name"
-              }
-            }
-          }
           # env {
           #   name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-          #   value = "/usr/mongodb/secrets/mongo-initdb-root-username"
+          #   value = "${local.path_to_secrets}/mongo-initdb-root-username"
           # }
           # env {
           #   name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-          #   value = "/usr/mongodb/secrets/mongo-initdb-root-password"
+          #   value = "${local.path_to_secrets}/mongo-initdb-root-password"
           # }
-          env {
-            name = "MONGODB_INITIAL_PRIMARY_HOST"
-            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
-          }
+          # env {
+          #   name = "MONGO_INITDB_ROOT_USERNAME"
+          #   value_from {
+          #     secret_key_ref {
+          #       name = kubernetes_secret.mongodb_secret.metadata[0].name
+          #       key = "mongo_initdb_root_username"
+          #     }
+          #   }
+          # }
+          # env {
+          #   name = "MONGO_INITDB_ROOT_PASSWORD"
+          #   value_from {
+          #     secret_key_ref {
+          #       name = kubernetes_secret.mongodb_secret.metadata[0].name
+          #       key = "mongo_initdb_root_password"
+          #     }
+          #   }
+          # }
           env {
             name = "MONGODB_ADVERTISED_HOSTNAME"
             value = "$(MONGODB_INITIAL_PRIMARY_HOST)"
@@ -412,21 +433,22 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           # directory.
           volume_mount {
             name = "configs"
-            mount_path = "${local.config_files}/mongod.conf"
+            # Mounting into a file, not a directory.
+            mount_path = "${local.path_to_config}/mongod.conf"
+            # Mounting only this file.
             sub_path = "mongod.conf"
             read_only = true
           }
-          # volume_mount {
-          #   name = "scripts"
-          #   mount_path = "${local.script_files}/entrypoint.sh"
-          #   sub_path = "entrypoint.sh"
-          #   read_only = true
-          # }
           volume_mount {
-            name = "secrets"
-            mount_path = "/usr/mongodb/secrets"
+            name = "scripts"
+            mount_path = "${local.path_to_scripts}"
             read_only = true
           }
+          # volume_mount {
+          #   name = "secrets"
+          #   mount_path = "${local.path_to_secrets}"
+          #   read_only = true
+          # }
         }
         volume {
           name = "configs"
@@ -437,42 +459,43 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
           }
         }
-        # volume {
-        #   name = "scripts"
-        #   config_map {
-        #     name = kubernetes_config_map.script_files.metadata[0].name
-        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
-        #     # readable and writable only by the user and group that owns it.
-        #     default_mode = "0440"  # Octal
-        #   }
-        # }
         volume {
-          name = "secrets"
-          secret {
-            secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
+          name = "scripts"
+          config_map {
+            name = kubernetes_config_map.scripts_files.metadata[0].name
+            # Although ConfigMap should be used for non-sensitive configuration data, make the file
+            # readable and writable only by the user and group that owns it.
             default_mode = "0440"  # Octal
-            # items {
-            #   key = "mongo_initdb_root_username"
-            #   path = "mongo-initdb-root-username"
-            # }
-            # items {
-            #   key = "mongo_initdb_root_password"
-            #   path = "mongo-initdb-root-password"
-            # }
-            # items {
-            #   key = "mongodb_username"
-            #   path = "MONGODB_USERNAME"
-            # }
-            # items {
-            #   key = "mongodb_password"
-            #   path = "MONGODB_PASSWORD"
-            # }
             items {
-              key = "mongo_replicaset_key"
-              path = "replicaset-key"
+              key = "entrypoint.sh"
+              path = "entrypoint.sh"  #File name.
+            }
+            items {
+              key = "start-replication.js"
+              path = "start-replication.js"  #File name.
             }
           }
         }
+        # volume {
+        #   name = "secrets"
+        #   secret {
+        #     secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
+        #     # default_mode = "0600"  # Octal
+        #     default_mode = "0440"  # Octal
+        #     items {
+        #       key = "mongo_initdb_root_username"
+        #       path = "mongo-initdb-root-username"  #File name.
+        #     }
+        #     items {
+        #       key = "mongo_initdb_root_password"
+        #       path = "mongo-initdb-root-password"
+        #     }
+        #     items {
+        #       key = "mongo_replicaset_key"
+        #       path = "mongo-replicaset.key"
+        #     }
+        #   }
+        # }
       }
     }
     # This template will be used to create a PersistentVolumeClaim for each pod.

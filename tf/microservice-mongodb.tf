@@ -90,7 +90,7 @@ module "mem-mongodb" {
     # .sh and .js that are found in /docker-entrypoint-initdb.d. Files will be executed in
     # alphabetical order. .js files will be executed by mongo using the database specified by the
     # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
-    MONGO_INITDB_DATABASE = "testxxx"  # 'test' is the default db.
+    MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
             # - name: MONGODB_DISABLE_SYSTEM_LOG
             #   value: "false"
             # - name: MONGODB_SYSTEM_LOG_VERBOSITY

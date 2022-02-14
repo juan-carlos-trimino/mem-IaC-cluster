@@ -355,9 +355,9 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           args = [
             "--config", "${local.path_to_config}/mongod.conf",
             "--replSet", "rs0",
-          #   # "--port", "27017",
-          #   # "--ipv6", "false",
-            "--bind_ip", "$(POD_NAME).${var.service_name}.${var.namespace}"
+            # "--port", "27017",
+            # "--ipv6", "false",
+            "--bind_ip", "localhost,$(POD_NAME).${var.service_name}.${var.namespace}"
           ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the

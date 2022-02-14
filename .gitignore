@@ -29,12 +29,15 @@ tf/utility-files/*
 !tf/utility-files/mongodb/
 tf/utility-files/mongodb/*
 !tf/utility-files/mongodb/.gitkeep
+!tf/utility-files/mongodb/certs/
+tf/utility-files/mongodb/certs/*
 !tf/utility-files/mongodb/configmaps/
 tf/utility-files/mongodb/configmaps/*
 !tf/utility-files/mongodb/configmaps/mongod.conf
 !tf/utility-files/mongodb/scripts/
 tf/utility-files/mongodb/scripts/*
 !tf/utility-files/mongodb/scripts/entrypoint.sh
+!tf/utility-files/mongodb/scripts/start-replication.js
 # ... and these directories...
 !tf/modules/
 tf/modules/*

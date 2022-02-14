@@ -22,6 +22,16 @@ variable "mongodb_password" {}
 variable "namespace" {
   default = "default"
 }
+# Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
+# latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
+# Always, but if the container refers to any other tag, the policy defaults to IfNotPresent.
+#
+# When using a tag other that latest, the imagePullPolicy property must be set if changes are made
+# to an image without changing the tag. Better yet, always push changes to an image under a new
+# tag.
+variable "imagePullPolicy" {
+  default = "Always"
+}
 variable "env" {
   default = {}
   type = map
@@ -332,6 +342,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         container {
           name = var.service_name
           image = local.image_tag
+          image_pull_policy = var.imagePullPolicy
           # security_context {
           #   run_as_non_root = true
           #   # run_as_user = 1001

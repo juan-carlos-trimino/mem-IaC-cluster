@@ -13,6 +13,16 @@ variable "namespace" {
 variable "dns_name" {
   default = ""
 }
+# Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
+# latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
+# Always, but if the container refers to any other tag, the policy defaults to IfNotPresent.
+#
+# When using a tag other that latest, the imagePullPolicy property must be set if changes are made
+# to an image without changing the tag. Better yet, always push changes to an image under a new
+# tag.
+variable "imagePullPolicy" {
+  default = "Always"
+}
 variable "env" {
   default = {}
   type = map
@@ -144,6 +154,7 @@ resource "kubernetes_deployment" "deployment" {
         termination_grace_period_seconds = var.terminationGracePeriodSeconds
         container {
           image = var.image_tag
+          image_pull_policy = var.imagePullPolicy
           name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the

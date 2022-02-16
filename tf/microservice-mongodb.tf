@@ -74,8 +74,8 @@ module "mem-mongodb" {
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
   qos_limits_cpu = "400m"
-  #qos_limits_memory = "1Gi"
-  qos_limits_memory = "500Mi"
+  qos_limits_memory = "1Gi"
+  # qos_limits_memory = "500Mi"
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
@@ -86,31 +86,6 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    # When a mongod container is started for the first time, it will execute files with extensions
-    # .sh and .js that are found in /docker-entrypoint-initdb.d. Files will be executed in
-    # alphabetical order. .js files will be executed by mongo using the database specified by the
-    # MONGO_INITDB_DATABASE variable, if it is present, or test otherwise.
     MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
-            # - name: MONGODB_DISABLE_SYSTEM_LOG
-            #   value: "false"
-            # - name: MONGODB_SYSTEM_LOG_VERBOSITY
-            #   value: "1"
-            # - name: POD_NAME
-            #   valueFrom:
-            #     fieldRef:
-            #       fieldPath: metadata.name
-            # - name: MONGODB_REPLICA_SET_NAME
-            #   value: "replicaset"
-            # - name: MONGODB_INITIAL_PRIMARY_HOST
-            #   value: "mongodb-0.mongodb"
-            # - name: MONGODB_ADVERTISED_HOSTNAME
-            #   value: "$(POD_NAME).mongodb"
-            # - name: ALLOW_EMPTY_PASSWORD
-            #   value: "yes"
-    # MONGODB_ADMIN_PASSWORD = "jct123"
-  #   MONGODB_USER = "guest"
-  #   MONGODB_PASSWORD = "guest"
-    # MONGODB_DATABASE = "admin"
-    #MONGODB_REPLICA_SET_NAME = "rs0"
   }
 }

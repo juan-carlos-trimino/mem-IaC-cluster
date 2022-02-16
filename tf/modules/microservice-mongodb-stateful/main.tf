@@ -84,10 +84,10 @@ variable "service_target_port" {
 }
 #
 locals {
-  # service_name = "service-mongodb"
   # The service normally forwards each connection to a randomly selected backing pod. To
   # ensure that connections from a particular client are passed to the same Pod each time,
   # set the service's sessionAffinity property to ClientIP instead of None (default).
+  #
   # Session affinity and Web Browsers (for LoadBalancer Services)
   # Since the service is now exposed externally, accessing it with a web browser will hit
   # the same pod every time. If the sessionAffinity is set to None, then why? The browser
@@ -98,8 +98,8 @@ locals {
   # always get hit (until the connection is closed).
   session_affinity = "None"
   service_type = "ClusterIP"
-  path_to_secrets = "/usr/mongodb/secrets"
-  path_to_config = "/usr/mongodb/configs"
+  path_to_secrets = "/mongodb/secrets"
+  path_to_config = "/mongodb/configs"
   path_to_scripts = "/docker-entrypoint-initdb.d"
 }
 
@@ -141,11 +141,7 @@ resource "null_resource" "docker_login" {
     always_run = timestamp()
   }
   #
-  # provisioner "local-exec" {
-  #   command = "echo ${var.cr_password} >> pw.txt"
-  # }
   provisioner "local-exec" {
-    # command = "docker login ${var.cr_login_server} -T -u ${var.cr_username} --password-stdin"
     command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
   }
 }
@@ -249,19 +245,6 @@ resource "kubernetes_config_map" "scripts_files" {
   }
 }
 
-# resource "kubernetes_config_map" "ensure_users" {
-#   metadata {
-#     name = "${var.service_name}-ensure-users"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   data = {
-#     "ensure-users.js" = "${file("${var.path_mongodb_files}/scripts/ensure-users.js")}"
-#   }
-# }
-
 /***
 Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
 microservice into the K8s cluster.
@@ -327,8 +310,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
         }
-        # jct
-        # automount_service_account_token = false
         termination_grace_period_seconds = var.termination_grace_period_seconds
         # The security settings that is specified for a Pod apply to all Containers in the Pod.
         # security_context {
@@ -347,27 +328,13 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           #   run_as_non_root = true
           #   # run_as_user = 1001
           # }
-          env {
-            name = "POD_NAME"
-            value_from {
-              field_ref {
-                field_path = "metadata.name"
-              }
-            }
-          }
-          env {
-            name = "MONGODB_INITIAL_PRIMARY_HOST"
-            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
-          }
-          # image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
-          # command = ["/usr/local/bin/docker-entrypoint.sh"]
+          command = ["/usr/local/bin/docker-entrypoint.sh"]
           # Docker (CMD)
           args = [
+            "mongod",
             "--config", "${local.path_to_config}/mongod.conf",
             "--replSet", "rs0",
-            # "--port", "27017",
-            # "--ipv6", "false",
             "--bind_ip", "localhost,$(POD_NAME).${var.service_name}.${var.namespace}"
           ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -395,6 +362,18 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
           # Using the Pod field as a value for the environment variable.
+          env {
+            name = "POD_NAME"
+            value_from {
+              field_ref {
+                field_path = "metadata.name"
+              }
+            }
+          }
+          env {
+            name = "MONGODB_INITIAL_PRIMARY_HOST"
+            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
+          }
           # env {
           #   name = "MONGO_INITDB_ROOT_USERNAME_FILE"
           #   value = "${local.path_to_secrets}/mongo-initdb-root-username"
@@ -402,24 +381,6 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           # env {
           #   name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
           #   value = "${local.path_to_secrets}/mongo-initdb-root-password"
-          # }
-          # env {
-          #   name = "MONGO_INITDB_ROOT_USERNAME"
-          #   value_from {
-          #     secret_key_ref {
-          #       name = kubernetes_secret.mongodb_secret.metadata[0].name
-          #       key = "mongo_initdb_root_username"
-          #     }
-          #   }
-          # }
-          # env {
-          #   name = "MONGO_INITDB_ROOT_PASSWORD"
-          #   value_from {
-          #     secret_key_ref {
-          #       name = kubernetes_secret.mongodb_secret.metadata[0].name
-          #       key = "mongo_initdb_root_password"
-          #     }
-          #   }
           # }
           env {
             name = "MONGODB_ADVERTISED_HOSTNAME"
@@ -440,14 +401,9 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             name = "mongodb-storage"
             mount_path = "/data/db"
           }
-          # Mounting an individual ConfigMap entry as a file without hiding other files in the
-          # directory.
           volume_mount {
             name = "configs"
-            # Mounting into a file, not a directory.
-            mount_path = "${local.path_to_config}/mongod.conf"
-            # Mounting only this file.
-            sub_path = "mongod.conf"
+            mount_path = "${local.path_to_config}"
             read_only = true
           }
           volume_mount {
@@ -455,11 +411,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             mount_path = "${local.path_to_scripts}"
             read_only = true
           }
-          # volume_mount {
-          #   name = "secrets"
-          #   mount_path = "${local.path_to_secrets}"
-          #   read_only = true
-          # }
+          volume_mount {
+            name = "secrets"
+            mount_path = "${local.path_to_secrets}"
+            read_only = true
+          }
         }
         volume {
           name = "configs"
@@ -468,6 +424,10 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             # Although ConfigMap should be used for non-sensitive configuration data, make the file
             # readable and writable only by the user and group that owns it.
             default_mode = "0440"  # Octal
+            items {
+              key = "mongod.conf"
+              path = "mongod.conf"  #File name.
+            }
           }
         }
         volume {
@@ -487,26 +447,26 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
         }
-        # volume {
-        #   name = "secrets"
-        #   secret {
-        #     secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
-        #     # default_mode = "0600"  # Octal
-        #     default_mode = "0440"  # Octal
-        #     items {
-        #       key = "mongo_initdb_root_username"
-        #       path = "mongo-initdb-root-username"  #File name.
-        #     }
-        #     items {
-        #       key = "mongo_initdb_root_password"
-        #       path = "mongo-initdb-root-password"
-        #     }
-        #     items {
-        #       key = "mongo_replicaset_key"
-        #       path = "mongo-replicaset.key"
-        #     }
-        #   }
-        # }
+        volume {
+          name = "secrets"
+          secret {
+            secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
+            # default_mode = "0600"  # Octal
+            default_mode = "0440"  # Octal
+            items {
+              key = "mongo_initdb_root_username"
+              path = "mongo-initdb-root-username"  #File name.
+            }
+            items {
+              key = "mongo_initdb_root_password"
+              path = "mongo-initdb-root-password"
+            }
+            items {
+              key = "mongo_replicaset_key"
+              path = "mongo-replicaset.key"
+            }
+          }
+        }
       }
     }
     # This template will be used to create a PersistentVolumeClaim for each pod.

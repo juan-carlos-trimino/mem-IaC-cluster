@@ -67,10 +67,13 @@ IaC-cluster
  | | └ .gitkeep
  | ├ utility-files
  | | ├ mongodb
+ | | | ├ certs
+ | | | | └ .gitigonre
  | | | ├ configmaps
  | | | | └ mongod.conf
  | | | ├ scripts
- | | | | └ entrypoint.sh
+ | | | | ├ entrypoint.sh
+ | | | | └ start-replication.js
  | | | └ .gitkeep
  | | └ .gitkeep
  | ├ data.tf

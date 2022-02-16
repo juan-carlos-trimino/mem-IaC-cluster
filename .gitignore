@@ -31,6 +31,7 @@ tf/utility-files/mongodb/*
 !tf/utility-files/mongodb/.gitkeep
 !tf/utility-files/mongodb/certs/
 tf/utility-files/mongodb/certs/*
+!tf/utility-files/mongodb/certs/.gitkeep
 !tf/utility-files/mongodb/configmaps/
 tf/utility-files/mongodb/configmaps/*
 !tf/utility-files/mongodb/configmaps/mongod.conf

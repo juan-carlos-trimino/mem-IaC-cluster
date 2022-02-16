@@ -15,7 +15,7 @@ module "ms-rabbitmq" {
 }
 */
 
-/*
+
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-deploy"
@@ -29,8 +29,8 @@ module "mem-mongodb" {
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
   qos_limits_cpu = "400m"
-  #qos_limits_memory = "1Gi"
-  qos_limits_memory = "500Mi"
+  qos_limits_memory = "1Gi"
+  # qos_limits_memory = "500Mi"
   pvc_name = "mongodb-pvc"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "25Gi"
@@ -38,13 +38,12 @@ module "mem-mongodb" {
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
-  env = {
-    # MONGO_INITIAL_PRIMARY_HOST = "mem-mongodb-0.mem-mongodb.${var.app_name}.svc.cluster.local"
-    # MONGO_ENABLE_IPV6 = "no"
-  }
+  # env = {
+  # }
 }
-*/
 
+
+/***
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -89,3 +88,4 @@ module "mem-mongodb" {
     MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
   }
 }
+***/

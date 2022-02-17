@@ -12,6 +12,7 @@ tf/*
 !tf/data.tf
 !tf/pri-microservices.tf
 !tf/microservice-mongodb.tf
+!tf/microservice-rabbitmq.tf
 !tf/providers.tf
 !tf/namespace.tf
 !tf/tekton.yaml
@@ -52,3 +53,9 @@ tf/modules/microservice-mongodb-deploy/*
 !tf/modules/microservice-mongodb-stateful/
 tf/modules/microservice-mongodb-stateful/*
 !tf/modules/microservice-mongodb-stateful/main.tf
+!tf/modules/microservice-rabbitmq-deploy/
+tf/modules/microservice-rabbitmq-deploy/*
+# !tf/modules/microservice-rabbitmq-deploy/main.tf
+!tf/modules/microservice-rabbitmq-stateful/
+tf/modules/microservice-rabbitmq-stateful/*
+# !tf/modules/microservice-rabbitmq-stateful/main.tf

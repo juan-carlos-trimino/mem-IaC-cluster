@@ -218,6 +218,31 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
   }
 }
 
+
+
+
+# Roles define WHAT can be done; role bindings define WHO can do it.
+# The distinction between a Role/RoleBinding and a ClusterRole/ClusterRoleBinding is that the Role/
+# RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
+
+resource "kubernetes_role" "rabbitmq_role" {
+  metadata {
+    name = "${var.service_name}-role"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  #
+  role {
+
+  }
+}
+
+
+
+
+
 resource "kubernetes_config_map" "rabbitmq_config" {
   metadata {
     name = "${var.service_name}-config"

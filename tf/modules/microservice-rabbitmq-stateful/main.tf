@@ -3,6 +3,12 @@
 A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
+
+
+The enabled_plugins file, which adds the rabbitmq_peer_discovery_k8s plugin and the standard management plugin, looks like this:
+
+[rabbitmq_management,rabbitmq_peer_discovery_k8s].
+
 ***/
 variable "app_name" {}
 variable "app_version" {}
@@ -13,12 +19,8 @@ variable "dir_name" {}
 variable "cr_login_server" {}
 variable "cr_username" {}
 variable "cr_password" {}
-variable "path_mongodb_files" {}
-variable "mongodb_database" {}
-variable "mongo_initdb_root_username" {}
-variable "mongo_initdb_root_password" {}
-variable "mongodb_username" {}
-variable "mongodb_password" {}
+variable "path_rabbitmq_files" {}
+variable "rabbitmq_erlang_cookie" {}
 variable "namespace" {
   default = "default"
 }
@@ -182,7 +184,7 @@ resource "kubernetes_secret" "registry_credentials" {
   type = "kubernetes.io/dockerconfigjson"
 }
 
-resource "kubernetes_secret" "mongodb_secret" {
+resource "kubernetes_secret" "rabbitmq_secret" {
   metadata {
     name = "${var.service_name}-secrets"
     namespace = var.namespace
@@ -192,9 +194,7 @@ resource "kubernetes_secret" "mongodb_secret" {
   }
   # Plain-text data.
   data = {
-    mongo_initdb_root_username = "${var.mongo_initdb_root_username}"
-    mongo_initdb_root_password = "${var.mongo_initdb_root_password}"
-    mongo_replicaset_key = "${file("${var.path_mongodb_files}/certs/mongo-replicaset.key")}"
+    mongo_initdb_root_username = "${var.rabbitmq_erlang_cookie}"
   }
   type = "Opaque"
 }
@@ -205,7 +205,7 @@ resource "kubernetes_secret" "mongodb_secret" {
 # pod can only use a ServiceAccount from the same namespace.
 #
 # For cluster security, let’s constrain the cluster metadata this pod may read.
-resource "kubernetes_service_account" "mongodb_service_account" {
+resource "kubernetes_service_account" "rabbitmq_service_account" {
   metadata {
     name = "${var.service_name}-service-account"
     namespace = var.namespace
@@ -214,11 +214,11 @@ resource "kubernetes_service_account" "mongodb_service_account" {
     }
   }
   secret {
-    name = "${kubernetes_secret.mongodb_secret.metadata[0].name}"
+    name = "${kubernetes_secret.rabbitmq_secret.metadata[0].name}"
   }
 }
 
-resource "kubernetes_config_map" "mongodb_config" {
+resource "kubernetes_config_map" "rabbitmq_config" {
   metadata {
     name = "${var.service_name}-config"
     namespace = var.namespace
@@ -227,21 +227,11 @@ resource "kubernetes_config_map" "mongodb_config" {
     }
   }
   data = {
-    "mongod.conf" = "${file("${var.path_mongodb_files}/configmaps/mongod.conf")}"
-  }
-}
-
-resource "kubernetes_config_map" "scripts_files" {
-  metadata {
-    name = "${var.service_name}-script-files"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    "entrypoint.sh" = "${file("${var.path_mongodb_files}/scripts/entrypoint.sh")}"
-    "start-replication.js" = "${file("${var.path_mongodb_files}/scripts/start-replication.js")}"
+    # The enabled_plugins file is usually located in the node data directory or under /etc,
+    # together with configuration files. The file contains a list of plugin names ending with
+    # a dot.
+    "enabled_plugins" = "[rabbitmq_federation, rabbitmq_management, rabbitmq_peer_discovery_k8s]."
+    "rabbitmq.conf" = "${file("${var.path_rabbitmq_files}/configmaps/rabbitmq.conf")}"
   }
 }
 
@@ -250,7 +240,7 @@ Declare a K8s stateful set to deploy a microservice; it instantiates the contain
 microservice into the K8s cluster.
 $ kubectl get sts -n memories
 ***/
-resource "kubernetes_stateful_set" "mongodb_stateful_set" {
+resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
   metadata {
     name = var.service_name
     namespace = var.namespace
@@ -277,7 +267,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
       }
       #
       spec {
-        service_account_name = kubernetes_service_account.mongodb_service_account.metadata[0].name
+        service_account_name = kubernetes_service_account.rabbitmq_service_account.metadata[0].name
         affinity {
           # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
           # that node is already running a pod with label having key 'replicaset' and value
@@ -298,7 +288,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
                     # pod and the set of values in the matchExpression parameters in the
                     # specification for the new pod. Can be In, NotIn, Exists, or DoesNotExist.
                     operator = "In"
-                    values = ["running_one"]
+                    values = ["rs_rabbitmq"]
                   }
                 }
                 # By default, the label selector only matches pods in the same namespace as the pod
@@ -329,14 +319,14 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           #   # run_as_user = 1001
           # }
           # Docker (ENTRYPOINT)
-          command = ["/usr/local/bin/docker-entrypoint.sh"]
+          # command = ["/usr/local/bin/docker-entrypoint.sh"]
           # Docker (CMD)
-          args = [
-            "mongod",
-            "--config", "${local.path_to_config}/mongod.conf",
-            "--replSet", "rs0",
-            "--bind_ip", "localhost,$(POD_NAME).${var.service_name}.${var.namespace}"
-          ]
+          # args = [
+          #   "mongod",
+          #   "--config", "${local.path_to_config}/mongod.conf",
+          #   "--replSet", "rs0",
+          #   "--bind_ip", "localhost,$(POD_NAME).${var.service_name}.${var.namespace}"
+          # ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -363,7 +353,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
           }
           # Using the Pod field as a value for the environment variable.
           env {
-            name = "POD_NAME"
+            name = "RABBIT_POD_NAME"
             value_from {
               field_ref {
                 field_path = "metadata.name"
@@ -371,24 +361,23 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
           env {
-            name = "MONGODB_INITIAL_PRIMARY_HOST"
-            value = "$(POD_NAME).${var.service_name}.${var.namespace}.svc.cluster.local"
+            name = "RABBIT_POD_NAMESPACE"
+            value_from {
+              field_ref {
+                field_path = "metadata.namespace"
+              }
+            }
           }
-          # env {
-          #   name = "MONGO_INITDB_ROOT_USERNAME_FILE"
-          #   value = "${local.path_to_secrets}/mongo-initdb-root-username"
-          # }
-          # env {
-          #   name = "MONGO_INITDB_ROOT_PASSWORD_FILE"
-          #   value = "${local.path_to_secrets}/mongo-initdb-root-password"
-          # }
+          # When a node starts up, it checks whether it has been assigned a node name. If no value
+          # was explicitly configured, the node resolves its hostname and prepends rabbit to it to
+          # compute its node name.
           env {
-            name = "MONGODB_ADVERTISED_HOSTNAME"
-            value = "$(MONGODB_INITIAL_PRIMARY_HOST)"
+            name = "RABBITMQ_NODENAME"
+            value = "rabbit@$(RABBIT_POD_NAME).${var.service_name}.$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
           env {
-            name = "MONGODB_PORT_NUMBER"
-            value = "${var.service_target_port}"
+            name = "K8S_HOSTNAME_SUFFIX"
+            value = ".${var.service_name}.$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
           dynamic "env" {
             for_each = var.env
@@ -406,11 +395,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             mount_path = "${local.path_to_config}"
             read_only = true
           }
-          volume_mount {
-            name = "scripts"
-            mount_path = "${local.path_to_scripts}"
-            read_only = true
-          }
+          # volume_mount {
+          #   name = "scripts"
+          #   mount_path = "${local.path_to_scripts}"
+          #   read_only = true
+          # }
           volume_mount {
             name = "secrets"
             mount_path = "${local.path_to_secrets}"
@@ -420,7 +409,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
         volume {
           name = "configs"
           config_map {
-            name = kubernetes_config_map.mongodb_config.metadata[0].name
+            name = kubernetes_config_map.rabbitmq_config.metadata[0].name
             # Although ConfigMap should be used for non-sensitive configuration data, make the file
             # readable and writable only by the user and group that owns it.
             default_mode = "0440"  # Octal
@@ -430,27 +419,27 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             }
           }
         }
-        volume {
-          name = "scripts"
-          config_map {
-            name = kubernetes_config_map.scripts_files.metadata[0].name
-            # Although ConfigMap should be used for non-sensitive configuration data, make the file
-            # readable and writable only by the user and group that owns it.
-            default_mode = "0440"  # Octal
-            items {
-              key = "entrypoint.sh"
-              path = "entrypoint.sh"  #File name.
-            }
-            items {
-              key = "start-replication.js"
-              path = "start-replication.js"  #File name.
-            }
-          }
-        }
+        # volume {
+        #   name = "scripts"
+        #   config_map {
+        #     name = kubernetes_config_map.scripts_files.metadata[0].name
+        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
+        #     # readable and writable only by the user and group that owns it.
+        #     default_mode = "0440"  # Octal
+        #     items {
+        #       key = "entrypoint.sh"
+        #       path = "entrypoint.sh"  #File name.
+        #     }
+        #     items {
+        #       key = "start-replication.js"
+        #       path = "start-replication.js"  #File name.
+        #     }
+        #   }
+        # }
         volume {
           name = "secrets"
           secret {
-            secret_name = kubernetes_secret.mongodb_secret.metadata[0].name
+            secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
             # default_mode = "0600"  # Octal
             default_mode = "0440"  # Octal
             items {
@@ -472,7 +461,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
     # This template will be used to create a PersistentVolumeClaim for each pod.
     volume_claim_template {
       metadata {
-        name = "mongodb-storage"
+        name = "rabbitmq-storage"
       }
       spec {
         access_modes = var.pvc_access_modes
@@ -496,7 +485,7 @@ can be reached by its fully qualified domain name of pod-0.service1.default.svc.
 
 To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
 the cluster:
-$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-mongodb.memories.svc.cluster.local
+$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq.memories.svc.cluster.local
 
 where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
 ***/
@@ -511,12 +500,18 @@ resource "kubernetes_service" "service" {
   #
   spec {
     selector = {
-      pod = kubernetes_stateful_set.mongodb_stateful_set.metadata[0].labels.pod
+      pod = kubernetes_stateful_set.rabbitmq_stateful_set.metadata[0].labels.pod
     }
     session_affinity = local.session_affinity
     port {
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
+  #       - port: 15672
+  #   targetPort: 15672
+  #   name: discovery
+  # - port: 5672
+  #   targetPort: 5672
+  #   name: amqp
     }
     type = local.service_type
     cluster_ip = "None"  # Headless Service.

@@ -15,7 +15,7 @@ module "ms-rabbitmq" {
 }
 */
 
-
+/***
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-deploy"
@@ -41,7 +41,7 @@ module "mem-mongodb" {
   # env = {
   # }
 }
-
+***/
 
 /***
 # StatefulSet.

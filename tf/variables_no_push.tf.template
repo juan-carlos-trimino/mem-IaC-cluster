@@ -67,3 +67,33 @@ variable bucket_name {
 variable resource_instance_id {
   default = "<required>"
 }
+
+###########################
+# For StatefulSet mongoDB #
+###########################
+variable "mongodb_database" {
+  default = "<required>"
+}
+
+variable mongo_initdb_root_username {
+  default = "<required>"
+}
+
+variable mongo_initdb_root_password {
+  default = "<required>"
+}
+
+variable "mongodb_username" {
+  default = "<required>"
+}
+
+variable "mongodb_password" {
+  default = "<required>"
+}
+
+############################
+# For StatefulSet rabbitMQ #
+############################
+variable "rabbitmq_erlang_cookie" {
+  default = "<required>"
+}

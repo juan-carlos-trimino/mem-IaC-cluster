@@ -55,7 +55,7 @@ tf/modules/microservice-mongodb-stateful/*
 !tf/modules/microservice-mongodb-stateful/main.tf
 !tf/modules/microservice-rabbitmq-deploy/
 tf/modules/microservice-rabbitmq-deploy/*
-# !tf/modules/microservice-rabbitmq-deploy/main.tf
+!tf/modules/microservice-rabbitmq-deploy/main.tf
 !tf/modules/microservice-rabbitmq-stateful/
 tf/modules/microservice-rabbitmq-stateful/*
-# !tf/modules/microservice-rabbitmq-stateful/main.tf
+!tf/modules/microservice-rabbitmq-stateful/main.tf

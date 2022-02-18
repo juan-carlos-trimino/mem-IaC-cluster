@@ -29,7 +29,7 @@ locals {
   # Stateful stuff
 }
 
-
+/***
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
@@ -230,3 +230,4 @@ module "mem-video-upload" {
   }]
   service_name = "mem-video-upload"
 }
+***/

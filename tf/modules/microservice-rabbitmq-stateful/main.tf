@@ -58,6 +58,11 @@ variable "termination_grace_period_seconds" {
   default = 30
   type = number
 }
+# To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
+# guarantee.
+variable "pod_management_policy" {
+  default = "OrderedReady"
+}
 # The primary use case for setting this field is to use a StatefulSet's Headless Service to
 # propagate SRV records for its Pods without respect to their readiness for purpose of peer
 # discovery.
@@ -78,10 +83,16 @@ variable "pvc_storage_size" {
 variable "service_name" {
   default = ""
 }
-variable "service_port" {
+variable "amqp_service_port" {
   type = number
 }
-variable "service_target_port" {
+variable "amqp_service_target_port" {
+  type = number
+}
+variable "mgmt_service_port" {
+  type = number
+}
+variable "mgmt_service_target_port" {
   type = number
 }
 #
@@ -186,7 +197,7 @@ resource "kubernetes_secret" "registry_credentials" {
 
 resource "kubernetes_secret" "rabbitmq_secret" {
   metadata {
-    name = "${var.service_name}-secrets"
+    name = "${var.service_name}-secret"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -194,7 +205,7 @@ resource "kubernetes_secret" "rabbitmq_secret" {
   }
   # Plain-text data.
   data = {
-    mongo_initdb_root_username = "${var.rabbitmq_erlang_cookie}"
+    rabbitmq_erlang_cookie = "${var.rabbitmq_erlang_cookie}"
   }
   type = "Opaque"
 }
@@ -214,17 +225,15 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
     }
   }
   secret {
-    name = "${kubernetes_secret.rabbitmq_secret.metadata[0].name}"
+    name = kubernetes_secret.rabbitmq_secret.metadata[0].name
   }
 }
-
-
-
 
 # Roles define WHAT can be done; role bindings define WHO can do it.
 # The distinction between a Role/RoleBinding and a ClusterRole/ClusterRoleBinding is that the Role/
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
-
+# A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
+# requests can be performed on which RESTful resources.
 resource "kubernetes_role" "rabbitmq_role" {
   metadata {
     name = "${var.service_name}-role"
@@ -233,15 +242,38 @@ resource "kubernetes_role" "rabbitmq_role" {
       app = var.app_name
     }
   }
-  #
-  role {
-
+  rule {
+    # Endpoints are resources in the core apiGroup, which has no name - hence the "".
+    api_groups = [""]
+    verbs = ["get", "watch", "list"]
+    # This rule pertains to endpoints; the plural form must be used when specifying resources.
+    resources = ["endpoints"]
   }
 }
 
-
-
-
+resource "kubernetes_role_binding" "rabbitmq_role_binding" {
+  metadata {
+    name = "${var.service_name}-role-binding"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind = "Role"
+    # This RoleBinding references the Role specified below...
+    name = kubernetes_role.rabbitmq_role.metadata[0].name
+  }
+  # ... and binds it to the specified ServiceAccount in the specified namespace.
+  subject {
+    # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
+    kind = "ServiceAccount"
+    name = kubernetes_service_account.rabbitmq_service_account.metadata[0].name
+    namespace = kubernetes_service_account.rabbitmq_service_account.metadata[0].namespace
+  }
+}
 
 resource "kubernetes_config_map" "rabbitmq_config" {
   metadata {
@@ -277,6 +309,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
   #
   spec {
     replicas = var.replicas
+    pod_management_policy = var.pod_management_policy
     service_name = var.service_name
     selector {
       match_labels = {
@@ -359,7 +392,13 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
           port {
-            container_port = var.service_target_port  # The port the app is listening.
+            name = "amqp"
+            container_port = var.amqp_service_target_port  # The port the app is listening.
+            protocol = "TCP"
+          }
+          port {
+            name = "mgmt"
+            container_port = var.mgmt_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
           resources {
@@ -404,6 +443,15 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "K8S_HOSTNAME_SUFFIX"
             value = ".${var.service_name}.$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
+          env {
+            name = "RABBITMQ_ERLANG_COOKIE"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+                key = "rabbitmq_erlang_cookie"
+              }
+            }
+          }
           dynamic "env" {
             for_each = var.env
             content {
@@ -411,6 +459,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               value = env.value
             }
           }
+          mmmmmmmmmmmmmmm
           volume_mount {
             name = "mongodb-storage"
             mount_path = "/data/db"
@@ -484,6 +533,9 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
       }
     }
     # This template will be used to create a PersistentVolumeClaim for each pod.
+    # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
+    # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
+    # pods in the same namespace.
     volume_claim_template {
       metadata {
         name = "rabbitmq-storage"
@@ -529,14 +581,14 @@ resource "kubernetes_service" "service" {
     }
     session_affinity = local.session_affinity
     port {
-      port = var.service_port  # Service port.
-      target_port = var.service_target_port  # Pod port.
-  #       - port: 15672
-  #   targetPort: 15672
-  #   name: discovery
-  # - port: 5672
-  #   targetPort: 5672
-  #   name: amqp
+      name = "amqp"
+      port = var.amqp_service_port  # Service port.
+      target_port = var.amqp_service_target_port  # Pod port.
+    }
+    port {
+      name = "mgmt"
+      port = var.mgmt_service_port  # Service port.
+      target_port = var.mgmt_service_target_port  # Pod port.
     }
     type = local.service_type
     cluster_ip = "None"  # Headless Service.

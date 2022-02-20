@@ -59,12 +59,17 @@ module "mem-rabbitmq" {
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
-  # pvc_access_modes = ["ReadWriteOnce"]
-  # pvc_storage_size = "25Gi"
-  # pvc_storage_class_name = "ibmc-block-silver"
+  pvc_access_modes = ["ReadWriteOnce"]
+  pvc_storage_size = "5Gi"
+  pvc_storage_class_name = "ibmc-block-silver"
   service_name = "mem-rabbitmq"
-  service_port = 5672
-  service_target_port = 5672
+  # Used by AMQP 0-9-1 and AMQP 1.0 clients without and with TLS.
+  amqp_service_port = 5672
+  amqp_service_target_port = 5672
+  # HTTP API clients, management UI, and rabbitmqadmin, without and with TLS (only if the
+  # management plugin is enabled).
+  mgmt_service_port = 15672
+  mgmt_service_target_port = 15672
   env = {
     # If a system uses fully qualified domain names (FQDNs) for hostnames, RabbitMQ nodes and CLI
     # tools must be configured to use so called long node names.

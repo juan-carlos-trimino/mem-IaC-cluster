@@ -12,10 +12,8 @@ The enabled_plugins file, which adds the rabbitmq_peer_discovery_k8s plugin and 
 ***/
 variable "app_name" {}
 variable "app_version" {}
-variable "image_tag" {
-  default = ""
-}
-variable "dir_name" {}
+variable "image_tag" {}
+# variable "dir_name" {}
 variable "cr_login_server" {}
 variable "cr_username" {}
 variable "cr_password" {}
@@ -112,20 +110,18 @@ locals {
   session_affinity = "None"
   service_type = "ClusterIP"
   path_to_secrets = "/mongodb/secrets"
-  path_to_config = "/mongodb/configs"
-  path_to_scripts = "/docker-entrypoint-initdb.d"
 }
 
 /***
 Define local variables.
 ***/
-locals {
-  image_tag = (
-                var.image_tag == "" ?
-                "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
-                var.image_tag
-              )
-}
+# locals {
+#   image_tag = (
+#                 var.image_tag == "" ?
+#                 "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
+#                 var.image_tag
+#               )
+# }
 
 /***
 Build the Docker image.
@@ -133,67 +129,67 @@ Use null_resource to create Terraform resources that do not have any particular 
 Use local-exec to invoke commands on the local workstation.
 Use timestamp to force the Docker image to build.
 ***/
-resource "null_resource" "docker_build" {
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  provisioner "local-exec" {
-    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
-  }
-}
+# resource "null_resource" "docker_build" {
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   #
+#   provisioner "local-exec" {
+#     command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
+#   }
+# }
 
 /***
 Login to the Container Registry.
 ***/
-resource "null_resource" "docker_login" {
-  depends_on = [
-    null_resource.docker_build
-  ]
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  provisioner "local-exec" {
-    command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
-  }
-}
+# resource "null_resource" "docker_login" {
+#   depends_on = [
+#     null_resource.docker_build
+#   ]
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   #
+#   provisioner "local-exec" {
+#     command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
+#   }
+# }
 
 /***
 Push the image to the Container Registry.
 ***/
-resource "null_resource" "docker_push" {
-  depends_on = [
-    null_resource.docker_login
-  ]
-  triggers = {
-    always_run = timestamp()
-  }
-  #
-  provisioner "local-exec" {
-    command = "docker push ${local.image_tag}"
-  }
-}
+# resource "null_resource" "docker_push" {
+#   depends_on = [
+#     null_resource.docker_login
+#   ]
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   #
+#   provisioner "local-exec" {
+#     command = "docker push ${local.image_tag}"
+#   }
+# }
 
-resource "kubernetes_secret" "registry_credentials" {
-  metadata {
-    name = "${var.service_name}-registry-credentials"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "${var.cr_login_server}" = {
-          auth = base64encode("${var.cr_username}:${var.cr_password}")
-        }
-      }
-    })
-  }
-  type = "kubernetes.io/dockerconfigjson"
-}
+# resource "kubernetes_secret" "registry_credentials" {
+#   metadata {
+#     name = "${var.service_name}-registry-credentials"
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   data = {
+#     ".dockerconfigjson" = jsonencode({
+#       auths = {
+#         "${var.cr_login_server}" = {
+#           auth = base64encode("${var.cr_username}:${var.cr_password}")
+#         }
+#       }
+#     })
+#   }
+#   type = "kubernetes.io/dockerconfigjson"
+# }
 
 resource "kubernetes_secret" "rabbitmq_secret" {
   metadata {
@@ -222,6 +218,9 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
     namespace = var.namespace
     labels = {
       app = var.app_name
+    }
+    annotations = {
+      "kubernetes.io/enforce-mountable-secrets" = true
     }
   }
   secret {
@@ -365,12 +364,12 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
         #   # run_as_group = 1010
         #   fs_group = 0
         # }
-        image_pull_secrets {
-          name = kubernetes_secret.registry_credentials.metadata[0].name
-        }
+        # image_pull_secrets {
+        #   name = kubernetes_secret.registry_credentials.metadata[0].name
+        # }
         container {
           name = var.service_name
-          image = local.image_tag
+          image = var.image_tag
           image_pull_policy = var.imagePullPolicy
           # security_context {
           #   run_as_non_root = true
@@ -415,7 +414,8 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               memory = var.qos_limits_memory
             }
           }
-          # Using the Pod field as a value for the environment variable.
+          # Using the Pod field as a value for the environment variable; pass RABBIT_POD_NAME to
+          # build the FQDN.
           env {
             name = "RABBIT_POD_NAME"
             value_from {
@@ -424,6 +424,8 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               }
             }
           }
+          # Using the Pod field as a value for the environment variable; pass RABBIT_POD_NAMESPACE
+          # to build the FQDN.
           env {
             name = "RABBIT_POD_NAMESPACE"
             value_from {
@@ -432,17 +434,26 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               }
             }
           }
+          # Name of K8s headless service that selects the pods in the cluster.
+          env {
+            name = "K8S_SERVICE_NAME"
+            value = var.service_name
+          }
           # When a node starts up, it checks whether it has been assigned a node name. If no value
           # was explicitly configured, the node resolves its hostname and prepends rabbit to it to
           # compute its node name.
+          # Build the rabbitmq host FQDN.
           env {
             name = "RABBITMQ_NODENAME"
-            value = "rabbit@$(RABBIT_POD_NAME).${var.service_name}.$(RABBIT_POD_NAMESPACE).svc.cluster.local"
+            value = "rabbit@$(RABBIT_POD_NAME).$(K8S_SERVICE_NAME).$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
+          # Build the cluster DNS domain name.
+          # Suffix to match FQDN of rabbitmq instances in the K8s namespace.
           env {
             name = "K8S_HOSTNAME_SUFFIX"
-            value = ".${var.service_name}.$(RABBIT_POD_NAMESPACE).svc.cluster.local"
+            value = ".$(K8S_SERVICE_NAME).$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
+          # Import the shared secret cookie for erlang authentication.
           env {
             name = "RABBITMQ_ERLANG_COOKIE"
             value_from {
@@ -459,24 +470,13 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               value = env.value
             }
           }
-          mmmmmmmmmmmmmmm
           volume_mount {
-            name = "mongodb-storage"
-            mount_path = "/data/db"
+            name = "rabbitmq-storage"
+            mount_path = "/var/lib/rabbitmq/mnesia"
           }
           volume_mount {
             name = "configs"
-            mount_path = "${local.path_to_config}"
-            read_only = true
-          }
-          # volume_mount {
-          #   name = "scripts"
-          #   mount_path = "${local.path_to_scripts}"
-          #   read_only = true
-          # }
-          volume_mount {
-            name = "secrets"
-            mount_path = "${local.path_to_secrets}"
+            mount_path = "/etc/rabbitmq"
             read_only = true
           }
         }
@@ -488,45 +488,12 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             # readable and writable only by the user and group that owns it.
             default_mode = "0440"  # Octal
             items {
-              key = "mongod.conf"
-              path = "mongod.conf"  #File name.
-            }
-          }
-        }
-        # volume {
-        #   name = "scripts"
-        #   config_map {
-        #     name = kubernetes_config_map.scripts_files.metadata[0].name
-        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
-        #     # readable and writable only by the user and group that owns it.
-        #     default_mode = "0440"  # Octal
-        #     items {
-        #       key = "entrypoint.sh"
-        #       path = "entrypoint.sh"  #File name.
-        #     }
-        #     items {
-        #       key = "start-replication.js"
-        #       path = "start-replication.js"  #File name.
-        #     }
-        #   }
-        # }
-        volume {
-          name = "secrets"
-          secret {
-            secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-            # default_mode = "0600"  # Octal
-            default_mode = "0440"  # Octal
-            items {
-              key = "mongo_initdb_root_username"
-              path = "mongo-initdb-root-username"  #File name.
+              key = "enabled_plugins"
+              path = "enabled_plugins"  #File name.
             }
             items {
-              key = "mongo_initdb_root_password"
-              path = "mongo-initdb-root-password"
-            }
-            items {
-              key = "mongo_replicaset_key"
-              path = "mongo-replicaset.key"
+              key = "rabbitmq.conf"
+              path = "rabbitmq.conf"  #File name.
             }
           }
         }

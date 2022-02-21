@@ -41,9 +41,11 @@ module "mem-rabbitmq" {
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/microservice-rabbitmq-stateful"
-  dir_name = "../../mem-rabbitmq/rabbitmq"
+  # dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
+  # This image has the RabbitMQ dashboard.
+  image_tag = "rabbitmq:3.9.7-management-alpine"
   path_rabbitmq_files = "./utility-files/rabbitmq"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie

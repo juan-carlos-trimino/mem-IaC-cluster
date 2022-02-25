@@ -46,9 +46,12 @@ module "mem-rabbitmq" {
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
+  # image_tag = "rabbitmq:3.9.7-alpine"
   path_rabbitmq_files = "./utility-files/rabbitmq"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
+  rabbitmq_default_pass = var.rabbitmq_default_pass
+  rabbitmq_default_user = var.rabbitmq_default_user
   #
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -58,13 +61,9 @@ module "mem-rabbitmq" {
   # '250m.'
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
-  cr_login_server = local.cr_login_server
-  cr_username = var.cr_username
-  cr_password = var.cr_password
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "5Gi"
   pvc_storage_class_name = "ibmc-block-silver"
-  service_name = "mem-rabbitmq"
   # Used by AMQP 0-9-1 and AMQP 1.0 clients without and with TLS.
   amqp_service_port = 5672
   amqp_service_target_port = 5672
@@ -76,6 +75,12 @@ module "mem-rabbitmq" {
     # If a system uses fully qualified domain names (FQDNs) for hostnames, RabbitMQ nodes and CLI
     # tools must be configured to use so called long node names.
     RABBITMQ_USE_LONGNAME = true
+    # Override the main RabbitMQ config file location.
     RABBITMQ_CONFIG_FILE = "/config/rabbitmq"
+    # RABBITMQ_DEFAULT_USER = "test"                    # Default user name (for management console).
+    # RABBITMQ_DEFAULT_PASS = "test1234"                # Default password (for management console).
+    # RABBITMQ_DEFAULT_VHOST = "rabbit-vhost"         # Change default Vhost name of RabbitMQ server.
+
   }
+  service_name = "mem-rabbitmq"
 }

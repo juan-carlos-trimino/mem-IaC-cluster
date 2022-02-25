@@ -15,7 +15,6 @@ module "ms-rabbitmq" {
 }
 */
 
-/***
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/microservice-mongodb-deploy"
@@ -38,10 +37,7 @@ module "mem-mongodb" {
   service_name = "mem-mongodb"
   service_port = 27017
   service_target_port = 27017
-  # env = {
-  # }
 }
-***/
 
 /***
 # StatefulSet.

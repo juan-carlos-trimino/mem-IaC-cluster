@@ -13,12 +13,10 @@ The enabled_plugins file, which adds the rabbitmq_peer_discovery_k8s plugin and 
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
-# variable "dir_name" {}
-variable "cr_login_server" {}
-variable "cr_username" {}
-variable "cr_password" {}
 variable "path_rabbitmq_files" {}
 variable "rabbitmq_erlang_cookie" {}
+variable "rabbitmq_default_pass" {}
+variable "rabbitmq_default_user" {}
 variable "namespace" {
   default = "default"
 }
@@ -81,6 +79,20 @@ variable "pvc_storage_size" {
 variable "service_name" {
   default = ""
 }
+# The service normally forwards each connection to a randomly selected backing pod. To
+# ensure that connections from a particular client are passed to the same Pod each time,
+# set the service's sessionAffinity property to ClientIP instead of None (default).
+# Session affinity and Web Browsers (for LoadBalancer Services)
+# Since the service is now exposed externally, accessing it with a web browser will hit
+# the same pod every time. If the sessionAffinity is set to None, then why? The browser
+# is using keep-alive connections and sends all its requests through a single connection.
+# Services work at the connection level, and when a connection to a service is initially
+# open, a random pod is selected and then all network packets belonging to that connection
+# are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
+# always get hit (until the connection is closed).
+variable "service_session_affinity" {
+  default = "None"
+}
 variable "amqp_service_port" {
   type = number
 }
@@ -92,6 +104,14 @@ variable "mgmt_service_port" {
 }
 variable "mgmt_service_target_port" {
   type = number
+}
+variable "dns_name" {
+  default = ""
+}
+# The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
+# NodePort, LoadBalancer, and ExternalName.
+variable "service_type" {
+  default = "ClusterIP"
 }
 #
 locals {
@@ -109,87 +129,8 @@ locals {
   # always get hit (until the connection is closed).
   session_affinity = "None"
   service_type = "ClusterIP"
-  path_to_secrets = "/mongodb/secrets"
+  service_name = "${var.service_name}-headless"
 }
-
-/***
-Define local variables.
-***/
-# locals {
-#   image_tag = (
-#                 var.image_tag == "" ?
-#                 "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
-#                 var.image_tag
-#               )
-# }
-
-/***
-Build the Docker image.
-Use null_resource to create Terraform resources that do not have any particular resourse type.
-Use local-exec to invoke commands on the local workstation.
-Use timestamp to force the Docker image to build.
-***/
-# resource "null_resource" "docker_build" {
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   #
-#   provisioner "local-exec" {
-#     command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
-#   }
-# }
-
-/***
-Login to the Container Registry.
-***/
-# resource "null_resource" "docker_login" {
-#   depends_on = [
-#     null_resource.docker_build
-#   ]
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   #
-#   provisioner "local-exec" {
-#     command = "docker login ${var.cr_login_server} -u ${var.cr_username} -p ${var.cr_password}"
-#   }
-# }
-
-/***
-Push the image to the Container Registry.
-***/
-# resource "null_resource" "docker_push" {
-#   depends_on = [
-#     null_resource.docker_login
-#   ]
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   #
-#   provisioner "local-exec" {
-#     command = "docker push ${local.image_tag}"
-#   }
-# }
-
-# resource "kubernetes_secret" "registry_credentials" {
-#   metadata {
-#     name = "${var.service_name}-registry-credentials"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   data = {
-#     ".dockerconfigjson" = jsonencode({
-#       auths = {
-#         "${var.cr_login_server}" = {
-#           auth = base64encode("${var.cr_username}:${var.cr_password}")
-#         }
-#       }
-#     })
-#   }
-#   type = "kubernetes.io/dockerconfigjson"
-# }
 
 resource "kubernetes_secret" "rabbitmq_secret" {
   metadata {
@@ -200,8 +141,13 @@ resource "kubernetes_secret" "rabbitmq_secret" {
     }
   }
   # Plain-text data.
+  # RabbitMQ nodes and the CLI tools use a cookie to determine whether they are allowed to
+  # communicate with each other. For two nodes to be able to communicate, they must have the same
+  # shared secret called the Erlang cookie.
   data = {
-    rabbitmq_erlang_cookie = "${var.rabbitmq_erlang_cookie}"
+    cookie = "${var.rabbitmq_erlang_cookie}"
+    pass = "${var.rabbitmq_default_pass}"
+    user = "${var.rabbitmq_default_user}"
   }
   type = "Opaque"
 }
@@ -211,7 +157,7 @@ resource "kubernetes_secret" "rabbitmq_secret" {
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
 # pod can only use a ServiceAccount from the same namespace.
 #
-# For cluster security, let’s constrain the cluster metadata this pod may read.
+# For cluster security, let's constrain the cluster metadata this pod may read.
 resource "kubernetes_service_account" "rabbitmq_service_account" {
   metadata {
     name = "${var.service_name}-service-account"
@@ -233,6 +179,11 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
+#
+# RabbitMQ's Kubernetes peer discovery plugin relies on the Kubernetes API as a data source. On
+# first boot, every node will try to discover their peers using the Kubernetes API and attempt to
+# join them. Nodes that finish booting emit a Kubernetes event to make it easier to discover such
+# events in cluster activity (event) logs.
 resource "kubernetes_role" "rabbitmq_role" {
   metadata {
     name = "${var.service_name}-role"
@@ -246,10 +197,18 @@ resource "kubernetes_role" "rabbitmq_role" {
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # This rule pertains to endpoints; the plural form must be used when specifying resources.
+    # The peer discovery plugin requires that the pod it runs in has rights to query the K8s API
+    # endpoints resource (https://github.com/rabbitmq/rabbitmq-peer-discovery-k8s).
     resources = ["endpoints"]
+  }
+  rule {
+    api_groups = [""]
+    verbs = ["create"]
+    resources = ["events"]
   }
 }
 
+# Bind the role to the service account.
 resource "kubernetes_role_binding" "rabbitmq_role_binding" {
   metadata {
     name = "${var.service_name}-role-binding"
@@ -274,6 +233,8 @@ resource "kubernetes_role_binding" "rabbitmq_role_binding" {
   }
 }
 
+# The ConfigMap passes to the rabbitmq daemon a bootstrap configuration which mainly defines peer
+# discovery and connectivity settings.
 resource "kubernetes_config_map" "rabbitmq_config" {
   metadata {
     name = "${var.service_name}-config"
@@ -286,14 +247,20 @@ resource "kubernetes_config_map" "rabbitmq_config" {
     # The enabled_plugins file is usually located in the node data directory or under /etc,
     # together with configuration files. The file contains a list of plugin names ending with
     # a dot.
-    "enabled_plugins" = "[rabbitmq_federation, rabbitmq_management, rabbitmq_peer_discovery_k8s]."
+    "enabled_plugins" = "[rabbitmq_management, rabbitmq_peer_discovery_k8s]."
     "rabbitmq.conf" = "${file("${var.path_rabbitmq_files}/configmaps/rabbitmq.conf")}"
   }
 }
 
 /***
-Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
-microservice into the K8s cluster.
+RabbitMQ requires using a Stateful Set to deploy a RabbitMQ cluster to Kubernetes. The Stateful Set
+ensures that the RabbitMQ nodes are deployed in order, one at a time. This avoids running into a
+potential peer discovery race condition when deploying a multi-node RabbitMQ cluster.
+
+There are other, equally important reasons for using a Stateful Set instead of a Deployment: sticky
+identity, simple network identifiers, stable persistent storage and the ability to perform ordered
+rolling upgrades.
+
 $ kubectl get sts -n memories
 ***/
 resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
@@ -309,7 +276,11 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
   spec {
     replicas = var.replicas
     pod_management_policy = var.pod_management_policy
-    service_name = var.service_name
+    # Headless service that gives network identity to the RabbitMQ nodes and enables them to
+    # cluster. The name of the service that governs this StatefulSet. This service must exist
+    # before the StatefulSet and is responsible for the network identity of the set. Pods get
+    # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
+    service_name = local.service_name
     selector {
       match_labels = {
         pod = var.service_name
@@ -364,26 +335,10 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
         #   # run_as_group = 1010
         #   fs_group = 0
         # }
-        # image_pull_secrets {
-        #   name = kubernetes_secret.registry_credentials.metadata[0].name
-        # }
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          # security_context {
-          #   run_as_non_root = true
-          #   # run_as_user = 1001
-          # }
-          # Docker (ENTRYPOINT)
-          # command = ["/usr/local/bin/docker-entrypoint.sh"]
-          # Docker (CMD)
-          # args = [
-          #   "mongod",
-          #   "--config", "${local.path_to_config}/mongod.conf",
-          #   "--replSet", "rs0",
-          #   "--bind_ip", "localhost,$(POD_NAME).${var.service_name}.${var.namespace}"
-          # ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -398,6 +353,11 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
           port {
             name = "mgmt"
             container_port = var.mgmt_service_target_port  # The port the app is listening.
+            protocol = "TCP"
+          }
+          port {
+            name = "epmd"
+            container_port = 4369
             protocol = "TCP"
           }
           resources {
@@ -434,10 +394,12 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               }
             }
           }
-          # Name of K8s headless service that selects the pods in the cluster.
+          # The name of the headless service needs to be provided to the discovery plugin via this
+          # environment variable. It uses the name to query the K8s API for information on all pods
+          # selected by the service.
           env {
             name = "K8S_SERVICE_NAME"
-            value = var.service_name
+            value = local.service_name
           }
           # When a node starts up, it checks whether it has been assigned a node name. If no value
           # was explicitly configured, the node resolves its hostname and prepends rabbit to it to
@@ -453,13 +415,33 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "K8S_HOSTNAME_SUFFIX"
             value = ".$(K8S_SERVICE_NAME).$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
-          # Import the shared secret cookie for erlang authentication.
+          env {
+            name = "RABBITMQ_DEFAULT_PASS"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+                key = "pass"
+              }
+            }
+          }
+          env {
+            name = "RABBITMQ_DEFAULT_USER"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+                key = "user"
+              }
+            }
+          }
+          # RabbitMQ nodes and CLI tools use a shared secret known as the Erlang Cookie, to
+          # authenticate to each other. The cookie value is a string of alphanumeric characters up
+          # to 255 characters in size.
           env {
             name = "RABBITMQ_ERLANG_COOKIE"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-                key = "rabbitmq_erlang_cookie"
+                key = "cookie"
               }
             }
           }
@@ -470,23 +452,58 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               value = env.value
             }
           }
+          # liveness_probe {
+          #   exec {
+          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
+          #   }
+          #   initial_delay_seconds = 60
+          #   # See https://www.rabbitmq.com/monitoring.html for monitoring frequency recommendations.
+          #   period_seconds = 60
+          #   timeout_seconds = 15
+          #   failure_threshold = 3
+          #   success_threshold = 1
+          # }
+          # readiness_probe {
+          #   exec {
+          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
+          #   }
+          #   initial_delay_seconds = 20
+          #   period_seconds = 60
+          #   timeout_seconds = 10
+          # }
           volume_mount {
             name = "rabbitmq-storage"
             mount_path = "/var/lib/rabbitmq/mnesia"
           }
+          # volume_mount {
+          #   name = "erlang-cookie"
+          #   mount_path = "/var/lib/rabbitmq"
+          #   read_only = false
+          # }
           volume_mount {
             name = "configs"
             mount_path = "/etc/rabbitmq"
-            read_only = true
+            read_only = false
           }
         }
+        # volume {
+        #   name = "erlang-cookie"
+        #   secret {
+        #     secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+        #     default_mode = "0600"  # Octal
+        #     items {
+        #       key = "rabbitmq_erlang_cookie"
+        #       path = ".erlang.cookie"  #File name.
+        #     }
+        #   }
+        # }
         volume {
           name = "configs"
           config_map {
             name = kubernetes_config_map.rabbitmq_config.metadata[0].name
             # Although ConfigMap should be used for non-sensitive configuration data, make the file
             # readable and writable only by the user and group that owns it.
-            default_mode = "0440"  # Octal
+            default_mode = "0660"  # Octal
             items {
               key = "enabled_plugins"
               path = "enabled_plugins"  #File name.
@@ -503,9 +520,18 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
     # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
     # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
     # pods in the same namespace.
+    #
+    # In order for RabbitMQ nodes to retain data between Pod restarts, node's data directory must
+    # use durable storage. A Persistent Volume must be attached to each RabbitMQ Pod.
+    #
+    # If a transient volume is used to back a RabbitMQ node, the node will lose its identity and
+    # all of its local data in case of a restart. This includes both schema and durable queue data.
+    # Syncing all of this data on every node restart would be highly inefficient. In case of a loss
+    # of quorum during a rolling restart, this will also lead to data loss.
     volume_claim_template {
       metadata {
         name = "rabbitmq-storage"
+        namespace = var.namespace
       }
       spec {
         access_modes = var.pvc_access_modes
@@ -521,11 +547,13 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
 }
 
 /***
-A StatefulSet requires a corresponding governing headless Service that's used to provide the actual
-network identity to each pod. Through this Service, each pod gets its own DNS entry thereby
-allowing its peers in the cluster to address the pod by its hostname. For example, if the governing
-Service belongs to the default namespace and is called service1, and the pod name is pod-0, the pod
-can be reached by its fully qualified domain name of pod-0.service1.default.svc.cluster.local.
+Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
+reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
+the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
+thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
+governing Service belongs to the default namespace and is called service1, and the pod name is
+pod-0, the pod can be reached by its fully qualified domain name of
+pod-0.service1.default.svc.cluster.local.
 
 To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
 the cluster:
@@ -533,9 +561,9 @@ $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig S
 
 where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
 ***/
-resource "kubernetes_service" "service" {
+resource "kubernetes_service" "headless_service" {
   metadata {
-    name = var.service_name
+    name = local.service_name
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -548,17 +576,52 @@ resource "kubernetes_service" "service" {
     }
     session_affinity = local.session_affinity
     port {
-      name = "amqp"
-      port = var.amqp_service_port  # Service port.
-      target_port = var.amqp_service_target_port  # Pod port.
+      name = "epmd"  # Node discovery.
+      port = 4369
+      target_port = 4369
+      protocol = "TCP"
     }
     port {
-      name = "mgmt"
-      port = var.mgmt_service_port  # Service port.
-      target_port = var.mgmt_service_target_port  # Pod port.
+      name = "cluster-rpc"  # Inter-node communication.
+      port = 25672
+      target_port = 25672
+      protocol = "TCP"
     }
     type = local.service_type
     cluster_ip = "None"  # Headless Service.
     publish_not_ready_addresses = var.publish_not_ready_addresses
+  }
+}
+
+/***
+Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
+***/
+resource "kubernetes_service" "service" {
+  metadata {
+    name = var.dns_name != "" ? var.dns_name : var.service_name
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  #
+  spec {
+    selector = {
+      pod = kubernetes_stateful_set.rabbitmq_stateful_set.metadata[0].labels.pod
+    }
+    session_affinity = var.service_session_affinity
+    port {
+      name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
+      port = var.amqp_service_port  # Service port.
+      target_port = var.amqp_service_target_port  # Pod port.
+      protocol = "TCP"
+    }
+    port {
+      name = "mgmt"  # management UI and HTTP API).
+      port = var.mgmt_service_port  # Service port.
+      target_port = var.mgmt_service_target_port  # Pod port.
+      protocol = "TCP"
+    }
+    type = var.service_type
   }
 }

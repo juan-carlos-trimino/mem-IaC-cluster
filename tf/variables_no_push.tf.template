@@ -97,3 +97,11 @@ variable "mongodb_password" {
 variable "rabbitmq_erlang_cookie" {
   default = "<required>"
 }
+
+variable "rabbitmq_default_pass" {
+  default = "<required>"
+}
+
+variable "rabbitmq_default_user" {
+  default = "<required>"
+}

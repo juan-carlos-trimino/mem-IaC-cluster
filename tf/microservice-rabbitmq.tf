@@ -41,12 +41,11 @@ module "mem-rabbitmq" {
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/microservice-rabbitmq-stateful"
-  # dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
-  # image_tag = "rabbitmq:3.9.7-alpine"
+  imagePullPolicy = "IfNotPresent"
   path_rabbitmq_files = "./utility-files/rabbitmq"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
@@ -55,6 +54,9 @@ module "mem-rabbitmq" {
   #
   publish_not_ready_addresses = true
   namespace = local.namespace
+  # Because several features (e.g. quorum queues, client tracking in MQTT) require a consensus
+  # between cluster members, odd numbers of cluster nodes are highly recommended: 1, 3, 5, 7
+  # and so on.
   replicas = 3
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
@@ -77,10 +79,6 @@ module "mem-rabbitmq" {
     RABBITMQ_USE_LONGNAME = true
     # Override the main RabbitMQ config file location.
     RABBITMQ_CONFIG_FILE = "/config/rabbitmq"
-    # RABBITMQ_DEFAULT_USER = "test"                    # Default user name (for management console).
-    # RABBITMQ_DEFAULT_PASS = "test1234"                # Default password (for management console).
-    # RABBITMQ_DEFAULT_VHOST = "rabbit-vhost"         # Change default Vhost name of RabbitMQ server.
-
   }
   service_name = "mem-rabbitmq"
 }

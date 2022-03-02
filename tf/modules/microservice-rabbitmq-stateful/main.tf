@@ -3,12 +3,6 @@
 A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
-
-
-The enabled_plugins file, which adds the rabbitmq_peer_discovery_k8s plugin and the standard management plugin, looks like this:
-
-[rabbitmq_management,rabbitmq_peer_discovery_k8s].
-
 ***/
 variable "app_name" {}
 variable "app_version" {}
@@ -252,17 +246,15 @@ resource "kubernetes_config_map" "rabbitmq_config" {
   }
 }
 
-/***
-RabbitMQ requires using a Stateful Set to deploy a RabbitMQ cluster to Kubernetes. The Stateful Set
-ensures that the RabbitMQ nodes are deployed in order, one at a time. This avoids running into a
-potential peer discovery race condition when deploying a multi-node RabbitMQ cluster.
-
-There are other, equally important reasons for using a Stateful Set instead of a Deployment: sticky
-identity, simple network identifiers, stable persistent storage and the ability to perform ordered
-rolling upgrades.
-
-$ kubectl get sts -n memories
-***/
+# RabbitMQ requires using a StatefulSet to deploy a RabbitMQ cluster to Kubernetes. The StatefulSet
+# ensures that the RabbitMQ nodes are deployed in order, one at a time. This avoids running into a
+# potential peer discovery race condition when deploying a multi-node RabbitMQ cluster.
+#
+# There are other, equally important reasons for using a StatefulSet instead of a Deployment:
+# sticky identity, simple network identifiers, stable persistent storage and the ability to perform
+# ordered rolling upgrades.
+#
+# $ kubectl get sts -n memories
 resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
   metadata {
     name = var.service_name
@@ -339,6 +331,13 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
+          # lifecycle {
+          #   post_start {
+          #     exec {
+          #       command = ["sh", "-c", "echo The $(RABBIT_POD_NAME) is running. && ls -al /var/lib/rabbitmq/mnesia"]
+          #     }
+          #   }
+          # }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -415,6 +414,10 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "K8S_HOSTNAME_SUFFIX"
             value = ".$(K8S_SERVICE_NAME).$(RABBIT_POD_NAMESPACE).svc.cluster.local"
           }
+          # This environment variable is only mean to be used in development and CI environments.
+          # This has the same meaning as default_user in rabbitmq.conf but higher priority. This
+          # option may be more convenient in cases where providing a config file is impossible, and
+          # environment variables is the only way to seed a user.
           env {
             name = "RABBITMQ_DEFAULT_PASS"
             value_from {
@@ -424,6 +427,10 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
               }
             }
           }
+          # This environment variable is only mean to be used in development and CI environments.
+          # This has the same meaning as default_pass in rabbitmq.conf but higher priority. This
+          # option may be more convenient in cases where providing a config file is impossible, and
+          # environment variables is the only way to seed a user.
           env {
             name = "RABBITMQ_DEFAULT_USER"
             value_from {
@@ -436,15 +443,15 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
           # RabbitMQ nodes and CLI tools use a shared secret known as the Erlang Cookie, to
           # authenticate to each other. The cookie value is a string of alphanumeric characters up
           # to 255 characters in size.
-          env {
-            name = "RABBITMQ_ERLANG_COOKIE"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-                key = "cookie"
-              }
-            }
-          }
+          # env {
+          #   name = "RABBITMQ_ERLANG_COOKIE"
+          #   value_from {
+          #     secret_key_ref {
+          #       name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+          #       key = "cookie"
+          #     }
+          #   }
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -475,35 +482,37 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "rabbitmq-storage"
             mount_path = "/var/lib/rabbitmq/mnesia"
           }
-          # volume_mount {
-          #   name = "erlang-cookie"
-          #   mount_path = "/var/lib/rabbitmq"
-          #   read_only = false
-          # }
+          volume_mount {
+            name = "erlang-cookie"
+            mount_path = "/var/lib/rabbitmq/mnesia/.erlang.cookie"
+            sub_path = ".erlang.cookie"
+            read_only = true
+          }
           volume_mount {
             name = "configs"
             mount_path = "/etc/rabbitmq"
-            read_only = false
+            read_only = true
           }
         }
-        # volume {
-        #   name = "erlang-cookie"
-        #   secret {
-        #     secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-        #     default_mode = "0600"  # Octal
-        #     items {
-        #       key = "rabbitmq_erlang_cookie"
-        #       path = ".erlang.cookie"  #File name.
-        #     }
-        #   }
-        # }
+        volume {
+          name = "erlang-cookie"
+          secret {
+            secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+            default_mode = "0600"  # Octal
+            items {
+              key = "cookie"
+              path = ".erlang.cookie"  #File name.
+              mode = "0400"
+            }
+          }
+        }
         volume {
           name = "configs"
           config_map {
             name = kubernetes_config_map.rabbitmq_config.metadata[0].name
             # Although ConfigMap should be used for non-sensitive configuration data, make the file
             # readable and writable only by the user and group that owns it.
-            default_mode = "0660"  # Octal
+            default_mode = "0400"  # Octal
             items {
               key = "enabled_plugins"
               path = "enabled_plugins"  #File name.
@@ -557,11 +566,11 @@ pod-0.service1.default.svc.cluster.local.
 
 To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
 the cluster:
-$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq.memories.svc.cluster.local
+$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
 
-where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
+$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq-headless.memories.svc.cluster.local
 ***/
-resource "kubernetes_service" "headless_service" {
+resource "kubernetes_service" "headless_service" {  # For inter-node communication.
   metadata {
     name = local.service_name
     namespace = var.namespace

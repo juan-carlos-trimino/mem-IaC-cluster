@@ -87,10 +87,8 @@ variable "service_target_port" {
   type = number
 }
 
-/***
-Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
-used by pods in the same namespace.
-***/
+# Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
+# used by pods in the same namespace.
 resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   metadata {
     name = var.pvc_name
@@ -121,10 +119,8 @@ resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
   }
 }
 
-/***
-Declare a K8s deployment to deploy a microservice; it instantiates the container for the
-microservice into the K8s cluster.
-***/
+# Declare a K8s deployment to deploy a microservice; it instantiates the container for the
+# microservice into the K8s cluster.
 resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
@@ -151,7 +147,7 @@ resource "kubernetes_deployment" "deployment" {
       }
       #
       spec {
-        termination_grace_period_seconds = var.terminationGracePeriodSeconds
+        termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
@@ -227,9 +223,8 @@ resource "kubernetes_deployment" "deployment" {
   }
 }
 
-/***
-Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-***/
+# Declare a K8s service to create a DNS record to make the microservice accessible within the
+# cluster.
 resource "kubernetes_service" "service" {
   metadata {
     name = var.dns_name != "" ? var.dns_name : var.service_name

@@ -230,7 +230,7 @@ resource "kubernetes_deployment" "deployment" {
       }
       #
       spec {
-        termination_grace_period_seconds = var.terminationGracePeriodSeconds
+        termination_grace_period_seconds = var.termination_grace_period_seconds
         image_pull_secrets {
           name = kubernetes_secret.registry_credentials.metadata[0].name
         }
@@ -308,9 +308,8 @@ resource "kubernetes_deployment" "deployment" {
   }
 }
 
-/***
-Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-***/
+# Declare a K8s service to create a DNS record to make the microservice accessible within the
+# cluster.
 resource "kubernetes_service" "service" {
   metadata {
     name = var.dns_name != "" ? var.dns_name : var.service_name

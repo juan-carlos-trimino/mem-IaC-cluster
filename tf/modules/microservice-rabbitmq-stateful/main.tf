@@ -555,21 +555,19 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
   }
 }
 
-/***
-Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
-reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
-the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
-thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
-governing Service belongs to the default namespace and is called service1, and the pod name is
-pod-0, the pod can be reached by its fully qualified domain name of
-pod-0.service1.default.svc.cluster.local.
-
-To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
-the cluster:
-$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
-
-$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq-headless.memories.svc.cluster.local
-***/
+# Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
+# reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
+# the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
+# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
+# governing Service belongs to the default namespace and is called service1, and the pod name is
+# pod-0, the pod can be reached by its fully qualified domain name of
+# pod-0.service1.default.svc.cluster.local.
+#
+# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
+# the cluster:
+# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
+#
+# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq-headless.memories.svc.cluster.local
 resource "kubernetes_service" "headless_service" {  # For inter-node communication.
   metadata {
     name = local.service_name
@@ -602,9 +600,7 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
   }
 }
 
-/***
-Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-***/
+# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
 resource "kubernetes_service" "service" {
   metadata {
     name = var.dns_name != "" ? var.dns_name : var.service_name

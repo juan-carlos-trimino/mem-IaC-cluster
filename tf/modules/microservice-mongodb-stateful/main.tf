@@ -245,11 +245,9 @@ resource "kubernetes_config_map" "scripts_files" {
   }
 }
 
-/***
-Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
-microservice into the K8s cluster.
-$ kubectl get sts -n memories
-***/
+# Declare a K8s stateful set to deploy a microservice; it instantiates the container for the
+# microservice into the K8s cluster.
+# $ kubectl get sts -n memories
 resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   metadata {
     name = var.service_name
@@ -487,19 +485,18 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
   }
 }
 
-/***
-A StatefulSet requires a corresponding governing headless Service that's used to provide the actual
-network identity to each pod. Through this Service, each pod gets its own DNS entry thereby
-allowing its peers in the cluster to address the pod by its hostname. For example, if the governing
-Service belongs to the default namespace and is called service1, and the pod name is pod-0, the pod
-can be reached by its fully qualified domain name of pod-0.service1.default.svc.cluster.local.
-
-To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
-the cluster:
-$ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-mongodb.memories.svc.cluster.local
-
-where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
-***/
+# A StatefulSet requires a corresponding governing headless Service that's used to provide the
+# actual network identity to each pod. Through this Service, each pod gets its own DNS entry
+# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
+# governing Service belongs to the default namespace and is called service1, and the pod name is
+# pod-0, the pod can be reached by its fully qualified domain name of
+# pod-0.service1.default.svc.cluster.local.
+#
+# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
+# the cluster:
+# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-mongodb.memories.svc.cluster.local
+#
+# where 'dig SRV <service-name>.<namespace>.svc.cluster.local'
 resource "kubernetes_service" "service" {
   metadata {
     name = var.service_name

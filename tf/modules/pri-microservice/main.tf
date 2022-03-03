@@ -79,7 +79,7 @@ variable "replicas" {
   default = 1
   type = number
 }
-variable "terminationGracePeriodSeconds" {
+variable "termination_grace_period_seconds" {
   default = 30
   type = number
 }
@@ -197,10 +197,8 @@ resource "kubernetes_secret" "registry_credentials" {
   type = "kubernetes.io/dockerconfigjson"
 }
 
-/***
-Declare a K8s deployment to deploy a microservice; it instantiates the container for the
-microservice into the K8s cluster.
-***/
+# Declare a K8s deployment to deploy a microservice; it instantiates the container for the
+# microservice into the K8s cluster.
 resource "kubernetes_deployment" "deployment" {
   depends_on = [
     null_resource.docker_push
@@ -230,7 +228,7 @@ resource "kubernetes_deployment" "deployment" {
       }
       #
       spec {
-        termination_grace_period_seconds = var.terminationGracePeriodSeconds
+        termination_grace_period_seconds = var.termination_grace_period_seconds
         image_pull_secrets {
           name = kubernetes_secret.registry_credentials.metadata[0].name
         }
@@ -308,9 +306,8 @@ resource "kubernetes_deployment" "deployment" {
   }
 }
 
-/***
-Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-***/
+# Declare a K8s service to create a DNS record to make the microservice accessible within the
+# cluster.
 resource "kubernetes_service" "service" {
   metadata {
     name = var.dns_name != "" ? var.dns_name : var.service_name

@@ -17,7 +17,7 @@ module "ms-rabbitmq" {
 
 # Deployment.
 module "mem-mongodb" {
-  source = "./modules/microservice-mongodb-deploy"
+  source = "./modules/mongodb-deploy"
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
@@ -49,7 +49,7 @@ module "mem-mongodb" {
 # (2) mongod does not read a configuration file by default, so the --config option with the path to
 #     the configuration file needs to be specified.
 module "mem-mongodb" {
-  source = "./modules/microservice-mongodb-stateful"
+  source = "./modules/mongodb-statefulset"
   dir_name = "../../mem-mongodb/mongodb"
   app_name = var.app_name
   app_version = var.app_version

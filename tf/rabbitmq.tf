@@ -19,7 +19,7 @@ module "ms-rabbitmq" {
 # Deployment.
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
-  source = "./modules/microservice-rabbitmq-deploy"
+  source = "./modules/rabbitmq-deploy"
   dir_name = "../../mem-rabbitmq/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
@@ -40,7 +40,7 @@ module "mem-rabbitmq" {
 
 # StatefulSet.
 module "mem-rabbitmq" {
-  source = "./modules/microservice-rabbitmq-stateful"
+  source = "./modules/rabbitmq-statefulset"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.

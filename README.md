@@ -58,11 +58,15 @@ IaC-cluster
  | ├ cluster_config
  | | └ .gitkeep
  | ├ modules
- | | ├ microservice-mongodb-deploy
+ | | ├ mongodb-deploy
  | | | └ main.tf
- | | ├ microservice-mongodb-stateful
+ | | ├ mongodb-statefulset
  | | | └ main.tf
  | | ├ pri-microservice
+ | | | └ main.tf
+ | | ├ rabbitmq-deploy
+ | | | └ main.tf
+ | | ├ rabbitmq-statefulset
  | | | └ main.tf
  | | └ .gitkeep
  | ├ utility-files
@@ -81,8 +85,8 @@ IaC-cluster
  | | └ .gitkeep
  | ├ data.tf
  | ├ ELK.tf
- | ├ microservice-mongodb.tf
- | ├ microservice-rabbitmq.tf
+ | ├ mongodb.tf
+ | ├ rabbitmq.tf
  | ├ namespace.tf
  | ├ pri-microservices.tf
  | ├ providers.tf

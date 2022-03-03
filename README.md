@@ -68,16 +68,21 @@ IaC-cluster
  | ├ utility-files
  | | ├ mongodb
  | | | ├ certs
- | | | | └ .gitigonre
+ | | | | └ .gitkeep
  | | | ├ configmaps
  | | | | └ mongod.conf
  | | | ├ scripts
  | | | | ├ entrypoint.sh
  | | | | └ start-replication.js
  | | | └ .gitkeep
+ | | ├ rabbitmq
+ | | | ├ configmaps
+ | | | | └ rabbitmq.conf
  | | └ .gitkeep
  | ├ data.tf
+ | ├ ELK.tf
  | ├ microservice-mongodb.tf
+ | ├ microservice-rabbitmq.tf
  | ├ namespace.tf
  | ├ pri-microservices.tf
  | ├ providers.tf

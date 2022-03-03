@@ -11,8 +11,8 @@
 tf/*
 !tf/data.tf
 !tf/pri-microservices.tf
-!tf/microservice-mongodb.tf
-!tf/microservice-rabbitmq.tf
+!tf/mongodb.tf
+!tf/rabbitmq.tf
 !tf/providers.tf
 !tf/namespace.tf
 !tf/tekton.yaml

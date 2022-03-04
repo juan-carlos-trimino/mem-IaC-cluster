@@ -43,7 +43,7 @@ variable "replicas" {
   default = 1
   type = number
 }
-variable "terminationGracePeriodSeconds" {
+variable "termination_grace_period_seconds" {
   default = 30
   type = number
 }

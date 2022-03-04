@@ -27,6 +27,7 @@ locals {
   # Stateful stuff
   # svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-1.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-2.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
   # Stateful stuff
+  svc_dns_elk = "http://mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
 }
 
 module "mem-gateway" {

@@ -126,7 +126,7 @@ locals {
   service_name = "${var.service_name}-headless"
 }
 
-resource "kubernetes_secret" "rabbitmq_secret" {
+resource "kubernetes_secret" "secret" {
   metadata {
     name = "${var.service_name}-secret"
     namespace = var.namespace
@@ -152,7 +152,7 @@ resource "kubernetes_secret" "rabbitmq_secret" {
 # pod can only use a ServiceAccount from the same namespace.
 #
 # For cluster security, let's constrain the cluster metadata this pod may read.
-resource "kubernetes_service_account" "rabbitmq_service_account" {
+resource "kubernetes_service_account" "service_account" {
   metadata {
     name = "${var.service_name}-service-account"
     namespace = var.namespace
@@ -164,7 +164,7 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
     }
   }
   secret {
-    name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+    name = kubernetes_secret.secret.metadata[0].name
   }
 }
 
@@ -178,7 +178,7 @@ resource "kubernetes_service_account" "rabbitmq_service_account" {
 # first boot, every node will try to discover their peers using the Kubernetes API and attempt to
 # join them. Nodes that finish booting emit a Kubernetes event to make it easier to discover such
 # events in cluster activity (event) logs.
-resource "kubernetes_role" "rabbitmq_role" {
+resource "kubernetes_role" "role" {
   metadata {
     name = "${var.service_name}-role"
     namespace = var.namespace
@@ -203,7 +203,7 @@ resource "kubernetes_role" "rabbitmq_role" {
 }
 
 # Bind the role to the service account.
-resource "kubernetes_role_binding" "rabbitmq_role_binding" {
+resource "kubernetes_role_binding" "role_binding" {
   metadata {
     name = "${var.service_name}-role-binding"
     namespace = var.namespace
@@ -216,20 +216,20 @@ resource "kubernetes_role_binding" "rabbitmq_role_binding" {
     api_group = "rbac.authorization.k8s.io"
     kind = "Role"
     # This RoleBinding references the Role specified below...
-    name = kubernetes_role.rabbitmq_role.metadata[0].name
+    name = kubernetes_role.role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
   subject {
     # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
     kind = "ServiceAccount"
-    name = kubernetes_service_account.rabbitmq_service_account.metadata[0].name
-    namespace = kubernetes_service_account.rabbitmq_service_account.metadata[0].namespace
+    name = kubernetes_service_account.service_account.metadata[0].name
+    namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
 
 # The ConfigMap passes to the rabbitmq daemon a bootstrap configuration which mainly defines peer
 # discovery and connectivity settings.
-resource "kubernetes_config_map" "rabbitmq_config" {
+resource "kubernetes_config_map" "config" {
   metadata {
     name = "${var.service_name}-config"
     namespace = var.namespace
@@ -255,7 +255,7 @@ resource "kubernetes_config_map" "rabbitmq_config" {
 # ordered rolling upgrades.
 #
 # $ kubectl get sts -n memories
-resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
+resource "kubernetes_stateful_set" "stateful_set" {
   metadata {
     name = var.service_name
     namespace = var.namespace
@@ -287,7 +287,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
       }
       #
       spec {
-        service_account_name = kubernetes_service_account.rabbitmq_service_account.metadata[0].name
+        service_account_name = kubernetes_service_account.service_account.metadata[0].name
         affinity {
           # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
           # that node is already running a pod with label having key 'replicaset' and value
@@ -422,7 +422,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "RABBITMQ_DEFAULT_PASS"
             value_from {
               secret_key_ref {
-                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+                name = kubernetes_secret.secret.metadata[0].name
                 key = "pass"
               }
             }
@@ -435,7 +435,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
             name = "RABBITMQ_DEFAULT_USER"
             value_from {
               secret_key_ref {
-                name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+                name = kubernetes_secret.secret.metadata[0].name
                 key = "user"
               }
             }
@@ -447,7 +447,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
           #   name = "RABBITMQ_ERLANG_COOKIE"
           #   value_from {
           #     secret_key_ref {
-          #       name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+          #       name = kubernetes_secret.secret.metadata[0].name
           #       key = "cookie"
           #     }
           #   }
@@ -497,7 +497,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
         volume {
           name = "erlang-cookie"
           secret {
-            secret_name = kubernetes_secret.rabbitmq_secret.metadata[0].name
+            secret_name = kubernetes_secret.secret.metadata[0].name
             default_mode = "0600"  # Octal
             items {
               key = "cookie"
@@ -509,7 +509,7 @@ resource "kubernetes_stateful_set" "rabbitmq_stateful_set" {
         volume {
           name = "configs"
           config_map {
-            name = kubernetes_config_map.rabbitmq_config.metadata[0].name
+            name = kubernetes_config_map.config.metadata[0].name
             # Although ConfigMap should be used for non-sensitive configuration data, make the file
             # readable and writable only by the user and group that owns it.
             default_mode = "0400"  # Octal
@@ -579,7 +579,7 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
   #
   spec {
     selector = {
-      pod = kubernetes_stateful_set.rabbitmq_stateful_set.metadata[0].labels.pod
+      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
     }
     session_affinity = local.session_affinity
     port {
@@ -612,7 +612,7 @@ resource "kubernetes_service" "service" {
   #
   spec {
     selector = {
-      pod = kubernetes_stateful_set.rabbitmq_stateful_set.metadata[0].labels.pod
+      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
     }
     session_affinity = var.service_session_affinity
     port {

@@ -59,3 +59,7 @@ tf/modules/rabbitmq-deploy/*
 !tf/modules/rabbitmq-statefulset/
 tf/modules/rabbitmq-statefulset/*
 !tf/modules/rabbitmq-statefulset/main.tf
+
+
+
+

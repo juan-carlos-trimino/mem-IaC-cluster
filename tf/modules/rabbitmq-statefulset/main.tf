@@ -187,7 +187,7 @@ resource "kubernetes_role" "role" {
     }
   }
   rule {
-    # Endpoints are resources in the core apiGroup, which has no name - hence the "".
+    # Resources in the core apiGroup, which has no name - hence the "".
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # This rule pertains to endpoints; the plural form must be used when specifying resources.
@@ -541,6 +541,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
       metadata {
         name = "rabbitmq-storage"
         namespace = var.namespace
+        labels = {
+          app = var.app_name
+        }
       }
       spec {
         access_modes = var.pvc_access_modes

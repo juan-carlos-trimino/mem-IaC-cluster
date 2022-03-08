@@ -1,3 +1,6 @@
+#It is very important to deploy same version for all the tools to prevent unxcpected results.
+
+
 /***
 -------------------------------------------------------
 A Terraform reusable module for deploying microservices
@@ -7,6 +10,7 @@ Define input variables to the module.
 variable "app_name" {}
 variable "app_version" {}
 variable "image_tag" {}
+variable "path_to_files" {}
 variable "namespace" {
   default = "default"
 }
@@ -19,6 +23,16 @@ variable "namespace" {
 # tag.
 variable "imagePullPolicy" {
   default = "Always"
+}
+# Certain pods (usually system pods) need to operate in the host's default namespaces, allowing
+# them to see and manipulate node-level resources and devices.
+# Attaching the hostNetwork permits a pod to access the node’s network adapter allowing a pod to listen to all network traffic for all pods on the node and communicate with other pods on the network namespace.
+# Certain pods (usually system pods) need to operate in the host’s default namespaces, allowing them to see and manipulate node-level resources and devices. For example, a pod may need to use the node’s network adapters instead of its own virtual network adapters. This can be achieved by setting the hostNetwork property in the pod spec to true.
+# Network interfaces in a pod using the host’s network namespace
+# $ kubectl exec pod-with-host-network ifconfig
+variable "host_network" {
+  default = false
+  type = bool
 }
 variable "env" {
   default = {}
@@ -36,8 +50,8 @@ variable "qos_limits_cpu" {
 variable "qos_limits_memory" {
   default = "0"
 }
-variable "replicas" {
-  default = 1
+variable "revision_history_limit" {
+  default = 2
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
@@ -45,18 +59,6 @@ variable "replicas" {
 variable "termination_grace_period_seconds" {
   default = 30
   type = number
-}
-# To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
-# guarantee.
-variable "pod_management_policy" {
-  default = "OrderedReady"
-}
-# The primary use case for setting this field is to use a StatefulSet's Headless Service to
-# propagate SRV records for its Pods without respect to their readiness for purpose of peer
-# discovery.
-variable "publish_not_ready_addresses" {
-  default = "false"
-  type = bool
 }
 variable "pvc_access_modes" {
   default = []
@@ -86,18 +88,6 @@ variable "service_name" {
 variable "service_session_affinity" {
   default = "None"
 }
-variable "rest_api_service_port" {
-  type = number
-}
-variable "rest_api_service_target_port" {
-  type = number
-}
-variable "inter_node_service_port" {
-  type = number
-}
-variable "inter_node_service_target_port" {
-  type = number
-}
 variable "dns_name" {
   default = ""
 }
@@ -106,25 +96,6 @@ variable "dns_name" {
 variable "service_type" {
   default = "ClusterIP"
 }
-#
-locals {
-  # The service normally forwards each connection to a randomly selected backing pod. To
-  # ensure that connections from a particular client are passed to the same Pod each time,
-  # set the service's sessionAffinity property to ClientIP instead of None (default).
-  #
-  # Session affinity and Web Browsers (for LoadBalancer Services)
-  # Since the service is now exposed externally, accessing it with a web browser will hit
-  # the same pod every time. If the sessionAffinity is set to None, then why? The browser
-  # is using keep-alive connections and sends all its requests through a single connection.
-  # Services work at the connection level, and when a connection to a service is initially
-  # open, a random pod is selected and then all network packets belonging to that connection
-  # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-  # always get hit (until the connection is closed).
-  session_affinity = "None"
-  service_type = "ClusterIP"
-  service_name = "${var.service_name}-headless"
-}
-
 
 
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
@@ -154,7 +125,7 @@ resource "kubernetes_service_account" "service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
-resource "kubernetes_role" "cluster_role" {
+resource "kubernetes_cluster_role" "cluster_role" {
   metadata {
     name = "${var.service_name}-cluster-role"
     labels = {
@@ -166,12 +137,12 @@ resource "kubernetes_role" "cluster_role" {
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
-    resources = ["pods", "namespaces"]
+    resources = ["pods", "namespaces", "nodes"]
   }
 }
 
 # Bind the role to the service account.
-resource "kubernetes_role_binding" "cluster_role_binding" {
+resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   metadata {
     name = "${var.service_name}-cluster-role-binding"
     labels = {
@@ -183,7 +154,7 @@ resource "kubernetes_role_binding" "cluster_role_binding" {
     api_group = "rbac.authorization.k8s.io"
     kind = "ClusterRole"
     # This RoleBinding references the Role specified below...
-    name = kubernetes_role.cluster_role.metadata[0].name
+    name = kubernetes_cluster_role.cluster_role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
   subject {
@@ -193,6 +164,25 @@ resource "kubernetes_role_binding" "cluster_role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
+
+
+
+resource "kubernetes_config_map" "config_files" {
+  metadata {
+    name = "${var.service_name}-config-files"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    "filebeat.yml" = "${file("${var.path_to_files}/filebeat.yml")}"
+  }
+}
+
+
+
+
 
 # $ kubectl get sts -n memories
 resource "kubernetes_daemonset" "daemonset" {
@@ -205,7 +195,13 @@ resource "kubernetes_daemonset" "daemonset" {
   }
   #
   spec {
-    pod_management_policy = var.pod_management_policy
+    revision_history_limit = var.revision_history_limit
+    selector {
+      match_labels = {
+        pod = var.service_name
+      }
+    }
+    #
     template {
       metadata {
         labels = {
@@ -216,20 +212,23 @@ resource "kubernetes_daemonset" "daemonset" {
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
+        host_network = var.host_network
+        dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          port {
-            name = "rest-api"
-            container_port = var.rest_api_service_target_port  # The port the app is listening.
-            protocol = "TCP"
-          }
-          port {
-            name = "inter-node"
-            container_port = var.inter_node_service_target_port  # The port the app is listening.
-            protocol = "TCP"
-          }
+          # security_context {
+          #   run_as_user = 0
+          #   # If using Red Hat OpenShift, uncomment the line below.
+          #   # privileged = true
+          # }
+          # Docker (CMD)
+          args = [
+            "-c",
+            "/etc/filebeat.yml",
+            "-e"
+          ]
           resources {
             requests = {
               # If a Container specifies its own memory limit, but does not specify a memory
@@ -248,21 +247,13 @@ resource "kubernetes_daemonset" "daemonset" {
           # uuid used as the node id. Note that the node id is persisted and does not change when a
           # node restarts and therefore the default node name will also not change.
           env {
-            name = "node.name"
+            name = "NODE_NAME"
             value_from {
               field_ref {
-                field_path = "metadata.name"
+                # field_path = "metadata.name"
+                field_path = "spec.nodeName"
               }
             }
-          }
-          # When you want to form a cluster with nodes on other hosts, use the static
-          # discovery.seed_hosts setting. This setting provides a list of other nodes in the
-          # cluster that are master-eligible and likely to be live and contactable to seed the
-          # discovery process. Each address can be either an IP address or a hostname that resolves
-          # to one or more IP addresses via DNS.
-          env {
-            name = "discovery.seed_hosts"
-            value = "mem-elasticsearch-0.${local.service_name}, mem-elasticsearch-1.${local.service_name}, mem-elasticsearch-2.${local.service_name}"
           }
           dynamic "env" {
             for_each = var.env
@@ -293,113 +284,24 @@ resource "kubernetes_daemonset" "daemonset" {
           #   timeout_seconds = 10
           # }
           volume_mount {
-            name = "elasticsearch-storage"
-            mount_path = "/usr/share/elasticsearch/data"
+            name = "config-files"
+            mount_path = "/etc/filebeat.yml"
+            sub_path = "filebeat.yml"
+            read_only = true
+          }
+        }
+        volume {
+          name = "config-files"
+          config_map {
+            name = kubernetes_config_map.config_files.metadata[0].name
+            default_mode = "0600"
+            items {
+              key = "filebeat.yml"
+              path = "filebeat.yml"  # File name.
+            }
           }
         }
       }
     }
-    # This template will be used to create a PersistentVolumeClaim for each pod.
-    # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
-    # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
-    # pods in the same namespace.
-    #
-    # In order for RabbitMQ nodes to retain data between Pod restarts, node's data directory must
-    # use durable storage. A Persistent Volume must be attached to each RabbitMQ Pod.
-    #
-    # If a transient volume is used to back a RabbitMQ node, the node will lose its identity and
-    # all of its local data in case of a restart. This includes both schema and durable queue data.
-    # Syncing all of this data on every node restart would be highly inefficient. In case of a loss
-    # of quorum during a rolling restart, this will also lead to data loss.
-    volume_claim_template {
-      metadata {
-        name = "elasticsearch-storage"
-        namespace = var.namespace
-      }
-      spec {
-        access_modes = var.pvc_access_modes
-        storage_class_name = var.pvc_storage_class_name
-        resources {
-          requests = {
-            storage = var.pvc_storage_size
-          }
-        }
-      }
-    }
-  }
-}
-
-
-
-
-
-
-# Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
-# reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
-# the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
-# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
-# governing Service belongs to the default namespace and is called service1, and the pod name is
-# pod-0, the pod can be reached by its fully qualified domain name of
-# pod-0.service1.default.svc.cluster.local.
-#
-# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
-# the cluster:
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
-#
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-elasticsearch-headless.memories.svc.cluster.local
-resource "kubernetes_service" "headless_service" {  # For inter-node communication.
-  metadata {
-    name = local.service_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  #
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = local.session_affinity
-    port {
-      name = "rest-api"  # Node discovery.
-      port = var.rest_api_service_port
-      target_port = var.rest_api_service_target_port
-      protocol = "TCP"
-    }
-    port {
-      name = "inter-node"  # Inter-node communication.
-      port = var.inter_node_service_port
-      target_port = var.inter_node_service_target_port
-      protocol = "TCP"
-    }
-    type = local.service_type
-    cluster_ip = "None"  # Headless Service.
-    publish_not_ready_addresses = var.publish_not_ready_addresses
-  }
-}
-
-# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-resource "kubernetes_service" "service" {
-  metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  #
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = var.service_session_affinity
-    port {
-      name = "rest-api"  # Node discovery.
-      port = var.rest_api_service_port
-      target_port = var.rest_api_service_target_port
-      protocol = "TCP"
-    }
-    type = var.service_type
   }
 }

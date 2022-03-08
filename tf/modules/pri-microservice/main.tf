@@ -233,9 +233,9 @@ resource "kubernetes_deployment" "deployment" {
           name = kubernetes_secret.registry_credentials.metadata[0].name
         }
         container {
+          name = var.service_name
           image = local.image_tag
           image_pull_policy = var.imagePullPolicy
-          name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other

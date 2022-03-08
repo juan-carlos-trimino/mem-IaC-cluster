@@ -5,7 +5,6 @@ A Terraform reusable module for deploying microservices
 Define input variables to the module.
 ***/
 variable "app_name" {}
-variable "app_version" {}
 variable "image_tag" {}
 variable "namespace" {
   default = "default"
@@ -38,6 +37,10 @@ variable "qos_limits_memory" {
 }
 variable "replicas" {
   default = 1
+  type = number
+}
+variable "revision_history_limit" {
+  default = 2
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
@@ -125,11 +128,6 @@ locals {
   service_name = "${var.service_name}-headless"
 }
 
-
-
-#################
-# Elasticsearch #
-#################
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -157,16 +155,15 @@ resource "kubernetes_service_account" "service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
-resource "kubernetes_role" "cluster_role" {
+resource "kubernetes_cluster_role" "cluster_role" {
   metadata {
     name = "${var.service_name}-cluster-role"
-    # namespace = var.namespace
     labels = {
       app = var.app_name
     }
   }
   rule {
-    # Endpoints are resources in the core apiGroup, which has no name - hence the "".
+    # Resources in the core apiGroup, which has no name - hence the "".
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
@@ -175,10 +172,9 @@ resource "kubernetes_role" "cluster_role" {
 }
 
 # Bind the role to the service account.
-resource "kubernetes_role_binding" "cluster_role_binding" {
+resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   metadata {
     name = "${var.service_name}-cluster-role-binding"
-    # namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -188,7 +184,7 @@ resource "kubernetes_role_binding" "cluster_role_binding" {
     api_group = "rbac.authorization.k8s.io"
     kind = "ClusterRole"
     # This RoleBinding references the Role specified below...
-    name = kubernetes_role.cluster_role.metadata[0].name
+    name = kubernetes_cluster_role.cluster_role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
   subject {
@@ -199,16 +195,9 @@ resource "kubernetes_role_binding" "cluster_role_binding" {
   }
 }
 
-# xxxxxxxxxxxxxxxxxxxxxxxxxRabbitMQ requires using a StatefulSet to deploy a RabbitMQ cluster to Kubernetes. The StatefulSet
-# ensures that the RabbitMQ nodes are deployed in order, one at a time. This avoids running into a
-# potential peer discovery race condition when deploying a multi-node RabbitMQ cluster.
-#
-# There are other, equally important reasons for using a StatefulSet instead of a Deployment:
-# sticky identity, simple network identifiers, stable persistent storage and the ability to perform
-# ordered rolling upgrades.
-
-# Elasticsearch requires that the vm.max_map_count in the Linux kernel parameter be set to be at least 262144.
-
+# There are important reasons for using a StatefulSet instead of a Deployment: sticky identity,
+# simple network identifiers, stable persistent storage and the ability to perform ordered rolling
+# upgrades.
 #
 # $ kubectl get sts -n memories
 resource "kubernetes_stateful_set" "stateful_set" {
@@ -224,6 +213,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
   spec {
     replicas = var.replicas
     pod_management_policy = var.pod_management_policy
+    revision_history_limit = var.revision_history_limit
     # Headless service that gives network identity to the RabbitMQ nodes and enables them to
     # cluster. The name of the service that governs this StatefulSet. This service must exist
     # before the StatefulSet and is responsible for the network identity of the set. Pods get
@@ -279,21 +269,23 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        # The security settings that is specified for a Pod apply to all Containers in the Pod.
-        # security_context {
-        #   # run_as_user = 1010
-        #   # run_as_group = 1010
-        #   fs_group = 0
-        # }
-
-
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
         # init_container {
-        #   name = "${var.service_name}-init"
-        #   image = "busybox"
+        #   name = "increase-vm-max-map-count"
+        #   image = "busybox:latest"
         #   # Docker (ENTRYPOINT)
         #   command = ["/sbin/sysctl", "-w", "vm.max_map_count=262144"]
+        #   security_context {
+        #     privileged = true
+        #   }
+        # }
+        # Increase the max number of open file descriptors.
+        # init_container {
+        #   name = "increase-fd-ulimit"
+        #   image = "busybox:latest"
+        #   # Docker (ENTRYPOINT)
+        #   command = ["/bin/sh", "-c", "ulimit -n 65536"]
         #   security_context {
         #     privileged = true
         #   }
@@ -302,13 +294,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          # lifecycle {
-          #   post_start {
-          #     exec {
-          #       command = ["sh", "-c", "echo The $(RABBIT_POD_NAME) is running. && ls -al /var/lib/rabbitmq/mnesia"]
-          #     }
-          #   }
-          # }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -366,8 +351,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
               value = env.value
             }
           }
-
-
           # liveness_probe {
           #   exec {
           #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
@@ -410,6 +393,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
       metadata {
         name = "elasticsearch-storage"
         namespace = var.namespace
+        labels = {
+          app = var.app_name
+        }
       }
       spec {
         access_modes = var.pvc_access_modes
@@ -423,11 +409,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
     }
   }
 }
-
-
-
-
-
 
 # Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
 # reason, a StatefulSet requires a corresponding governing headless Service that's used to provide

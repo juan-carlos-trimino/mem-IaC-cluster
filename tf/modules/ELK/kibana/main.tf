@@ -5,9 +5,7 @@ A Terraform reusable module for deploying microservices
 Define input variables to the module.
 ***/
 variable "app_name" {}
-variable "app_version" {}
 variable "image_tag" {}
-# variable "svc_dns_elasticsearch" {}
 variable "namespace" {
   default = "default"
 }
@@ -41,33 +39,15 @@ variable "replicas" {
   default = 1
   type = number
 }
+variable "revision_history_limit" {
+  default = 2
+  type = number
+}
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
 # seconds to terminate gracefully before they're killed forcibly.
 variable "termination_grace_period_seconds" {
   default = 30
   type = number
-}
-# To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
-# guarantee.
-variable "pod_management_policy" {
-  default = "OrderedReady"
-}
-# The primary use case for setting this field is to use a StatefulSet's Headless Service to
-# propagate SRV records for its Pods without respect to their readiness for purpose of peer
-# discovery.
-variable "publish_not_ready_addresses" {
-  default = "false"
-  type = bool
-}
-variable "pvc_access_modes" {
-  default = []
-  type = list
-}
-variable "pvc_storage_class_name" {
-  default = ""
-}
-variable "pvc_storage_size" {
-  default = "20Gi"
 }
 variable "service_name" {
   default = ""
@@ -114,6 +94,7 @@ resource "kubernetes_deployment" "deployment" {
   #
   spec {
     replicas = var.replicas
+    revision_history_limit = var.revision_history_limit
     selector {
       match_labels = {
         pod = var.service_name
@@ -130,9 +111,9 @@ resource "kubernetes_deployment" "deployment" {
       spec {
         termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
+          name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -158,12 +139,6 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          # env {
-          #   name = "ELASTICSEARCH_HOSTS"
-          #   value = "${var.svc_dns_elasticsearch}"
-          #   # value = "http://mem-elasticsearch-headless.${var.namespace}:9200"
-          # }
-
           dynamic "env" {
             for_each = var.env
             content {
@@ -176,7 +151,6 @@ resource "kubernetes_deployment" "deployment" {
     }
   }
 }
-
 
 # Declare a K8s service to create a DNS record to make the microservice accessible within the
 # cluster.

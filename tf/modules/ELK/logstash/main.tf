@@ -5,7 +5,6 @@ A Terraform reusable module for deploying microservices
 Define input variables to the module.
 ***/
 variable "app_name" {}
-variable "app_version" {}
 variable "image_tag" {}
 variable "namespace" {
   default = "default"
@@ -20,51 +19,17 @@ variable "namespace" {
 variable "imagePullPolicy" {
   default = "Always"
 }
-variable "env" {
-  default = {}
-  type = map
-}
-variable "qos_requests_cpu" {
-  default = ""
-}
-variable "qos_requests_memory" {
-  default = ""
-}
-variable "qos_limits_cpu" {
-  default = "0"
-}
-variable "qos_limits_memory" {
-  default = "0"
-}
 variable "replicas" {
   default = 1
+  type = number
+}
+variable "revision_history_limit" {
+  default = 2
   type = number
 }
 variable "termination_grace_period_seconds" {
   default = 30
   type = number
-}
-# To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
-# guarantee.
-variable "pod_management_policy" {
-  default = "OrderedReady"
-}
-# The primary use case for setting this field is to use a StatefulSet's Headless Service to
-# propagate SRV records for its Pods without respect to their readiness for purpose of peer
-# discovery.
-variable "publish_not_ready_addresses" {
-  default = "false"
-  type = bool
-}
-variable "pvc_access_modes" {
-  default = []
-  type = list
-}
-variable "pvc_storage_class_name" {
-  default = ""
-}
-variable "pvc_storage_size" {
-  default = "20Gi"
 }
 variable "service_name" {
   default = ""
@@ -110,46 +75,65 @@ resource "kubernetes_config_map" "config" {
     }
   }
   data = {
-    # logstash.yml
-    # (1) It defines the network address on which Logstash will listen; 0.0.0.0 to denote that it
-    #     needs to listen on all available interfaces.
-    # (2) It specifies where Logstash should find its configuration file which is /usr/share/logstash/pipeline.
-    # This configuration path is where the second file (logstash.conf) resides. That second file is what instructs Logstash about how to parse the incoming log files. Let’s have a look at the interesting parts of this file:
+    # (1) Define the network address on which Logstash will listen; 0.0.0.0 denotes that it needs
+    #     to listen on all available interfaces.
+    # (2) Specify where Logstash will find its configuration file. This configuration path is where
+    #     'logstash.conf' resides; this file is what instructs Logstash about how to parse the
+    #     incoming log files.
     "logstash.yml" = <<EOF
       http.host: 0.0.0.0
       path.config: /usr/share/logstash/pipeline
       EOF
-    # The input stanza instructs Logstash as to where it should get its data. The daemon will be listening at port 5044 and an agent (Filebeat in our case) will push logs to this port.
-    # The filter stanza is where we specify how logs should be interpreted. Logstash uses filters to parse and transform log files to a format understandable by Elasticsearch. In our example, we are using grok. Explaining how the Grok filter works is beyond the scope of this article but you can read more about it here. We are using one of the options available for Grok out of the box, which is used for parsing Apache logs in the combined format (COMBINEDAPACHELOG). Since it’s a popular log format, grok can automatically extract key information from each line and convert it to JSON format.
-    # The date stanza is used for adding a timestamp to each logline. You can use the timestamp to configure exactly how the timestamp would appear.
-    # The geoip part is used to add the client’s IP address to the log so that we know where it is coming from.
-    # The output part defines the target, where Logstash should forward the parsed log data. In our lab, we want Logstash to forward it to the Elasticsearch cluster. We specify the service name without the need to add the namespace and the rest of the URL (like in elasticsearch-logging.kube-system.svc.cluster.local) because both resources are in the same namespace.
     "logstash.conf" = <<EOF
+      # All input will come from Filebeat, no local logs.
       input {
         beats {
           port => 5044
         }
       }
       filter {
-        grok {
-          match => {"message" => "%%{COMBINEDAPACHELOG}"}
+        # grok {
+        #  match => {"message" => "%%{COMBINEDAPACHELOG}"}
+        # }
+        # date {
+        #  match => ["timestamp", "dd/MMM/yyyy:HH:mm:ss Z"]
+        # }
+        # Container logs are received with a variable named index_prefix.
+        # Since it is in JSON format, decode it via the JSON filter plugin.
+        if [index_prefix] == "k8s-logs" {
+          if [message] =~ /^\{.*\}$/ {
+            json {
+              source => "message"
+              skip_on_invalid_json => true
+            }
+          }
         }
-        date {
-          match => ["timestamp", "dd/MMM/yyyy:HH:mm:ss Z"]
+        #
+        # Do not expose the index_prefix field to Kibana.
+        mutate {
+          # @metadata is not exposed outside of Logstash by default.
+          add_field => { "[@metadata][index_prefix]" => "%%{index_prefix}-%%{+YYYY.MM.dd}" }
+          # Since index_prefix was added to metadata, the ["index_prefix"] field is no longer needed.
+          remove_field => ["index_prefix"]
         }
-        geoip {
-          source => "clientip"
+        #
+        if [ClientHost] {
+          geoip {
+            source => "ClientHost"
+          }
         }
+        # geoip {
+        #   source => "clientip"
+        # }
       }
       output {
         elasticsearch {
-          hosts => ["elasticsearch-logging:9200"]
+          hosts => ["mem-elasticsearch:9200"]
         }
       }
       EOF
   }
 }
-
 
 resource "kubernetes_deployment" "deployment" {
   metadata {
@@ -163,6 +147,7 @@ resource "kubernetes_deployment" "deployment" {
   #
   spec {
     replicas = var.replicas
+    revision_history_limit = var.revision_history_limit
     selector {
       match_labels = {
         pod = var.service_name
@@ -179,9 +164,9 @@ resource "kubernetes_deployment" "deployment" {
       spec {
         termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
+          name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          name = var.service_name
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -191,27 +176,6 @@ resource "kubernetes_deployment" "deployment" {
           port {
             container_port = var.service_target_port  # The port the app is listening.
             protocol = "TCP"
-          }
-          resources {
-            requests = {
-              # If a Container specifies its own memory limit, but does not specify a memory
-              # request, Kubernetes automatically assigns a memory request that matches the limit.
-              # Similarly, if a Container specifies its own CPU limit, but does not specify a CPU
-              # request, Kubernetes automatically assigns a CPU request that matches the limit.
-              cpu = var.qos_requests_cpu == "" ? var.qos_limits_cpu : var.qos_requests_cpu
-              memory = var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
-            }
-            limits = {
-              cpu = var.qos_limits_cpu
-              memory = var.qos_limits_memory
-            }
-          }
-          dynamic "env" {
-            for_each = var.env
-            content {
-              name = env.key
-              value = env.value
-            }
           }
           volume_mount {
             name = "config1"

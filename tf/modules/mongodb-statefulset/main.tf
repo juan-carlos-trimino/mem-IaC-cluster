@@ -424,7 +424,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
             items {
               key = "mongod.conf"
-              path = "mongod.conf"  #File name.
+              path = "mongod.conf"  # File name.
             }
           }
         }
@@ -437,11 +437,11 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
             items {
               key = "entrypoint.sh"
-              path = "entrypoint.sh"  #File name.
+              path = "entrypoint.sh"  # File name.
             }
             items {
               key = "start-replication.js"
-              path = "start-replication.js"  #File name.
+              path = "start-replication.js"  # File name.
             }
           }
         }
@@ -453,7 +453,7 @@ resource "kubernetes_stateful_set" "mongodb_stateful_set" {
             default_mode = "0440"  # Octal
             items {
               key = "mongo_initdb_root_username"
-              path = "mongo-initdb-root-username"  #File name.
+              path = "mongo-initdb-root-username"  # File name.
             }
             items {
               key = "mongo_initdb_root_password"

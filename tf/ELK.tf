@@ -146,11 +146,13 @@ module "mem-logstash" {
 
 
 
+
+
+# Filebeat is the agent that we are going to use to ship logs to Logstash. We are using a DaemonSet for this deployment. A DaemonSet ensures that an instance of the Pod is running each node in the cluster. To deploy Filebeat, we need to create a service account, a cluster role, and a cluster role binding the same way we did with Elasticsearch. We also need a configMap to hold the instructions that Filebeat would use to ship logs. I’ve combined all the required resources in one definition file that we’ll discuss:
 module "mem-filebeat" {
   source = "./modules/ELK/filebeat"
   path_to_files = "./modules/ELK/filebeat"
   app_name = var.app_name
-  app_version = var.app_version
   image_tag = "docker.elastic.co/beats/filebeat:7.5.0"
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
@@ -158,18 +160,9 @@ module "mem-filebeat" {
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
-  # Burstable class because there is a need for more CPU upon initialization.
   qos_limits_cpu = "600m"
   qos_requests_cpu = "500m"
   qos_limits_memory = "200Mi"
   qos_requests_memory = "100Mi"
-  # pvc_access_modes = ["ReadWriteOnce"]
-  # pvc_storage_size = "25Gi"
-  # pvc_storage_class_name = "ibmc-block-silver"
   service_name = "mem-filebeat"
 }
-
-
-
-
-

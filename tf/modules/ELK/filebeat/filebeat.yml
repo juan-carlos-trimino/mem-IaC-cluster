@@ -20,7 +20,7 @@ filebeat.inputs:
   # Send events to Logstash.
   output.logstash:
     enabled: true
-    hosts: ["logstash:9600"]
+    hosts: ["mem-logstash:9600"]
   # You can set logging.level to debug to see the generated events by the running filebeat instance.
   logging.level: info
   logging.to_files: false

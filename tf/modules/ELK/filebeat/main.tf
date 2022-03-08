@@ -1,6 +1,3 @@
-#It is very important to deploy same version for all the tools to prevent unxcpected results.
-
-
 /***
 -------------------------------------------------------
 A Terraform reusable module for deploying microservices
@@ -8,7 +5,6 @@ A Terraform reusable module for deploying microservices
 Define input variables to the module.
 ***/
 variable "app_name" {}
-variable "app_version" {}
 variable "image_tag" {}
 variable "path_to_files" {}
 variable "namespace" {
@@ -59,16 +55,6 @@ variable "revision_history_limit" {
 variable "termination_grace_period_seconds" {
   default = 30
   type = number
-}
-variable "pvc_access_modes" {
-  default = []
-  type = list
-}
-variable "pvc_storage_class_name" {
-  default = ""
-}
-variable "pvc_storage_size" {
-  default = "20Gi"
 }
 variable "service_name" {
   default = ""
@@ -137,7 +123,7 @@ resource "kubernetes_cluster_role" "cluster_role" {
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
-    resources = ["pods", "namespaces", "nodes"]
+    resources = ["pods", "namespaces"]
   }
 }
 
@@ -165,8 +151,6 @@ resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   }
 }
 
-
-
 resource "kubernetes_config_map" "config_files" {
   metadata {
     name = "${var.service_name}-config-files"
@@ -176,6 +160,14 @@ resource "kubernetes_config_map" "config_files" {
     }
   }
   data = {
+    "kubernetes.yml" = <<EOF
+      - type: docker
+        containers.ids:
+        - "*"
+        processors:
+          - add_kubernetes_metadata:
+            in_cluster: true
+      EOF
     "filebeat.yml" = "${file("${var.path_to_files}/filebeat.yml")}"
   }
 }
@@ -184,7 +176,7 @@ resource "kubernetes_config_map" "config_files" {
 
 
 
-# $ kubectl get sts -n memories
+# $ kubectl get ds -n memories
 resource "kubernetes_daemonset" "daemonset" {
   metadata {
     name = var.service_name
@@ -212,8 +204,8 @@ resource "kubernetes_daemonset" "daemonset" {
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        host_network = var.host_network
-        dns_policy = "ClusterFirstWithHostNet"
+        # host_network = var.host_network
+        # dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
           image = var.image_tag
@@ -224,11 +216,7 @@ resource "kubernetes_daemonset" "daemonset" {
           #   # privileged = true
           # }
           # Docker (CMD)
-          args = [
-            "-c",
-            "/etc/filebeat.yml",
-            "-e"
-          ]
+          args = ["-c", "/etc/filebeat.yml", "-e"]
           resources {
             requests = {
               # If a Container specifies its own memory limit, but does not specify a memory
@@ -246,24 +234,22 @@ resource "kubernetes_daemonset" "daemonset" {
           # By default, Elasticsearch will take the 7 first character of the randomly generated
           # uuid used as the node id. Note that the node id is persisted and does not change when a
           # node restarts and therefore the default node name will also not change.
-          env {
-            name = "NODE_NAME"
-            value_from {
-              field_ref {
-                # field_path = "metadata.name"
-                field_path = "spec.nodeName"
-              }
-            }
-          }
-          dynamic "env" {
-            for_each = var.env
-            content {
-              name = env.key
-              value = env.value
-            }
-          }
-
-
+          # env {
+          #   name = "NODE_NAME"
+          #   value_from {
+          #     field_ref {
+          #       # field_path = "metadata.name"
+          #       field_path = "spec.nodeName"
+          #     }
+          #   }
+          # }
+          # dynamic "env" {
+          #   for_each = var.env
+          #   content {
+          #     name = env.key
+          #     value = env.value
+          #   }
+          # }
           # liveness_probe {
           #   exec {
           #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
@@ -283,15 +269,31 @@ resource "kubernetes_daemonset" "daemonset" {
           #   period_seconds = 60
           #   timeout_seconds = 10
           # }
+          # Among the mounted filesystems that Filebeat will have access to, we are specifying /var/lib/docker/containers. Notice that the volume type of this path is hostPath (line 120), which means that Filebeat will have access to this path on the node rather than the container. Kubernetes uses this path on the node to write data about the containers, additionally, any STDOUT or STDERR coming from the containers running on the node is directed to this path in JSON format (the standard output and standard error data is still viewable through the kubectl logs command, but a copy is kept at that path).
           volume_mount {
-            name = "config-files"
+            name = "config"
             mount_path = "/etc/filebeat.yml"
             sub_path = "filebeat.yml"
             read_only = true
           }
+          volume_mount {
+            name = "prospectors"
+            mount_path = "/usr/share/filebeat/prospectors.d"
+            read_only = true
+          }
+          volume_mount {
+            name = "data"
+            mount_path = "/usr/share/filebeat/data"
+            read_only = false
+          }
+          volume_mount {
+            name = "varlibdockercontainers"
+           mount_path = "/var/lib/docker/containers"
+           read_only = false
+          }
         }
         volume {
-          name = "config-files"
+          name = "config"
           config_map {
             name = kubernetes_config_map.config_files.metadata[0].name
             default_mode = "0600"
@@ -299,6 +301,27 @@ resource "kubernetes_daemonset" "daemonset" {
               key = "filebeat.yml"
               path = "filebeat.yml"  # File name.
             }
+          }
+        }
+        volume {
+          name = "prospectors"
+          config_map {
+            name = kubernetes_config_map.config_files.metadata[0].name
+            default_mode = "0600"
+            items {
+              key = "kubernetes.yml"
+              path = "kubernetes.yml"  # File name.
+            }
+          }
+        }
+        volume {
+          name = "data"
+          empty_dir {}
+        }
+        volume {
+          name = "varlibdockercontainers"
+          host_path {
+            path = "/var/lib/docker/containers"
           }
         }
       }

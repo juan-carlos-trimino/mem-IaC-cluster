@@ -37,6 +37,9 @@ tf/utility-files/mongodb/certs/*
 !tf/utility-files/mongodb/configmaps/
 tf/utility-files/mongodb/configmaps/*
 !tf/utility-files/mongodb/configmaps/mongod.conf
+!tf/utility-files/rabbitmq/configmaps/
+tf/utility-files/rabbitmq/configmaps/*
+!tf/utility-files/rabbitmq/configmaps/rabbitmq.conf
 !tf/utility-files/mongodb/scripts/
 tf/utility-files/mongodb/scripts/*
 !tf/utility-files/mongodb/scripts/entrypoint.sh

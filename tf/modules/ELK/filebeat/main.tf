@@ -20,12 +20,16 @@ variable "namespace" {
 variable "imagePullPolicy" {
   default = "Always"
 }
-# Certain pods (usually system pods) need to operate in the host's default namespaces, allowing
-# them to see and manipulate node-level resources and devices.
-# Attaching the hostNetwork permits a pod to access the node’s network adapter allowing a pod to listen to all network traffic for all pods on the node and communicate with other pods on the network namespace.
-# Certain pods (usually system pods) need to operate in the host’s default namespaces, allowing them to see and manipulate node-level resources and devices. For example, a pod may need to use the node’s network adapters instead of its own virtual network adapters. This can be achieved by setting the hostNetwork property in the pod spec to true.
-# Network interfaces in a pod using the host’s network namespace
-# $ kubectl exec pod-with-host-network ifconfig
+# Containers in a pod usually run under separate Linux namespaces, which isolate their processes
+# from processes running in other containers or in the node's default namespace. Certain pods
+# (usually system pods) need to operate in the host's default namespace, allowing them to see and
+# manipulate node-level resources and devices. If a pod needs to use the node's network adapters
+# instead of its own virtual network adapters, set the hostNetwork property to true. In doing so,
+# the pod gets to use the node's network interfaces instead of its own; this means the pod doesn't
+# get its own IP address, and if it runs a process that binds to a port, the process will be bound
+# to the node's port. (It allows a pod to listen to all network traffic for all pods on the node
+# and communicate with other pods on the network namespace.)
+# $ kubectl exec <pod-name> ifconfig
 variable "host_network" {
   default = false
   type = bool
@@ -83,7 +87,6 @@ variable "service_type" {
   default = "ClusterIP"
 }
 
-
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -124,6 +127,13 @@ resource "kubernetes_cluster_role" "cluster_role" {
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
     resources = ["pods", "namespaces"]
+  }
+  rule {
+    api_groups = ["security.openshift.io"]
+    # api_groups = ["security.openshift.io/v1"]
+    verbs = ["use"]
+    resources = ["securitycontextconstraints"]
+    resource_names = ["restricted-memories"]
   }
 }
 
@@ -172,10 +182,10 @@ resource "kubernetes_config_map" "config_files" {
   }
 }
 
-
-
-
-
+# Deploy Filebeat as a DaemonSet to ensure there's a running instance on each node of the cluster;
+# Filebeat will retrieve and ship the container logs. The Docker logs host folder
+# (/var/lib/docker/containers) is mounted on the Filebeat container. Filebeat starts an input for
+# the files and begins harvesting them as soon as they appear in the folder.
 # $ kubectl get ds -n memories
 resource "kubernetes_daemonset" "daemonset" {
   metadata {
@@ -204,17 +214,26 @@ resource "kubernetes_daemonset" "daemonset" {
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        # host_network = var.host_network
-        # dns_policy = "ClusterFirstWithHostNet"
+        host_network = var.host_network
+        dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          # security_context {
-          #   run_as_user = 0
-          #   # If using Red Hat OpenShift, uncomment the line below.
-          #   # privileged = true
-          # }
+          security_context {
+            run_as_user = 0
+            # By setting this property to true, the app will not be allowed to write to /tmp, and
+            # the error below will be generated. To avoid the error, mount a volume to the /tmp
+            # directory.
+            # log: exiting because of error: log: cannot create log: open /tmp/filebeat.kube-c8l9uj1d06jc36g628o0-itzroks6630-default-00000291.root.log.WARNING.20220314-023504.1: read-only file system
+            read_only_root_filesystem = true
+            # Filebeat needs extra configuration to run in the Openshift environment; enable the
+            # container to be privileged as an administrator for Openshift.
+            # (filebeat pods enter in CrashLoopBackOff status, and the following error appears:
+            #  Exiting: Failed to create Beat meta file: open
+            #  /usr/share/filebeat/data/meta.json.new: permission denied
+            privileged = true
+          }
           # Docker (CMD)
           args = ["-c", "/etc/filebeat.yml", "-e"]
           resources {
@@ -231,18 +250,14 @@ resource "kubernetes_daemonset" "daemonset" {
               memory = var.qos_limits_memory
             }
           }
-          # By default, Elasticsearch will take the 7 first character of the randomly generated
-          # uuid used as the node id. Note that the node id is persisted and does not change when a
-          # node restarts and therefore the default node name will also not change.
-          # env {
-          #   name = "NODE_NAME"
-          #   value_from {
-          #     field_ref {
-          #       # field_path = "metadata.name"
-          #       field_path = "spec.nodeName"
-          #     }
-          #   }
-          # }
+          env {
+            name = "NODE_NAME"
+            value_from {
+              field_ref {
+                field_path = "spec.nodeName"
+              }
+            }
+          }
           # dynamic "env" {
           #   for_each = var.env
           #   content {
@@ -250,26 +265,6 @@ resource "kubernetes_daemonset" "daemonset" {
           #     value = env.value
           #   }
           # }
-          # liveness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
-          #   }
-          #   initial_delay_seconds = 60
-          #   # See https://www.rabbitmq.com/monitoring.html for monitoring frequency recommendations.
-          #   period_seconds = 60
-          #   timeout_seconds = 15
-          #   failure_threshold = 3
-          #   success_threshold = 1
-          # }
-          # readiness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
-          #   }
-          #   initial_delay_seconds = 20
-          #   period_seconds = 60
-          #   timeout_seconds = 10
-          # }
-          # Among the mounted filesystems that Filebeat will have access to, we are specifying /var/lib/docker/containers. Notice that the volume type of this path is hostPath (line 120), which means that Filebeat will have access to this path on the node rather than the container. Kubernetes uses this path on the node to write data about the containers, additionally, any STDOUT or STDERR coming from the containers running on the node is directed to this path in JSON format (the standard output and standard error data is still viewable through the kubectl logs command, but a copy is kept at that path).
           volume_mount {
             name = "config"
             mount_path = "/etc/filebeat.yml"
@@ -277,19 +272,32 @@ resource "kubernetes_daemonset" "daemonset" {
             read_only = true
           }
           volume_mount {
-            name = "prospectors"
-            mount_path = "/usr/share/filebeat/prospectors.d"
+            name = "data"
+            mount_path = "/usr/share/filebeat/data"  # Directory location on host.
+            read_only = false
+          }
+          # /var/lib/docker/containers is one of a few filesystems that Filebeat will have access.
+          # Notice that the volume type of this path is hostPath, which means that Filebeat will
+          # have access to this path on the node rather than the container. Kubernetes uses this
+          # path on the node to write data about the containers, additionally, any STDOUT or STDERR
+          # coming from the containers running on the node is directed to this path in JSON format
+          # (the standard output and standard error data is still viewable through the kubectl logs
+          # command, but a copy is kept at this path).
+          volume_mount {
+            name = "varlibdockercontainers"
+            mount_path = "/var/lib/docker/containers"
             read_only = true
           }
           volume_mount {
-            name = "data"
-            mount_path = "/usr/share/filebeat/data"
-            read_only = false
+            name = "varlog"
+            mount_path = "/var/log"
+            read_only = true
           }
+          # See read_only_root_filesystem.
           volume_mount {
-            name = "varlibdockercontainers"
-           mount_path = "/var/lib/docker/containers"
-           read_only = false
+            name = "tmp"
+            mount_path = "/tmp"
+            read_only = false
           }
         }
         volume {
@@ -303,25 +311,34 @@ resource "kubernetes_daemonset" "daemonset" {
             }
           }
         }
+        ####### data folder stores a registry of read status for all files, so we don't send everything again on a Filebeat pod restart
         volume {
-          name = "prospectors"
-          config_map {
-            name = kubernetes_config_map.config_files.metadata[0].name
-            default_mode = "0600"
-            items {
-              key = "kubernetes.yml"
-              path = "kubernetes.yml"  # File name.
-            }
+          name = "data"
+          host_path {
+            path = "/var/lib/filebeat-data"
+            type = "DirectoryOrCreate"
           }
         }
         volume {
-          name = "data"
-          empty_dir {}
+          name = "varlibdockercontainers"
+          # A hostPath volume points to a specific file or directory on the node's filesystem. Pods
+          # running on the same node and using the same path in their hostPath volume see the same
+          # files.
+          host_path {
+            # Access the node's /var/lib/docker/containers.
+            path = "/var/lib/docker/containers"  # Directory location on host.
+          }
         }
         volume {
-          name = "varlibdockercontainers"
+          name = "varlog"
           host_path {
-            path = "/var/lib/docker/containers"
+            path = "/var/log"
+          }
+        }
+        volume {
+          name = "tmp"
+          host_path {
+            path = "/tmp"
           }
         }
       }

@@ -28,6 +28,7 @@ locals {
   # svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-1.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-2.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
   # Stateful stuff
   svc_dns_elasticsearch = "http://mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
+  svc_dns_kibana = "http://mem-kibana.${local.namespace}.svc.cluster.local:5601"
 }
 # /***111
 module "mem-gateway" {
@@ -49,6 +50,7 @@ module "mem-gateway" {
     SVC_DNS_HISTORY: local.svc_dns_history
     SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
     SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
+    SVC_DNS_KIBANA: local.svc_dns_kibana
     MAX_RETRIES: 20
   }
   readiness_probe = [{

@@ -41,15 +41,12 @@ tf/utility-files/mongodb/configmaps/*
 tf/utility-files/mongodb/scripts/*
 !tf/utility-files/mongodb/scripts/entrypoint.sh
 !tf/utility-files/mongodb/scripts/start-replication.js
-
-
 !tf/utility-files/rabbitmq/
 tf/utility-files/rabbitmq/*
 !tf/utility-files/rabbitmq/.gitkeep
 !tf/utility-files/rabbitmq/configmaps/
 tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/rabbitmq/configmaps/rabbitmq.conf
-
 # ... and these directories...
 !tf/modules/
 tf/modules/*

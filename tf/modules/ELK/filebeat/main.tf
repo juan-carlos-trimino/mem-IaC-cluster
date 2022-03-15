@@ -128,11 +128,14 @@ resource "kubernetes_cluster_role" "cluster_role" {
     api_groups = ["security.openshift.io"]
     verbs = ["use"]
     resources = ["securitycontextconstraints"]
-    resource_names = ["restricted-memories"]
+    resource_names = ["mem-filebeat-scc"]
   }
 }
 
 # Bind the role to the service account.
+# Note: If you are binding a ClusterRole that grants access to cluster-level resources (which is
+# what Security Context Constraints are), you need to use a ClusterRoleBinding instead of a
+# (namespaced) RoleBinding.
 resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   metadata {
     name = "${var.service_name}-cluster-role-binding"

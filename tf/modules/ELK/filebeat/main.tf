@@ -192,11 +192,11 @@ resource "kubernetes_daemonset" "daemonset" {
   }
   #
   spec {
-    # selector {
-    #   match_labels = {
-    #     pod = var.service_name
-    #   }
-    # }
+    selector {
+      match_labels = {
+        pod = var.service_name
+      }
+    }
     revision_history_limit = var.revision_history_limit
     #
     template {

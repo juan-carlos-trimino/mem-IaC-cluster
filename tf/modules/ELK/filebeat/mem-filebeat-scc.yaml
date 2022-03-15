@@ -1,0 +1,71 @@
+###################################################################################################
+# Both Pod Security Policy (PSP) and Security Context Constraints (SCC) are cluster-level (non-   #
+# namespaced) resources and allows administrator to control the security aspects of pods in       #
+# Kubernetes and OpenShift clusters, respectively.                                                #
+###################################################################################################
+# WARNING: Once privileges are given to a Security Context Constraint (SCC) and the SCC is granted
+#          to a project Service Account (for example, via a role binding), any deployer in the
+#          project can take advantage of those privileges.
+# Note:
+# (1) In OpenShift, applications run under the restricted SCC by default.
+# (2) Similar to the way that RBAC resources control user access, administrators can use SCCs to
+#     control permissions for pods. These permissions include actions that a pod can perform and
+#     what resources it can access. Administrators can use SCCs to define a set of conditions that
+#     a pod must run with to be accepted into the system.
+#
+# To get a current list of SCCs:
+# $ oc get scc
+#
+# To create an SCC by passing in a file:
+# $ oc apply -f <scc-file>.yaml
+#
+# To verify that the SCC was created:
+# $ oc get scc <scc_name>
+#
+# To examine a specific SCC; e.g., the restricted SCC:
+# $ oc describe scc restricted
+#
+# To delete an SCC:
+# $ oc delete scc <scc_name>
+#
+kind: SecurityContextConstraints
+apiVersion: security.openshift.io/v1
+metadata:
+  name: mem-filebeat-scc
+# Get full access to the node's kernel. A privileged container sees all the host node's devices; it
+# can use any device freely.
+allowPrivilegedContainer: true
+# 
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+# Use the node's network adapters instead of the pod's virtual network adapters.
+allowHostNetwork: true
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowedCapabilities: null
+defaultAddCapabilities: null
+# priority: null
+# To prevent processes from writing to the container's filesystem (processes can only write to
+# volumes), set the container's securityContext.readOnlyRootFilesystem property to true. When you
+# make the container's filesystem read-only, you will probably want to mount a volume in every
+# directory the app writes.
+readOnlyRootFilesystem: false
+# The capabilities listed in this field are dropped automatically from every container.
+requiredDropCapabilities: [KILL, MKNOD, SETUID, SETGID]
+runAsUser:
+  type: MustRunAs
+  uid: 0
+groups:
+- system:authenticated
+fsGroup:
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+# To link the custom SCC to the custom service account:
+# $ oc adm policy add-scc-to-user <custom-service-account-name> -z <custom-scc-name>
+# List which users and service accounts the SCC is applied to.
+users: ["mem-filebeat-service-account"]
+volumes: [configMap, downwardAPI, emptyDir, persistentVolumeClaim, projected, secret]

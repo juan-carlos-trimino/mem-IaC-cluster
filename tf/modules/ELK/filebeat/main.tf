@@ -34,10 +34,6 @@ variable "host_network" {
   default = false
   type = bool
 }
-variable "env" {
-  default = {}
-  type = map
-}
 variable "qos_requests_cpu" {
   default = ""
 }
@@ -130,7 +126,6 @@ resource "kubernetes_cluster_role" "cluster_role" {
   }
   rule {
     api_groups = ["security.openshift.io"]
-    # api_groups = ["security.openshift.io/v1"]
     verbs = ["use"]
     resources = ["securitycontextconstraints"]
     resource_names = ["restricted-memories"]
@@ -197,12 +192,12 @@ resource "kubernetes_daemonset" "daemonset" {
   }
   #
   spec {
+    # selector {
+    #   match_labels = {
+    #     pod = var.service_name
+    #   }
+    # }
     revision_history_limit = var.revision_history_limit
-    selector {
-      match_labels = {
-        pod = var.service_name
-      }
-    }
     #
     template {
       metadata {
@@ -215,6 +210,7 @@ resource "kubernetes_daemonset" "daemonset" {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         host_network = var.host_network
+        ################# jct
         dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
@@ -258,13 +254,6 @@ resource "kubernetes_daemonset" "daemonset" {
               }
             }
           }
-          # dynamic "env" {
-          #   for_each = var.env
-          #   content {
-          #     name = env.key
-          #     value = env.value
-          #   }
-          # }
           volume_mount {
             name = "config"
             mount_path = "/etc/filebeat.yml"
@@ -311,7 +300,6 @@ resource "kubernetes_daemonset" "daemonset" {
             }
           }
         }
-        ####### data folder stores a registry of read status for all files, so we don't send everything again on a Filebeat pod restart
         volume {
           name = "data"
           host_path {

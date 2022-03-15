@@ -141,14 +141,7 @@ module "mem-logstash" {
   service_name = "mem-logstash"
 }
 
-
-
-
-
-
-
-
-# Filebeat is the agent that we are going to use to ship logs to Logstash. We are using a DaemonSet for this deployment. A DaemonSet ensures that an instance of the Pod is running each node in the cluster. To deploy Filebeat, we need to create a service account, a cluster role, and a cluster role binding the same way we did with Elasticsearch. We also need a configMap to hold the instructions that Filebeat would use to ship logs. I’ve combined all the required resources in one definition file that we’ll discuss:
+# Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   source = "./modules/ELK/filebeat"
   path_to_files = "./modules/ELK/filebeat"

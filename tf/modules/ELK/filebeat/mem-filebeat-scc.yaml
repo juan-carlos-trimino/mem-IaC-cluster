@@ -35,7 +35,6 @@ metadata:
 # Get full access to the node's kernel. A privileged container sees all the host node's devices; it
 # can use any device freely.
 allowPrivilegedContainer: true
-# 
 allowHostDirVolumePlugin: true
 allowHostIPC: false
 # Use the node's network adapters instead of the pod's virtual network adapters.

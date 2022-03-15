@@ -77,6 +77,7 @@ tf/modules/ELK/elasticsearch/*
 !tf/modules/ELK/filebeat/
 tf/modules/ELK/filebeat/*
 !tf/modules/ELK/filebeat/filebeat.yml
+!tf/modules/ELK/filebeat/mem-filebeat-scc.yaml
 !tf/modules/ELK/filebeat/main.tf
 !tf/modules/ELK/kibana/
 tf/modules/ELK/kibana/*

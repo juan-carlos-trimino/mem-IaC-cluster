@@ -64,8 +64,6 @@ variable "service_type" {
   default = "ClusterIP"
 }
 
-# The ConfigMap passes to the rabbitmq daemon a bootstrap configuration which mainly defines peer
-# discovery and connectivity settings.
 resource "kubernetes_config_map" "config" {
   metadata {
     name = "${var.service_name}-config"

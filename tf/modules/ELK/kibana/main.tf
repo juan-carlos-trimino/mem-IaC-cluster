@@ -82,6 +82,26 @@ variable "service_type" {
   default = "ClusterIP"
 }
 
+resource "kubernetes_config_map" "config" {
+  metadata {
+    name = "${var.service_name}-config"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    "kibana.yml" = <<EOF
+      server.name: "Kibana"
+      xpack.monitoring.ui.container.elasticsearch.enabled: true
+      server.port: 5601
+      # elasticsearch.url: ["http://mem-elasticsearch.memories:9200"]
+      elasticsearch.hosts: ["http://mem-elasticsearch.memories:9200"]
+      server.host: "0.0.0.0"
+      EOF
+  }
+}
+
 resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
@@ -144,6 +164,23 @@ resource "kubernetes_deployment" "deployment" {
             content {
               name = env.key
               value = env.value
+            }
+          }
+          volume_mount {
+            name = "config"
+            mount_path = "/usr/share/kibana/config/kibana.yml"
+            sub_path = "kibana.yml"
+            read_only = true
+          }
+        }
+        volume {
+          name = "config"
+          config_map {
+            name = kubernetes_config_map.config.metadata[0].name
+            default_mode = "0400"  # Octal
+            items {
+              key = "kibana.yml"
+              path = "kibana.yml"  #File name.
             }
           }
         }

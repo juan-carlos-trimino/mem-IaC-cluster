@@ -121,9 +121,13 @@ module "mem-kibana" {
   qos_requests_cpu = "200m"
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
-  env = {
-    ELASTICSEARCH_HOSTS: local.svc_dns_elasticsearch
-  }
+  # env = {
+    # ELASTICSEARCH_URL: "http://${local.svc_dns_elasticsearch}"
+    # # ELASTICSEARCH_HOSTS: "mem-elasticsearch-0, mem-elasticsearch-1, mem-elasticsearch-2"
+    # ELASTICSEARCH_USER: "user"
+    # ELASTICSEARCH_PASSWORD: "paasw"
+    # SVC_DNS_KIBANA: local.svc_dns_kibana
+  # }
   service_port = 5601
   service_target_port = 5601
   service_name = "mem-kibana"

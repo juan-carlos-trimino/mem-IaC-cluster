@@ -1,18 +1,3 @@
-module "ms-rabbitmq" {
-  # Specify the location of the module, which contains the file main.tf.
-  source = "./modules/pub-microservice"
-  # Set input variables to configure the microservice module for the ms-gateway.
-  app_name = var.app_name
-  app_version = var.app_version
-  # This image has the RabbitMQ dashboard.
-  # image_tag = "rabbitmq:3.9.7-management-alpine"
-  image_tag = "rabbitmq:3.9.7-alpine"
-  namespace = local.namespace
-  service_name = "mem-rabbitmq"
-  service_port = 5672
-  service_target_port = 5672
-}
-
 /***
 # Deployment.
 module "mem-rabbitmq" {
@@ -35,7 +20,7 @@ module "mem-rabbitmq" {
   service_target_port = 5672
 }
 ***/
-/***111
+
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/rabbitmq-statefulset"
@@ -80,4 +65,3 @@ module "mem-rabbitmq" {
   }
   service_name = "mem-rabbitmq"
 }
-111***/

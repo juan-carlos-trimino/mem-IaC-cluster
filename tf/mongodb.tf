@@ -1,12 +1,10 @@
-# /***111
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/mongodb-deploy"
   app_name = var.app_name
   app_version = var.app_version
   image_tag = "mongo:5.0"
-  namespace = kubernetes_namespace.ns.metadata[0].name
-  # namespace = local.namespace
+  namespace = local.namespace
   replicas = 1
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
@@ -22,7 +20,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# 111***/
+
 /***
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and

@@ -209,6 +209,7 @@ resource "kubernetes_service" "service" {
       name = "kibana"
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
+      # node_port = "30888"
       protocol = "TCP"
     }
     type = var.service_type

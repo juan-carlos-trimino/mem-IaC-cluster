@@ -1,4 +1,3 @@
-/*
 module "ms-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pub-microservice"
@@ -13,7 +12,6 @@ module "ms-rabbitmq" {
   service_port = 5672
   service_target_port = 5672
 }
-*/
 
 /***
 # Deployment.
@@ -37,7 +35,7 @@ module "mem-rabbitmq" {
   service_target_port = 5672
 }
 ***/
-# /***111
+/***111
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/rabbitmq-statefulset"
@@ -82,4 +80,4 @@ module "mem-rabbitmq" {
   }
   service_name = "mem-rabbitmq"
 }
-# 111***/
+111***/

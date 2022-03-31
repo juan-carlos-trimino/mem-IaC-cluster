@@ -134,7 +134,7 @@ module "mem-kibana" {
   service_target_port = 5601
   service_name = "mem-kibana"
 }
-/***1111
+
 module "mem-logstash" {
   source = "./modules/ELK/logstash"
   app_name = var.app_name
@@ -165,4 +165,3 @@ module "mem-filebeat" {
   qos_requests_memory = "100Mi"
   service_name = "mem-filebeat"
 }
-1111****/

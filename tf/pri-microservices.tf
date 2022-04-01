@@ -29,7 +29,7 @@ locals {
   # Stateful stuff
   # svc_dns_db = "mongodb://mem-mongodb-0.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-1.mem-mongodb.${local.namespace}.svc.cluster.local,mem-mongodb-2.mem-mongodb.${local.namespace}.svc.cluster.local:27017"
 }
-
+/***CCC
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
@@ -231,3 +231,4 @@ module "mem-video-upload" {
   }]
   service_name = "mem-video-upload"
 }
+CCC***/

@@ -20,7 +20,7 @@ module "mem-rabbitmq" {
   service_target_port = 5672
 }
 ***/
-
+/***CCC
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/rabbitmq-statefulset"
@@ -65,3 +65,4 @@ module "mem-rabbitmq" {
   }
   service_name = "mem-rabbitmq"
 }
+CCC***/

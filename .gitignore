@@ -9,6 +9,7 @@
 # ... and these files under the 'tf' directory...
 !tf/
 tf/*
+!tf/cert-manager.tf
 !tf/data.tf
 !tf/ELK.tf
 !tf/mongodb.tf
@@ -28,6 +29,18 @@ tf/cluster_config/*
 !tf/modules/
 tf/modules/*
 !tf/modules/.gitkeep
+#
+!tf/modules/cert-manager/
+tf/modules/cert-manager/*
+!tf/modules/cert-manager/cert-manager/
+tf/modules/cert-manager/cert-manager/*
+!tf/modules/cert-manager/cert-manager/main.tf
+!tf/modules/cert-manager/certificates/
+tf/modules/cert-manager/certificates/*
+!tf/modules/cert-manager/certificate/main.tf
+!tf/modules/cert-manager/issuers/
+tf/modules/cert-manager/issuers/*
+!tf/modules/cert-manager/issuers/main.tf
 #
 !tf/modules/ELK/
 tf/modules/ELK/*

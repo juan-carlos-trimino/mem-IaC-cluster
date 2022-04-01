@@ -19,6 +19,7 @@ tf/*
 !tf/rabbitmq.tf
 !tf/tekton_Copy.yaml
 !tf/tekton.yaml
+!tf/traefik.tf
 !tf/variables_no_push.tf.template
 !tf/variables.tf
 # ... and this directory...

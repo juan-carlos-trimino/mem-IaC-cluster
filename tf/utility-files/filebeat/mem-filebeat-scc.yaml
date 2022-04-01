@@ -29,7 +29,7 @@
 # $ oc delete scc <scc_name>
 #
 # To link a custom SCC to a custom service account:
-# $ oc adm policy add-scc-to-user <custom-service-account-name> -z <custom-scc-name>
+# $ oc adm policy add-scc-to-user <scc-name> <service-account-name>
 kind: SecurityContextConstraints
 apiVersion: security.openshift.io/v1
 metadata:
@@ -76,7 +76,12 @@ defaultAddCapabilities: []
 # The capabilities which must be dropped from containers. These capabilities are removed from the
 # default set, and must not be added. Capabilities listed in requiredDropCapabilities must not be
 # included in allowedCapabilities or defaultAddCapabilities.
-requiredDropCapabilities: [KILL, MKNOD, SETUID, SETGID]
+requiredDropCapabilities: [
+  KILL,
+  MKNOD,
+  SETUID,
+  SETGID
+]
 # Control which user ID the containers are run with.
 runAsUser:
   type: MustRunAs
@@ -92,10 +97,21 @@ seLinuxContext:
   type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
-users: ["mem-filebeat-service-account"]
-groups: [system:authenticated]
+users: [
+  "mem-filebeat-service-account"
+]
+groups: [
+  system:authenticated
+]
 # Provide a list of allowed volume types.
 # Notes:
 # (1) For backwards compatibility, the usage of allowHostDirVolumePlugin overrides settings in the
 #     volumes field.
-volumes: [configMap, downwardAPI, emptyDir, persistentVolumeClaim, projected, secret]
+volumes: [
+  configMap,
+  downwardAPI,
+  emptyDir,
+  persistentVolumeClaim,
+  projected,
+  secret
+]

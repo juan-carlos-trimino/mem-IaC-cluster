@@ -83,6 +83,17 @@ variable "service_type" {
   default = "ClusterIP"
 }
 
+resource "null_resource" "scc-filebeat" {
+  provisioner "local-exec" {
+    command = "oc apply -f ./utility-files/filebeat/mem-filebeat-scc.yaml"
+  }
+  #
+  provisioner "local-exec" {
+    when = destroy
+    command = "oc delete scc mem-filebeat-scc"
+  }
+}
+
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A

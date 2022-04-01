@@ -50,6 +50,7 @@
 # http://localhost:9200/_nodes/mem-elasticsearch-1/stats?pretty
 # Index-Only Stats:
 # http://localhost:9200/_nodes/stats/indices?pretty
+/***XXX
 module "mem-elasticsearch" {
   source = "./modules/ELK/elasticsearch"
   app_name = var.app_name
@@ -146,7 +147,7 @@ module "mem-logstash" {
   service_target_port = 5044
   service_name = "mem-logstash"
 }
-
+XXX***/
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   source = "./modules/ELK/filebeat"

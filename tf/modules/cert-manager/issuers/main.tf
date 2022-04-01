@@ -9,6 +9,7 @@ variable "namespace" {
 }
 
 # Certificate authority.
+# https://cert-manager.io/docs/concepts/issuer/
 resource "kubernetes_manifest" "issuer" {
   manifest = {
     apiVersion = "cert-manager.io/v1"

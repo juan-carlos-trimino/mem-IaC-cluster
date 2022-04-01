@@ -75,6 +75,10 @@ tf/modules/rabbitmq-deploy/*
 tf/modules/rabbitmq-statefulset/*
 !tf/modules/rabbitmq-statefulset/main.tf
 #
+!tf/modules/traefik/
+tf/modules/traefik/*
+!tf/modules/traefik/main.tf
+#
 !tf/utility-files/
 tf/utility-files/*
 !tf/utility-files/.gitkeep
@@ -104,3 +108,8 @@ tf/utility-files/rabbitmq/*
 !tf/utility-files/rabbitmq/configmaps/
 tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/rabbitmq/configmaps/rabbitmq.conf
+#
+!tf/utility-files/traefik/
+tf/utility-files/traefik/*
+!tf/utility-files/traefik/mem-traefik-scc.yaml
+!tf/utility-files/traefik/traefik.yml

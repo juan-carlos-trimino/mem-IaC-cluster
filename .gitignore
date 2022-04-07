@@ -113,5 +113,4 @@ tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/traefik/
 tf/utility-files/traefik/*
 !tf/utility-files/traefik/mem-traefik-scc.yaml
-!tf/utility-files/traefik/traefik.yml
 !tf/utility-files/traefik/values.yaml

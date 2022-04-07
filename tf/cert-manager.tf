@@ -4,7 +4,7 @@ module "cert-manager" {
   source = "./modules/cert-manager/cert-manager"
   namespace = local.namespace
 }
-
+/***
 module "issuers" {
   depends_on = [module.cert-manager]
   source = "./modules/cert-manager/issuers"
@@ -16,3 +16,4 @@ module "certificates" {
   source = "./modules/cert-manager/certificates"
   namespace = local.namespace
 }
+***/

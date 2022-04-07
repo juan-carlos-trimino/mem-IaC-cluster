@@ -1,15 +1,16 @@
 ingressRoute:
   dashboard:
     enabled: true
-    annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
-
-ports:
-  web:
-    redirectTo: websecure
-
+    30# annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
+# ports:
+#   web:
+#     redirectTo: websecure
 additionalArguments:
+  # For a list of all settings, go here
+  # (https://doc.traefik.io/traefik/reference/static-configuration/cli/).
   - "--log.level=INFO"
-  - "--entrypoints.websecure.http.tls"
+  # - "--entrypoints.websecure.http.tls"
+  - "--entrypoints.web.http"
   - "--providers.kubernetesIngress.ingressClass=traefik-cert-manager"
   - "--ping"
   - "--metrics.prometheus"

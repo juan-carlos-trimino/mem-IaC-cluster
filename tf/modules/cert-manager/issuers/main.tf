@@ -32,7 +32,7 @@ resource "kubernetes_manifest" "issuer" {
       # See https://cert-manager.io/docs/tutorials/acme/http-validation/
       acme = {
         # Email address used for ACME registration.
-        email = "juancarlos.trimino@gmail.com"
+        email = "juancarlos@trimino.com"
         # The ACME server URL.
         server = "https://acme-staging-v02.api.letsencrypt.org/directory"
         # server = "https://acme-v02.api.letsencrypt.org/directory"

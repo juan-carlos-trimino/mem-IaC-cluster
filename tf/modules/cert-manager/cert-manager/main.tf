@@ -23,6 +23,38 @@ variable "cert_manager_chart_version" {
   default = "1.7.2"
 }
 
+/***
+resource "null_resource" "issuer" {
+  depends_on = [
+    helm_release.cert_manager
+  ]
+  #
+  provisioner "local-exec" {
+    command = "kubectl apply -f ./modules/cert-manager/issuers/issuer.yml"
+  }
+  #
+  # provisioner "local-exec" {
+    # when = destroy
+    # command = "oc delete issuer letsencrypt-staging"
+  # }
+}
+
+resource "null_resource" "certificate" {
+  depends_on = [
+    null_resource.issuer
+  ]
+  #
+  provisioner "local-exec" {
+    command = "kubectl apply -f ./modules/cert-manager/certificates/traefik-dashboard-cert.yml"
+  }
+  #
+  # provisioner "local-exec" {
+    # when = destroy
+    # command = "oc delete certificate traefik-dashboard-cert"
+  # }
+}
+***/
+
 # cert-manager adds certificates and certificate issuers as resource types in Kubernetes clusters
 # and simplifies the process of obtaining, renewing, and using those certificates.
 #
@@ -32,8 +64,8 @@ variable "cert_manager_chart_version" {
 #
 # Once you've installed cert-manager, you can verify it is deployed correctly by checking the
 # cert-manager namespace for running pods:
-# $ kubectl get pods --namespace cert-manager
-# You should see the cert-manager, cert-manager-cainjector, and cert-manager-webhook pod in a
+# $ kubectl get pods --namespace memories
+# You should see the cert-manager, cert-manager-cainjector, and cert-manager-webhook pods in a
 # Running state.
 resource "helm_release" "cert_manager" {
   name = var.cert_manager_chart_name
@@ -49,5 +81,4 @@ resource "helm_release" "cert_manager" {
     name = "installCRDs"
     value = true
   }
-  # timeout = 150
 }

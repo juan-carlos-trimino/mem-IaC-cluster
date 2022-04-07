@@ -1,7 +1,7 @@
 ingressRoute:
   dashboard:
     enabled: true
-    30# annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
+    # annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
 # ports:
 #   web:
 #     redirectTo: websecure

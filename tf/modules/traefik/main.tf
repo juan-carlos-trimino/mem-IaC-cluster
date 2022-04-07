@@ -49,7 +49,7 @@ resource "helm_release" "ingress_controller" {
   repository = var.ingress_controller_chart_repo
   version = var.ingress_controller_chart_version
   namespace = var.namespace
-  values = [file("./utility-files/traefik/traefik.yml")]
+  values = [file("./utility-files/traefik/values.yaml")]
 }
 
 resource "kubernetes_secret" "secret" {

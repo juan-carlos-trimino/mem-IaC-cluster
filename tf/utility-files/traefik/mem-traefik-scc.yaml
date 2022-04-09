@@ -73,19 +73,22 @@ readOnlyRootFilesystem: false
 # capabilities are implicitly allowed. The empty set means that no additional capabilities may be
 # added beyond the default set. * can be used to allow all capabilities.
 allowedCapabilities: [
-  NET_BIND_SERVICE
 ]
 # The capabilities which are added to containers by default, in addition to the runtime defaults.
-defaultAddCapabilities: []
+defaultAddCapabilities: [
+  # Bind a socket to Internet domain privileged ports (port numbers less than 1024).
+  NET_BIND_SERVICE
+]
 # The capabilities which must be dropped from containers. These capabilities are removed from the
 # default set, and must not be added. Capabilities listed in requiredDropCapabilities must not be
 # included in allowedCapabilities or defaultAddCapabilities.
 requiredDropCapabilities: [
-  MKNOD
+  ALL
 ]
 # Control which user ID the containers are run with.
 runAsUser:
   type: RunAsAny
+  uid: 0
 #
 fsGroup:
   type: RunAsAny
@@ -98,7 +101,6 @@ seLinuxContext:
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 users: [
-  default:memories  # Namespace; see traefik.tf
 ]
 groups: [
   system:authenticated

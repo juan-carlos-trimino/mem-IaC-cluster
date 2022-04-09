@@ -148,6 +148,7 @@ module "mem-logstash" {
   service_name = "mem-logstash"
 }
 XXX***/
+/***
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   source = "./modules/ELK/filebeat"
@@ -166,3 +167,4 @@ module "mem-filebeat" {
   qos_requests_memory = "100Mi"
   service_name = "mem-filebeat"
 }
+***/

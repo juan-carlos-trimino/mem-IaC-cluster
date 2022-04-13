@@ -43,6 +43,21 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "traefik-dashboard-auth-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    users = "${var.traefik_secret}"
+  }
+  type = "Opaque"
+}
+
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits
 # the Kubernetes cluster, it will go to the right Service. Also, it makes it very easy to assign
@@ -75,21 +90,3 @@ resource "helm_release" "ingress_controller" {
   namespace = var.namespace
   values = [file("./utility-files/traefik/values.yaml")]
 }
-
-# resource "kubernetes_secret" "secret" {
-#   metadata {
-#     name = "traefik-dashboard-auth-secret"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   # Plain-text data.
-#   # RabbitMQ nodes and the CLI tools use a cookie to determine whether they are allowed to
-#   # communicate with each other. For two nodes to be able to communicate, they must have the same
-#   # shared secret called the Erlang cookie.
-#   data = {
-#     users = "${var.traefik_secret}"
-#   }
-#   type = "Opaque"
-# }

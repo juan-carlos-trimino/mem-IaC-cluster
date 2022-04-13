@@ -105,3 +105,21 @@ variable "rabbitmq_default_pass" {
 variable "rabbitmq_default_user" {
   default = "<required>"
 }
+
+###########
+# Traefik #
+###########
+# Traefik supports passwords hashed with MD5, SHA1, or BCrypt.
+# Using the htpasswd utility, encrypt a username and password for Traefik to use. First, let's
+# install (ubuntu) the utility, which is part of the apache2-utils package to manage usernames and
+# passwords with access to restricted content.
+# $ sudo apt update
+# $ sudo apt install apache2-utils
+# Now, let's encrypt the credentials for a username and password. The output of the utility will be
+# piped to openssl for base64 encoding.
+# $ htpasswd -nb <username> <password> | openssl base64
+# To verify the output from htpasswd:
+# $ echo "Output from htpasswd" | base64 -d
+variable "traefik_secret" {
+  default = "<username>:<password>"
+}

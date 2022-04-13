@@ -1,18 +1,40 @@
+# For the default values, go to:
+# https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+#
+# Set Traefik as the default Ingress Controller.
+ingressController:
+  enabled: true
+  isDefaultClass: true
+# Create an IngressRoute for the dashboard.
 ingressRoute:
   dashboard:
+    # Using a custom ingressRoute with basic auth instead of the default.
     enabled: false
     # enabled: true
+    # Additional ingressRoute annotations (e.g. for kubernetes.io/ingress.class).
+    annotations: {}
     # annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
+    # Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels).
+    labels: {}
+# Logs
+# https://docs.traefik.io/observability/logs/logs/
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
 ports:
   web:
-    port: 8000
+    port: 8000  # Traefik port.
     expose: true
     exposedPort: 80
+    # redirectTo: websecure
   websecure:
     port: 8443
     expose: true
-    # exposedPort: 443
-    exposedPort: 8443
+    exposedPort: 443
+    tls:
+      enabled: false
   traefik:
     port: 9000
     # DO NOT expose the traefik port on production deployments. To access it from outside of the
@@ -28,23 +50,40 @@ ports:
     expose: false
     # The exposed port for this service
     exposedPort: 9100
+persistence:
+  enablde: true
+  name: ssl-certs
+  size: 1Gi
+  path: /ssl-certs
 additionalArguments:
-  # For a list of all settings, go here
-  # (https://doc.traefik.io/traefik/reference/static-configuration/cli/).
+  # For a list of all settings, go to:
+  # (https://doc.traefik.io/traefik/reference/static-configuration/cli/)
+  # (https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations).
+  # Enable api/dashboard.
   - "--api=true"
+  # Activate dashboard.
   - "--api.dashboard=true"
+  # Activate API directly on the entryPoint named traefik.
   - "--api.insecure=true"
-  - "--log=true"
-  - "--log.level=INFO"
+  # Entry point address.
   - "--entrypoints.web.address=:80"
+  - "--entrypoints.websecure.address=:443"
+  # Traefik log settings.
+  - "--log=true"
+  # Log level set to traefik logs.
+  - "--log.level=INFO"
+  # Prometheus metrics exporter type.
+  - "--metrics.prometheus=true"
+  # Enable Kubernetes backend with default settings.
+  - "--providers.kubernetescrd=true"
+
+  # - "--traefik.enable=true"
+
   # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
   # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-  - "--entrypoints.websecure.address=:8443"
-  - "--providers.kubernetescrd=true"
   # - "--entrypoints.websecure.http.tls"
   # - "--providers.kubernetesIngress.ingressClass=traefik-cert-manager"
   # - "--ping"
-  - "--metrics.prometheus=true"
 # Set the container security context
 # To run the container with ports below 1024 this will need to be adjust to run as root
 securityContext:
@@ -52,7 +91,7 @@ securityContext:
     drop: [ALL]
     add: [NET_BIND_SERVICE]
   readOnlyRootFilesystem: true
-  runAsGroup: 1100
+  runAsGroup: 0
   runAsNonRoot: false
   runAsUser: 0
 podSecurityContext:

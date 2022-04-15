@@ -10,7 +10,7 @@ variable "app_name" {
 variable "namespace" {
   type = string
 }
-variable "traefik_secret" {
+variable "service_name" {
   type = string
 }
 variable "ingress_controller_chart_name" {
@@ -26,13 +26,16 @@ variable "ingress_controller_chart_repo" {
 variable "ingress_controller_chart_version" {
   type = string
   description = "Ingress Controller Helm repository version."
-  default = "10.0.0"
+  default = "10.9.1"
 }
 
 resource "null_resource" "scc-traefik" {
-  depends_on = [
-    helm_release.ingress_controller
-  ]
+  # depends_on = [
+  #   helm_release.ingress_controller_traefik
+  # ]
+  triggers = {
+    always_run = timestamp()
+  }
   provisioner "local-exec" {
     command = "oc apply -f ./utility-files/traefik/mem-traefik-scc.yaml"
   }
@@ -43,20 +46,108 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-resource "kubernetes_secret" "secret" {
+
+# resource "null_resource" "scc-traefik-add-user" {
+#   depends_on = [
+#     null_resource.scc-traefik
+#   ]
+#   triggers = {
+#     always_run = timestamp()
+#   }
+#   provisioner "local-exec" {
+#     command = "oc adm policy add-scc-to-user mem-traefik-scc -z default -n memories"
+#   }
+# }
+
+
+# /***
+# A ServiceAccount is used by an application running inside a pod to authenticate itself with the
+# API server. A default ServiceAccount is automatically created for each namespace; each pod is
+# associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
+# pod can only use a ServiceAccount from the same namespace.
+#
+# For cluster security, let's constrain the cluster metadata this pod may read.
+resource "kubernetes_service_account" "service_account" {
   metadata {
-    name = "traefik-dashboard-auth-secret"
+    name = "${var.service_name}-service-account"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+    # annotations = {
+      # "kubernetes.io/enforce-mountable-secrets" = true
+    # }
+  }
+  # secret {
+  #   name = kubernetes_secret.secret.metadata[0].name
+  # }
+}
+
+# Roles define WHAT can be done; role bindings define WHO can do it.
+# The distinction between a Role/RoleBinding and a ClusterRole/ClusterRoleBinding is that the Role/
+# RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
+# A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
+# requests can be performed on which RESTful resources.
+resource "kubernetes_role" "role" {
+  metadata {
+    name = "${var.service_name}-role"
     namespace = var.namespace
     labels = {
       app = var.app_name
     }
   }
-  # Plain-text data.
-  data = {
-    users = "${var.traefik_secret}"
+  rule {
+    # Resources in the core apiGroup, which has no name - hence the "".
+    api_groups = [""]
+    verbs = ["get", "watch", "list"]
+    # The plural form must be used when specifying resources.
+    resources = ["services", "endpoints", "secrets"]
   }
-  type = "Opaque"
+  rule {
+    api_groups = ["traefik.containo.us/v1alpha1"]
+    verbs = ["get", "watch", "list"]
+    resources = ["ingressroutes"]
+  }
+  rule {
+    api_groups = ["security.openshift.io"]
+    verbs = ["use"]
+    resources = ["securitycontextconstraints"]
+    resource_names = ["mem-traefik-scc"]
+  }
 }
+
+# Bind the role to the service account.
+resource "kubernetes_role_binding" "role_binding" {
+  metadata {
+    name = "${var.service_name}-role-binding"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind = "Role"
+    # This RoleBinding references the Role specified below...
+    name = kubernetes_role.role.metadata[0].name
+  }
+  # ... and binds it to the specified ServiceAccount in the specified namespace.
+  subject {
+    # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
+    kind = "ServiceAccount"
+    name = kubernetes_service_account.service_account.metadata[0].name
+    namespace = kubernetes_service_account.service_account.metadata[0].namespace
+  }
+}
+# ***/
+
+
+
+
+
+
+
 
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits
@@ -82,7 +173,10 @@ resource "kubernetes_secret" "secret" {
 #    websecure - port 8443 (exposed as port 443)
 #    traefik - port 9000 (not exposed)
 #    metrics - port 9100 (not exposed)
-resource "helm_release" "ingress_controller" {
+resource "helm_release" "ingress_controller_traefik" {
+  depends_on = [
+    kubernetes_service_account.service_account
+  ]
   name = var.ingress_controller_chart_name
   chart = var.ingress_controller_chart_name
   repository = var.ingress_controller_chart_repo

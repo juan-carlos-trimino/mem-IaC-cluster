@@ -42,7 +42,7 @@ priority: 10
 # devices on the host. This allows the container nearly all the same access as processes running on
 # the host. This is useful for containers that want to use Linux capabilities like manipulating the
 # network stack and accessing devices.
-allowPrivilegedContainer: false
+allowPrivilegedContainer: true
 #
 allowHostDirVolumePlugin: false
 # Control whether the pod may use the node network namespace. Doing so gives the pod access to the
@@ -101,7 +101,7 @@ seLinuxContext:
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 users: [
-  # default:memories
+  memories:mem-traefik-service-account
 ]
 groups: [
   system:authenticated

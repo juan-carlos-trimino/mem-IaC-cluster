@@ -18,6 +18,7 @@ ingressRoute:
     labels: {}
 # Logs
 # https://docs.traefik.io/observability/logs/logs/
+logs:
   general:
     level: INFO
   access:
@@ -31,7 +32,7 @@ ports:
     # redirectTo: websecure
   websecure:
     port: 8443
-    expose: true
+    expose: false
     exposedPort: 443
     tls:
       enabled: false
@@ -42,19 +43,31 @@ ports:
     # $ kubectl port-forward -n memories $(kubectl get pods -n memories --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
     # From a browser, use http://127.0.0.1:9000/dashboard/ to see the Traefik dashboard; the trailing slash / in /dashboard/ is mandatory.
     expose: false
-    # The exposed port for this service
+    # The exposed port for this service.
     exposedPort: 9000
   metrics:
     port: 9100
     # See traefik.
     expose: false
-    # The exposed port for this service
+    # The exposed port for this service.
     exposedPort: 9100
 persistence:
-  enablde: true
+  enabled: true
   name: ssl-certs
   size: 1Gi
   path: /ssl-certs
+
+
+# The service account the pods will use to interact with the Kubernetes API
+serviceAccount:
+  # If set, an existing service account is used
+  # If not set, a service account is created automatically using the fullname template
+  name: "mem-traefik-service-account"
+  # name: ""
+
+
+
+
 additionalArguments:
   # For a list of all settings, go to:
   # (https://doc.traefik.io/traefik/reference/static-configuration/cli/)
@@ -62,9 +75,10 @@ additionalArguments:
   # Enable api/dashboard.
   - "--api=true"
   # Activate dashboard.
+  # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
   - "--api.dashboard=true"
   # Activate API directly on the entryPoint named traefik.
-  - "--api.insecure=true"
+  # - "--api.insecure=true"
   # Entry point address.
   - "--entrypoints.web.address=:80"
   - "--entrypoints.websecure.address=:443"
@@ -90,9 +104,9 @@ securityContext:
   capabilities:
     drop: [ALL]
     add: [NET_BIND_SERVICE]
-  readOnlyRootFilesystem: true
+  # readOnlyRootFilesystem: true
   runAsGroup: 0
   runAsNonRoot: false
   runAsUser: 0
-podSecurityContext:
-  fsGroup: 1100
+# podSecurityContext:
+#   fsGroup: 1100

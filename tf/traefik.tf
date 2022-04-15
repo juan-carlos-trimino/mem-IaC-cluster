@@ -11,6 +11,6 @@
 module "traefik" {
   source = "./modules/traefik"
   app_name = var.app_name
-  traefik_secret = var.traefik_secret
   namespace = local.namespace
+  service_name = "mem-traefik"
 }

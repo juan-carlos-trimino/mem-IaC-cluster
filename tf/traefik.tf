@@ -7,6 +7,13 @@
 
 # On Linux, the full path to the file is /etc/hosts.
 # On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
+
+
+
+
+# kubectl get pod,middleware,ingressroute,svc -n memories
+# kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
+# kubectl get all -l "app=memories" -n memories
 locals {
   middleware_dashboard = "mem-middleware-dashboard"
 }

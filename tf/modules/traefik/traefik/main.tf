@@ -73,7 +73,9 @@ resource "null_resource" "scc-traefik" {
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
 # pod can only use a ServiceAccount from the same namespace.
 #
-# For cluster security, let's constrain the cluster metadata this pod may read.
+# Using the least-privilege approach with the namespace-scoped RoleBindings. In general, this is a
+# preferred approach if a cluster's namespaces do not change dynamically and if Traefik is not
+# required to watch all cluster namespaces.
 resource "kubernetes_service_account" "service_account" {
   metadata {
     name = "${var.service_name}-service-account"
@@ -113,7 +115,17 @@ resource "kubernetes_role" "role" {
   rule {
     api_groups = ["traefik.containo.us/v1alpha1"]
     verbs = ["get", "watch", "list"]
-    resources = ["ingressroutes"]
+    resources = ["ingressroutes", "middlewares", "traefikservices", "ingressroutetcps", "tlsoptions"]
+  }
+  rule {
+    api_groups = ["extensions"]
+    verbs = ["get", "watch", "list"]
+    resources = ["ingresses"]
+  }
+  rule {
+    api_groups = ["extensions"]
+    verbs = ["update"]
+    resources = ["ingresses/status"]
   }
   rule {
     api_groups = ["security.openshift.io"]

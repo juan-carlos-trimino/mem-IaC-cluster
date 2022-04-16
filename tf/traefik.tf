@@ -26,7 +26,7 @@ module "traefik" {
 }
 
 module "middleware-dashboard" {
-  source = "./modules/traefik/middlewares"
+  source = "./modules/traefik/middlewares/middleware-dashboard"
   app_name = var.app_name
   namespace = local.namespace
   # While the dashboard in itself is read-only, it is good practice to secure access to it.

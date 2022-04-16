@@ -7,19 +7,48 @@
 
 # On Linux, the full path to the file is /etc/hosts.
 # On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
+locals {
+  middleware_dashboard = "mem-middleware-dashboard"
+}
 
 module "traefik" {
-  source = "./modules/traefik"
+  source = "./modules/traefik/traefik"
   app_name = var.app_name
   namespace = local.namespace
   service_name = "mem-traefik"
 }
 
-module "middleware" {
+module "middleware-dashboard" {
   source = "./modules/traefik/middlewares"
   app_name = var.app_name
   namespace = local.namespace
-  traefik_username = var.traefik_username
-  traefik_password = var.traefik_password
-  service_name = "mem-middleware"
+  traefik_dashboard_username = var.traefik_dashboard_username
+  traefik_dashboard_password = var.traefik_dashboard_password
+  service_name = local.middleware_dashboard
 }
+
+module "ingress-route" {
+  source = "./modules/traefik/ingress-route"
+  app_name = var.app_name
+  namespace = local.namespace
+  middleware_dashboard = local.middleware_dashboard
+  service_name = "mem-ingress-route"
+}
+
+
+
+
+
+/***
+module "issuers" {
+  depends_on = [module.cert-manager]
+  source = "./modules/cert-manager/issuers"
+  namespace = local.namespace
+}
+
+module "certificates" {
+  depends_on = [module.issuers]
+  source = "./modules/cert-manager/certificates"
+  namespace = local.namespace
+}
+***/

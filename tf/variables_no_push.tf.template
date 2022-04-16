@@ -109,10 +109,10 @@ variable "rabbitmq_default_user" {
 ###########
 # Traefik #
 ###########
-variable "traefik_username" {
+variable "traefik_dashboard_username" {
   default = "user"
 }
 
-variable "traefik_password" {
+variable "traefik_dashboard_password" {
   default = "password"
 }

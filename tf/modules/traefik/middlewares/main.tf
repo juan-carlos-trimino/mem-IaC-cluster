@@ -13,16 +13,16 @@ variable "namespace" {
 variable "service_name" {
   type = string
 }
-variable "traefik_username" {
+variable "traefik_dashboard_username" {
   type = string
 }
-variable "traefik_password" {
+variable "traefik_dashboard_password" {
   type = string
 }
 
 resource "kubernetes_secret" "secret" {
   metadata {
-    name = "${var.service_name}-dashboard-secret"
+    name = "${var.service_name}-secret"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -46,17 +46,17 @@ resource "kubernetes_secret" "secret" {
     # $ htpasswd -nbB <username> <password> | openssl base64
     # To verify the output from htpasswd:
     # $ echo "Output from htpasswd" | base64 -d
-    users = "${var.traefik_username}:${bcrypt(var.traefik_password, 10)}"
+    users = "${var.traefik_dashboard_username}:${bcrypt(var.traefik_dashboard_password, 10)}"
   }
   type = "Opaque"
 }
 
-resource "kubernetes_manifest" "middleware-dashboard" {
+resource "kubernetes_manifest" "middleware_dashboard" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name}-dashboard"
+      name = "${var.service_name}"
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -73,5 +73,3 @@ resource "kubernetes_manifest" "middleware-dashboard" {
     }
   }
 }
-
-

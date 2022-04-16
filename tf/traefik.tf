@@ -22,6 +22,7 @@ module "middleware-dashboard" {
   source = "./modules/traefik/middlewares"
   app_name = var.app_name
   namespace = local.namespace
+  # While the dashboard in itself is read-only, it is good practice to secure access to it.
   traefik_dashboard_username = var.traefik_dashboard_username
   traefik_dashboard_password = var.traefik_dashboard_password
   service_name = local.middleware_dashboard

@@ -67,7 +67,7 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-/***SA
+# /***SA
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -147,7 +147,7 @@ resource "kubernetes_role_binding" "role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
-SA***/
+# SA***/
 
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits

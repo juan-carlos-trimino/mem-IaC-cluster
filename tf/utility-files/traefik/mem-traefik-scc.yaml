@@ -104,7 +104,7 @@ seLinuxContext:
 # users are granted access to the Restricted SCC.
 # system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>
 users: [
-  # system:serviceaccount:memories:mem-traefik-service-account
+  system:serviceaccount:memories:mem-traefik-service-account
 ]
 groups: [
   system:authenticated

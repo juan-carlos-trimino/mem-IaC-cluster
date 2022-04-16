@@ -66,8 +66,8 @@ rbac:
 serviceAccount:
   # If set, an existing service account is used
   # If not set, a service account is created automatically using the fullname template
-  # name: "mem-traefik-service-account"
-  name: ""
+  # name: ""
+  name: "mem-traefik-service-account"
 resources:
   # requests:
   #   cpu: "500m"

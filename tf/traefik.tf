@@ -14,3 +14,12 @@ module "traefik" {
   namespace = local.namespace
   service_name = "mem-traefik"
 }
+
+module "middleware" {
+  source = "./modules/traefik/middlewares"
+  app_name = var.app_name
+  namespace = local.namespace
+  traefik_username = var.traefik_username
+  traefik_password = var.traefik_password
+  service_name = "mem-middleware"
+}

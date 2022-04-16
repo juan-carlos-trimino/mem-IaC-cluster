@@ -26,7 +26,7 @@ logs:
     format: json
 ports:
   web:
-    port: 8000  # Traefik port.
+    port: 80  # Traefik port.
     expose: true
     exposedPort: 80
     # redirectTo: websecure
@@ -56,18 +56,25 @@ persistence:
   name: ssl-certs
   size: 1Gi
   path: /ssl-certs
-
-
+# Whether Role Based Access Control objects like roles and rolebindings should be created
+rbac:
+  enabled: true
+  # If set to false, installs ClusterRole and ClusterRoleBinding so Traefik can be used across namespaces.
+  # If set to true, installs namespace-specific Role and RoleBinding and requires provider configuration be set to that same namespace
+  namespaced: true
 # The service account the pods will use to interact with the Kubernetes API
 serviceAccount:
   # If set, an existing service account is used
   # If not set, a service account is created automatically using the fullname template
-  name: "mem-traefik-service-account"
-  # name: ""
-
-
-
-
+  # name: "mem-traefik-service-account"
+  name: ""
+resources:
+  # requests:
+  #   cpu: "500m"
+  #   memory: "150Mi"
+  limits:
+    cpu: "500m"
+    memory: "150Mi"
 additionalArguments:
   # For a list of all settings, go to:
   # (https://doc.traefik.io/traefik/reference/static-configuration/cli/)
@@ -98,13 +105,14 @@ additionalArguments:
   # - "--entrypoints.websecure.http.tls"
   # - "--providers.kubernetesIngress.ingressClass=traefik-cert-manager"
   # - "--ping"
+
 # Set the container security context
 # To run the container with ports below 1024 this will need to be adjust to run as root
 securityContext:
   capabilities:
     drop: [ALL]
     add: [NET_BIND_SERVICE]
-  # readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: true
   runAsGroup: 0
   runAsNonRoot: false
   runAsUser: 0

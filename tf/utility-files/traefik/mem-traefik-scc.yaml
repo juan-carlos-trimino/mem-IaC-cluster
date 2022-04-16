@@ -62,13 +62,14 @@ allowHostIPC: false
 # allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
 # Setting it to false ensures that no child process of a container can gain more privileges than
 # its parent.
-allowPrivilegeEscalation: true
+allowPrivilegeEscalation: false
 # To prevent processes from writing to the container's filesystem (processes can only write to
 # volumes), set the container's securityContext.readOnlyRootFilesystem property to true. When you
 # make the container's filesystem read-only, you will probably want to mount a volume in every
 # directory the app writes.
 readOnlyRootFilesystem: false
 # https://man7.org/linux/man-pages/man7/capabilities.7.html
+# https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
 # Provide a list of capabilities that are allowed to be added to a container. The default set of
 # capabilities are implicitly allowed. The empty set means that no additional capabilities may be
 # added beyond the default set. * can be used to allow all capabilities.
@@ -97,11 +98,13 @@ supplementalGroups:
   type: RunAsAny
 #
 seLinuxContext:
-  type: MustRunAs
+  type: RunAsAny
+  # type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
+# system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>
 users: [
-  memories:mem-traefik-service-account
+  # system:serviceaccount:memories:mem-traefik-service-account
 ]
 groups: [
   system:authenticated

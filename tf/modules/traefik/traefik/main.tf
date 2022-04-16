@@ -29,10 +29,31 @@ variable "ingress_controller_chart_version" {
   default = "10.9.1"
 }
 
+###################################################################################################
+# To use the service account below:                                                               #
+# (1) In this file, uncomment the lines from /***SA to SA***/.                                    #
+# (2) In the file "mem-traefik-scc.yaml", find section "users:" and change it from:               #
+#     users: [                                                                                    #
+#       # system:serviceaccount:memories:mem-traefik-service-account                              #
+#     ]                                                                                           #
+#                                                                                                 #
+#     to                                                                                          #
+#                                                                                                 #
+#     users: [                                                                                    #
+#       system:serviceaccount:memories:mem-traefik-service-account                                #
+#     ]                                                                                           #
+# (3) In the file "values.yaml", find section "serviceAccount:" and change it from:               #
+#     serviceAccount:                                                                             #
+#       # name: "mem-traefik-service-account"                                                     #
+#       name: ""                                                                                  #
+#                                                                                                 #
+#     to                                                                                          #
+#                                                                                                 #
+#     serviceAccount:                                                                             #
+#       name: "mem-traefik-service-account"                                                       #
+#       # name: ""                                                                                #
+###################################################################################################
 resource "null_resource" "scc-traefik" {
-  # depends_on = [
-  #   helm_release.ingress_controller_traefik
-  # ]
   triggers = {
     always_run = timestamp()
   }
@@ -46,21 +67,7 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-
-# resource "null_resource" "scc-traefik-add-user" {
-#   depends_on = [
-#     null_resource.scc-traefik
-#   ]
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   provisioner "local-exec" {
-#     command = "oc adm policy add-scc-to-user mem-traefik-scc -z default -n memories"
-#   }
-# }
-
-
-# /***
+/***SA
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -140,14 +147,7 @@ resource "kubernetes_role_binding" "role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
-# ***/
-
-
-
-
-
-
-
+SA***/
 
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits
@@ -174,13 +174,11 @@ resource "kubernetes_role_binding" "role_binding" {
 #    traefik - port 9000 (not exposed)
 #    metrics - port 9100 (not exposed)
 resource "helm_release" "ingress_controller_traefik" {
-  depends_on = [
-    kubernetes_service_account.service_account
-  ]
   name = var.ingress_controller_chart_name
   chart = var.ingress_controller_chart_name
   repository = var.ingress_controller_chart_repo
   version = var.ingress_controller_chart_version
   namespace = var.namespace
   values = [file("./utility-files/traefik/values.yaml")]
+  timeout = 150
 }

@@ -78,7 +78,12 @@ tf/modules/rabbitmq-statefulset/*
 #
 !tf/modules/traefik/
 tf/modules/traefik/*
-!tf/modules/traefik/main.tf
+
+!tf/modules/traefik/traefik/
+tf/modules/traefik/traefik/*
+!tf/modules/traefik/traefik/main.tf
+
+
 #
 !tf/utility-files/
 tf/utility-files/*

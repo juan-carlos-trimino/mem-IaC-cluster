@@ -152,7 +152,7 @@ XXX***/
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   source = "./modules/ELK/filebeat"
-  path_to_files = "./utility-files/filebeat"
+  path_to_files = "./utility-files/ELK/filebeat"
   app_name = var.app_name
   image_tag = "docker.elastic.co/beats/filebeat:7.5.0"
   imagePullPolicy = "IfNotPresent"

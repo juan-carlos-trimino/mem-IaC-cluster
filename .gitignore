@@ -94,10 +94,12 @@ tf/modules/traefik/traefik/*
 tf/utility-files/*
 !tf/utility-files/.gitkeep
 #
-!tf/utility-files/filebeat/
-tf/utility-files/filebeat/*
-!tf/utility-files/filebeat/filebeat.yml
-!tf/utility-files/filebeat/mem-filebeat-scc.yaml
+!tf/utility-files/ELK/
+tf/utility-files/ELK/*
+!tf/utility-files/ELK/filebeat/
+tf/utility-files/ELK/filebeat/*
+!tf/utility-files/ELK/filebeat/filebeat.yml
+!tf/utility-files/ELK/filebeat/mem-filebeat-scc.yaml
 #
 !tf/utility-files/mongodb/
 tf/utility-files/mongodb/*

@@ -126,6 +126,20 @@ locals {
   service_name = "${var.service_name}-headless"
 }
 
+resource "null_resource" "scc-rabbitmq" {
+  triggers = {
+    always_run = timestamp()
+  }
+  provisioner "local-exec" {
+    command = "oc apply -f ./utility-files/rabbitmq/mem-rabbitmq-scc.yaml"
+  }
+  #
+  provisioner "local-exec" {
+    when = destroy
+    command = "oc delete scc mem-rabbitmq-scc"
+  }
+}
+
 resource "kubernetes_secret" "secret" {
   metadata {
     name = "${var.service_name}-secret"
@@ -199,6 +213,12 @@ resource "kubernetes_role" "role" {
     api_groups = [""]
     verbs = ["create"]
     resources = ["events"]
+  }
+  rule {
+    api_groups = ["security.openshift.io"]
+    verbs = ["use"]
+    resources = ["securitycontextconstraints"]
+    resource_names = ["mem-mongodb-scc"]
   }
 }
 
@@ -322,11 +342,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
         # The security settings that is specified for a Pod apply to all Containers in the Pod.
-        # security_context {
-        #   # run_as_user = 1010
-        #   # run_as_group = 1010
-        #   fs_group = 0
-        # }
+        security_context {
+          run_as_non_root = true
+          run_as_user = 1060
+          run_as_group = 1060
+          read_only_root_filesystem = true
+        }
         container {
           name = var.service_name
           image = var.image_tag

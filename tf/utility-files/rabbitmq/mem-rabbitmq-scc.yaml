@@ -33,7 +33,7 @@
 kind: SecurityContextConstraints
 apiVersion: security.openshift.io/v1
 metadata:
-  name: mem-mongodb-scc
+  name: mem-rabbitmq-scc
 priority: 10
 # Determine if any container in a pod can enable privileged mode. By default a container is not
 # allowed to access any devices on the host, but a "privileged" container is given access to all
@@ -85,11 +85,11 @@ requiredDropCapabilities: [
 # Control which user ID the containers are run with.
 runAsUser:
   type: MustRunAs
-  uid: 1050
+  uid: 1060
 #
 fsGroup:
   type: MustRunAs
-  gid: 1050
+  gid: 1060
 #
 supplementalGroups:
   type: RunAsAny

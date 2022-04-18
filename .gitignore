@@ -96,6 +96,7 @@ tf/utility-files/*
 #
 !tf/utility-files/ELK/
 tf/utility-files/ELK/*
+!tf/utility-files/ELK/.gitkeep
 !tf/utility-files/ELK/filebeat/
 tf/utility-files/ELK/filebeat/*
 !tf/utility-files/ELK/filebeat/filebeat.yml

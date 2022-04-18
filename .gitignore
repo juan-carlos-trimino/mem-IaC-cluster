@@ -13,14 +13,11 @@ tf/*
 !tf/data.tf
 !tf/ELK.tf
 !tf/bootstrap.tf
-!tf/mongodb.tf
 !tf/namespace.tf
 !tf/pri-microservices.tf
 !tf/providers.tf
-!tf/rabbitmq.tf
 !tf/tekton_Copy.yaml
 !tf/tekton.yaml
-!tf/traefik.tf
 !tf/variables_no_push.tf.template
 !tf/variables.tf
 # ... and this directory...
@@ -118,7 +115,7 @@ tf/utility-files/mongodb/scripts/*
 #
 !tf/utility-files/rabbitmq/
 tf/utility-files/rabbitmq/*
-!tf/utility-files/rabbitmq/.gitkeep
+!tf/utility-files/rabbitmq/mem-rabbitmq-scc.yaml
 !tf/utility-files/rabbitmq/configmaps/
 tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/rabbitmq/configmaps/rabbitmq.conf

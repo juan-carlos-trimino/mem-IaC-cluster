@@ -12,6 +12,7 @@ tf/*
 !tf/cert-manager.tf
 !tf/data.tf
 !tf/ELK.tf
+!tf/bootstrap.tf
 !tf/mongodb.tf
 !tf/namespace.tf
 !tf/pri-microservices.tf

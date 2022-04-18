@@ -103,7 +103,7 @@ tf/utility-files/filebeat/*
 #
 !tf/utility-files/mongodb/
 tf/utility-files/mongodb/*
-!tf/utility-files/mongodb/.gitkeep
+!tf/utility-files/mongodb/mem-mongodb-scc.yaml
 !tf/utility-files/mongodb/certs/
 tf/utility-files/mongodb/certs/*
 !tf/utility-files/mongodb/certs/.gitkeep

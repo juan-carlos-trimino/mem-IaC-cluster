@@ -43,6 +43,11 @@ priority: 10
 # the host. This is useful for containers that want to use Linux capabilities like manipulating the
 # network stack and accessing devices.
 allowPrivilegedContainer: true
+# Gate whether or not a user is allowed to set the security context of a container to
+# allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
+# Setting it to false ensures that no child process of a container can gain more privileges than
+# its parent.
+allowPrivilegeEscalation: false
 #
 allowHostDirVolumePlugin: false
 # Control whether the pod may use the node network namespace. Doing so gives the pod access to the
@@ -58,11 +63,6 @@ allowHostPorts: false
 allowHostPID: false
 # Control whether the pod containers can share the host IPC namespace.
 allowHostIPC: false
-# Gate whether or not a user is allowed to set the security context of a container to
-# allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
-# Setting it to false ensures that no child process of a container can gain more privileges than
-# its parent.
-allowPrivilegeEscalation: false
 # To prevent processes from writing to the container's filesystem (processes can only write to
 # volumes), set the container's securityContext.readOnlyRootFilesystem property to true. When you
 # make the container's filesystem read-only, you will probably want to mount a volume in every

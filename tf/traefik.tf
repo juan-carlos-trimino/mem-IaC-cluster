@@ -10,7 +10,7 @@
 
 
 
-
+/***CCC
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -42,7 +42,7 @@ module "ingress-route" {
   middleware_dashboard = local.middleware_dashboard
   service_name = "mem-ingress-route"
 }
-
+CCC***/
 
 
 

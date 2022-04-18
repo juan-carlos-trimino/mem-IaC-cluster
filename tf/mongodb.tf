@@ -1,4 +1,4 @@
-/***CCC
+# /***CCC
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/mongodb-deploy"
@@ -21,7 +21,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-CCC***/
+# CCC***/
 /***
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and

@@ -341,17 +341,17 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        # The security settings that is specified for a Pod apply to all Containers in the Pod.
-        security_context {
-          run_as_non_root = true
-          run_as_user = 1060
-          run_as_group = 1060
-          read_only_root_filesystem = true
-        }
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
+          # The security settings that is specified for a Pod apply to all Containers in the Pod.
+          security_context {
+            run_as_non_root = true
+            run_as_user = 1060
+            run_as_group = 1060
+            read_only_root_filesystem = false
+          }
           # lifecycle {
           #   post_start {
           #     exec {
@@ -506,8 +506,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
           volume_mount {
             name = "erlang-cookie"
             mount_path = "/var/lib/rabbitmq/mnesia/.erlang.cookie"
+            # mount_path = "/var/lib/rabbitmq/.erlang.cookie"
             sub_path = ".erlang.cookie"
-            read_only = true
+            read_only = false
           }
           volume_mount {
             name = "configs"
@@ -523,7 +524,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             items {
               key = "cookie"
               path = ".erlang.cookie"  #File name.
-              mode = "0400"
             }
           }
         }

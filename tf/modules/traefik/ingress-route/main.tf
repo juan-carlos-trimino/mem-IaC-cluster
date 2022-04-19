@@ -13,6 +13,18 @@ variable "namespace" {
 variable "middleware_dashboard" {
   type = string
 }
+variable "middleware_gateway" {
+  type = string
+}
+variable "svc_gateway" {
+  type = string
+}
+variable "middleware_rabbitmq" {
+  type = string
+}
+variable "svc_rabbitmq" {
+  type = string
+}
 variable "service_name" {
   type = string
 }
@@ -64,19 +76,56 @@ resource "kubernetes_manifest" "ingress-route" {
                 flushInterval = "100ms"
               }
             }
-
-    # - match: Host(`trimino.com`) && PathPrefix(`/metrics`)
-      # kind: Rule
-      # middlewares:
-      #   - name: traefik-dashboard-basicauth
-      #     namespace: memories1
-      # services:
-        # - kind: TraefikService
-          # If you enable the API, a new special service named api@internal is created and can then
-          # be referenced in a router.
-          # name: api@internal
-          # port: 9001
-
+          ]
+        },
+        {
+          kind = "Rule"
+          match = "Host(`trimino.com`) && PathPrefix(`/`)"
+          priority = 10
+          middlewares = [
+            {
+              name = var.middleware_gateway
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_gateway
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
+          match = "Host(`trimino.com`) && PathPrefix(`/rabbitmq`)"
+          priority = 10
+          middlewares = [
+            {
+              name = var.middleware_rabbitmq
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_rabbitmq
+              namespace = var.namespace
+              port = 15672  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
           ]
         }
       ]

@@ -86,6 +86,12 @@ tf/modules/traefik/middlewares/*
 !tf/modules/traefik/middlewares/middleware-dashboard/
 tf/modules/traefik/middlewares/middleware-dashboard/*
 !tf/modules/traefik/middlewares/middleware-dashboard/main.tf
+!tf/modules/traefik/middlewares/middleware-gateway/
+tf/modules/traefik/middlewares/middleware-gateway/*
+!tf/modules/traefik/middlewares/middleware-gateway/main.tf
+!tf/modules/traefik/middlewares/middleware-rabbitmq/
+tf/modules/traefik/middlewares/middleware-rabbitmq/*
+!tf/modules/traefik/middlewares/middleware-rabbitmq/main.tf
 !tf/modules/traefik/traefik/
 tf/modules/traefik/traefik/*
 !tf/modules/traefik/traefik/main.tf

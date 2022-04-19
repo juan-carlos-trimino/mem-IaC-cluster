@@ -65,7 +65,7 @@ allowHostIPC: false
 # volumes), set the container's securityContext.readOnlyRootFilesystem property to true. When you
 # make the container's filesystem read-only, you will probably want to mount a volume in every
 # directory the app writes.
-readOnlyRootFilesystem: true
+readOnlyRootFilesystem: false
 # https://man7.org/linux/man-pages/man7/capabilities.7.html
 # https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
 # Provide a list of capabilities that are allowed to be added to a container. The default set of

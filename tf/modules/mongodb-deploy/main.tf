@@ -87,6 +87,82 @@ variable "service_target_port" {
   type = number
 }
 
+resource "null_resource" "scc-mongodb" {
+  triggers = {
+    always_run = timestamp()
+  }
+  provisioner "local-exec" {
+    command = "oc apply -f ./utility-files/mongodb/mem-mongodb-scc.yaml"
+  }
+  #
+  provisioner "local-exec" {
+    when = destroy
+    command = "oc delete scc mem-mongodb-scc"
+  }
+}
+
+# A ServiceAccount is used by an application running inside a pod to authenticate itself with the
+# API server. A default ServiceAccount is automatically created for each namespace; each pod is
+# associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
+# pod can only use a ServiceAccount from the same namespace.
+#
+# For cluster security, let's constrain the cluster metadata this pod may read.
+resource "kubernetes_service_account" "service_account" {
+  metadata {
+    name = "${var.service_name}-service-account"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+}
+
+# Roles define WHAT can be done; role bindings define WHO can do it.
+# The distinction between a Role/RoleBinding and a ClusterRole/ClusterRoleBinding is that the Role/
+# RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
+# A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
+# requests can be performed on which RESTful resources.
+resource "kubernetes_role" "role" {
+  metadata {
+    name = "${var.service_name}-role"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  rule {
+    api_groups = ["security.openshift.io"]
+    verbs = ["use"]
+    resources = ["securitycontextconstraints"]
+    resource_names = ["mem-mongodb-scc"]
+  }
+}
+
+# Bind the role to the service account.
+resource "kubernetes_role_binding" "role_binding" {
+  metadata {
+    name = "${var.service_name}-role-binding"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind = "Role"
+    # This RoleBinding references the Role specified below...
+    name = kubernetes_role.role.metadata[0].name
+  }
+  # ... and binds it to the specified ServiceAccount in the specified namespace.
+  subject {
+    # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
+    kind = "ServiceAccount"
+    name = kubernetes_service_account.service_account.metadata[0].name
+    namespace = kubernetes_service_account.service_account.metadata[0].namespace
+  }
+}
+
 # Because PersistentVolumeClaim (PVC) can only be created in a specific namespace, they can only be
 # used by pods in the same namespace.
 resource "kubernetes_persistent_volume_claim" "mongodb_claim" {
@@ -147,11 +223,18 @@ resource "kubernetes_deployment" "deployment" {
       }
       #
       spec {
+        service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
           name = var.service_name
+          security_context {
+            run_as_non_root = true
+            run_as_user = 1050
+            run_as_group = 1050
+            read_only_root_filesystem = true
+          }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -199,7 +282,13 @@ resource "kubernetes_deployment" "deployment" {
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
           volume_mount {
             name = "mongodb-storage"
-            mount_path = "/data/db"  #"$(DATA_FILE_PATH)"   "/aaa/data/db"     #"$(mongodb.conf.storage.dbPath)"    
+            mount_path = "/data/db"
+            read_only = false
+          }
+          volume_mount {
+            name = "mongodb-tmp-dir"
+            mount_path = "/tmp"
+            read_only = false
           }
           # *** Mount external storage in a volume to persist pod data across pod restarts ***
         }
@@ -215,6 +304,11 @@ resource "kubernetes_deployment" "deployment" {
           name = "mongodb-storage"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.mongodb_claim.metadata[0].name
+          }
+        }
+        volume {
+          name = "mongodb-tmp-dir"
+          empty_dir {
           }
         }
         # *** Mount external storage in a volume to persist pod data across pod restarts ***

@@ -105,3 +105,30 @@ variable "rabbitmq_default_pass" {
 variable "rabbitmq_default_user" {
   default = "<required>"
 }
+
+###########
+# Traefik #
+###########
+variable "traefik_dashboard_username" {
+  default = "<required>"
+}
+
+variable "traefik_dashboard_password" {
+  default = "<required>"
+}
+
+variable "traefik_rabbitmq_username" {
+  default = "<required>"
+}
+
+variable "traefik_rabbitmq_password" {
+  default = "<required>"
+}
+
+variable "traefik_gateway_username" {
+  default = "<required>"
+}
+
+variable "traefik_gateway_password" {
+  default = "<required>"
+}

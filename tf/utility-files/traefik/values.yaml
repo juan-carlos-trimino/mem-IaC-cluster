@@ -1,0 +1,120 @@
+# For the default values, go to:
+# https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+#
+# Set Traefik as the default Ingress Controller.
+ingressController:
+  enabled: true
+  isDefaultClass: true
+# Create an IngressRoute for the dashboard.
+ingressRoute:
+  dashboard:
+    # Using a custom ingressRoute with basic auth instead of the default.
+    enabled: false
+    # enabled: true
+    # Additional ingressRoute annotations (e.g. for kubernetes.io/ingress.class).
+    annotations: {}
+    # annotations: { traefik.ingress.kubernetes.io/router.tls: "true" }
+    # Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels).
+    labels: {}
+# Logs
+# https://docs.traefik.io/observability/logs/logs/
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
+ports:
+  web:
+    port: 80  # Traefik port.
+    expose: true
+    exposedPort: 80
+    # redirectTo: websecure
+  websecure:
+    port: 8443
+    expose: false
+    exposedPort: 443
+    tls:
+      enabled: false
+  traefik:
+    port: 9000
+    # DO NOT expose the traefik port on production deployments. To access it from outside of the
+    # cluster, use `kubectl port-forward` or create a secure ingress.
+    # $ kubectl port-forward -n memories $(kubectl get pods -n memories --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+    # From a browser, use http://127.0.0.1:9000/dashboard/ to see the Traefik dashboard; the trailing slash / in /dashboard/ is mandatory.
+    expose: false
+    # The exposed port for this service.
+    exposedPort: 9000
+  metrics:
+    port: 9100
+    # See traefik.
+    expose: false
+    # The exposed port for this service.
+    exposedPort: 9100
+persistence:
+  enabled: true
+  name: ssl-certs
+  size: 1Gi
+  path: /ssl-certs
+# Whether Role Based Access Control objects like roles and rolebindings should be created
+rbac:
+  enabled: true
+  # If set to false, installs ClusterRole and ClusterRoleBinding so Traefik can be used across namespaces.
+  # If set to true, installs namespace-specific Role and RoleBinding and requires provider configuration be set to that same namespace
+  namespaced: true
+# The service account the pods will use to interact with the Kubernetes API
+serviceAccount:
+  # If set, an existing service account is used
+  # If not set, a service account is created automatically using the fullname template
+  # name: ""
+  name: "mem-traefik-service-account"
+resources:
+  # requests:
+  #   cpu: "500m"
+  #   memory: "150Mi"
+  limits:
+    cpu: "500m"
+    memory: "150Mi"
+additionalArguments:
+  # For a list of all settings, go to:
+  # (https://doc.traefik.io/traefik/reference/static-configuration/cli/)
+  # (https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations).
+  # Enable api/dashboard.
+  - "--api=true"
+  # Activate dashboard.
+  # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
+  - "--api.dashboard=true"
+  # Activate API directly on the entryPoint named traefik.
+  # - "--api.insecure=true"
+  # Entry point address.
+  - "--entrypoints.web.address=:80"
+  - "--entrypoints.websecure.address=:443"
+  # Traefik log settings.
+  - "--log=true"
+  # Log level set to traefik logs.
+  - "--log.level=INFO"
+  # Prometheus metrics exporter type.
+  - "--metrics.prometheus=true"
+  # Enable Kubernetes backend with default settings.
+  - "--providers.kubernetescrd=true"
+
+  # - "--traefik.enable=true"
+
+  # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+  # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+  # - "--entrypoints.websecure.http.tls"
+  # - "--providers.kubernetesIngress.ingressClass=traefik-cert-manager"
+  # - "--ping"
+
+# Set the container security context
+# To run the container with ports below 1024 this will need to be adjust to run as root
+securityContext:
+  capabilities:
+    drop: [ALL]
+    add: [NET_BIND_SERVICE]
+  readOnlyRootFilesystem: true
+  runAsGroup: 0
+  runAsNonRoot: false
+  runAsUser: 0
+# podSecurityContext:
+#   fsGroup: 1100

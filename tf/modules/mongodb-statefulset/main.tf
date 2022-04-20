@@ -204,7 +204,7 @@ resource "kubernetes_secret" "mongodb_secret" {
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
 # pod can only use a ServiceAccount from the same namespace.
 #
-# For cluster security, let’s constrain the cluster metadata this pod may read.
+# For cluster security, let's constrain the cluster metadata this pod may read.
 resource "kubernetes_service_account" "mongodb_service_account" {
   metadata {
     name = "${var.service_name}-service-account"

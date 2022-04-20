@@ -58,6 +58,25 @@ IaC-cluster
  | ├ cluster_config
  | | └ .gitkeep
  | ├ modules
+ | | ├ cert-manager
+ | | | ├ cert-manager
+ | | | | └ main.tf
+ | | | ├ certificates
+ | | | | ├ main.tf
+ | | | | └ traefik-dashboard-cert.yml
+ | | | ├ issuers
+ | | | | ├ issuer.yml
+ | | | | └ main.tf
+ | | | └ .gitkeep
+ | | ├ ELK
+ | | | ├ elasticsearch
+ | | | | └ main.tf
+ | | | ├ filebeat
+ | | | | └ main.tf
+ | | | ├ kibana
+ | | | | └ main.tf
+ | | | ├ logstash
+ | | | | └ main.tf
  | | ├ mongodb-deploy
  | | | └ main.tf
  | | ├ mongodb-statefulset
@@ -68,8 +87,27 @@ IaC-cluster
  | | | └ main.tf
  | | ├ rabbitmq-statefulset
  | | | └ main.tf
+ | | ├ traefik
+ | | | ├ ingress-route
+ | | | | └ main.tf
+ | | | ├ middlewares
+ | | | | ├ middleware-dashboard
+ | | | | | └ main.tf
+ | | | | ├ middleware-gateway
+ | | | | | └ main.tf
+ | | | | ├ middleware-rabbitmq
+ | | | | | └ main.tf
+ | | | | └ .gitkeep
+ | | | ├ traefik
+ | | | | └ main.tf
+ | | | └ .gitkeep
  | | └ .gitkeep
  | ├ utility-files
+ | | ├ ELK
+ | | | ├ filebeat
+ | | | | ├ filebeat.yml
+ | | | | └ mem-filebeat-scc.yaml
+ | | | └ .gitkeep
  | | ├ mongodb
  | | | ├ certs
  | | | | └ .gitkeep
@@ -78,20 +116,23 @@ IaC-cluster
  | | | ├ scripts
  | | | | ├ entrypoint.sh
  | | | | └ start-replication.js
- | | | └ .gitkeep
+ | | | └ mem-mongodb-scc.yaml
  | | ├ rabbitmq
  | | | ├ configmaps
  | | | | └ rabbitmq.conf
- | | └ .gitkeep
+ | | | └ mem-rabbitmq-scc.yaml
+ | | ├ traefik
+ | | | ├ mem-traefik-scc.yaml
+ | | | └ values.yaml
+ | ├ bootstrap.tf
+ | ├ cert-manager.tf
  | ├ data.tf
  | ├ ELK.tf
- | ├ mongodb.tf
- | ├ rabbitmq.tf
  | ├ namespace.tf
- | ├ pri-microservices.tf
+ | ├ post-deployment.tf
  | ├ providers.tf
- | ├ variables.tf
- | └ variables_no_push.tf.template
+ | ├ variables_no_push.tf.template
+ | └ variables.tf
  ├ .gitignore
  ├ LICENSE
  └ README.md

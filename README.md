@@ -75,8 +75,8 @@ IaC-cluster
  | | | | └ main.tf
  | | | ├ kibana
  | | | | └ main.tf
- | | | ├ logstash
- | | | | └ main.tf
+ | | | └ logstash
+ | | |   └ main.tf
  | | ├ mongodb-deploy
  | | | └ main.tf
  | | ├ mongodb-statefulset
@@ -121,9 +121,9 @@ IaC-cluster
  | | | ├ configmaps
  | | | | └ rabbitmq.conf
  | | | └ mem-rabbitmq-scc.yaml
- | | ├ traefik
- | | | ├ mem-traefik-scc.yaml
- | | | └ values.yaml
+ | | └ traefik
+ | |   ├ mem-traefik-scc.yaml
+ | |   └ values.yaml
  | ├ bootstrap.tf
  | ├ cert-manager.tf
  | ├ data.tf
@@ -161,17 +161,17 @@ IaC-storage
  | | | ├ variables_no_push.tf.template
  | | | └ versions.tf
  | | └ modules
- | | | ├ bucket
- | | | | ├ main.tf
- | | | | ├ variables.tf
- | | | | ├ variables_no_push.tf.template
- | | | | └ versions.tf
- | | | ├ instance
- | | | | ├ main.tf
- | | | | ├ variables.tf
- | | | | ├ variables_no_push.tf.template
- | | | | └ versions.tf
- | | | └ .gitkeep
+ | |   ├ bucket
+ | |   | ├ main.tf
+ | |   | ├ variables.tf
+ | |   | ├ variables_no_push.tf.template
+ | |   | └ versions.tf
+ | |   ├ instance
+ | |   | ├ main.tf
+ | |   | ├ variables.tf
+ | |   | ├ variables_no_push.tf.template
+ | |   | └ versions.tf
+ | |   └ .gitkeep
  | └ .gitkeep
  ├ .gitignore
  ├ LICENSE
@@ -185,8 +185,8 @@ mem-gateway
  | | ├ css
  | | | ├ app.css
  | | | └ tailwind.min.css
- | | ├ js
- | | | └ upload.js
+ | | └ js
+ | |   └ upload.js
  | ├ src
  | | ├ views
  | | | ├ history.hbs

@@ -34,6 +34,7 @@ locals {
   ####################
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
+  svc_kibana = "mem-kibana"
   svc_metadata = "mem-metadata"
   svc_mongodb = "mem-mongodb"
   svc_rabbitmq = "mem-rabbitmq"
@@ -65,7 +66,7 @@ locals {
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
   # svc_dns_elasticsearch = "mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
-  # svc_dns_kibana = "mem-kibana.${local.namespace}.svc.cluster.local:5601"
+  svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
 module "traefik" {
@@ -300,7 +301,7 @@ module "mem-gateway" {
     SVC_DNS_HISTORY: local.svc_dns_history
     SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
     SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
-    # SVC_DNS_KIBANA: local.svc_dns_kibana
+    SVC_DNS_KIBANA: local.svc_dns_kibana
     MAX_RETRIES: 20
   }
   readiness_probe = [{

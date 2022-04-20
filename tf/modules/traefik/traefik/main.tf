@@ -186,7 +186,8 @@ resource "kubernetes_role_binding" "role_binding" {
 #    traefik - port 9000 (not exposed)
 #    metrics - port 9100 (not exposed)
 resource "helm_release" "ingress_controller_traefik" {
-  name = var.ingress_controller_chart_name
+  # name = var.ingress_controller_chart_name
+  name = var.service_name
   chart = var.ingress_controller_chart_name
   repository = var.ingress_controller_chart_repo
   version = var.ingress_controller_chart_version

@@ -75,12 +75,13 @@ resource "kubernetes_manifest" "ingress-route" {
                 # client.
                 flushInterval = "100ms"
               }
+              strategy = "RoundRobin"
             }
           ]
         },
         {
           kind = "Rule"
-          match = "Host(`trimino.com`) && PathPrefix(`/`)"
+          match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/history`) || PathPrefix(`/upload`))"
           priority = 10
           middlewares = [
             {

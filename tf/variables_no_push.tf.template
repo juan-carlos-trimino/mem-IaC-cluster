@@ -47,7 +47,6 @@ variable ibmcloud_timeout {
 
 ################
 # Storage info #
-################
 ####################################################################################################
 # To obtain the information below, find the Storage instance and select the desired bucket. Click  #
 # on the "Configuration" tab and copy the following values:                                        #

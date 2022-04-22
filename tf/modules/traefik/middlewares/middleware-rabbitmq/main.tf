@@ -10,7 +10,7 @@ variable "app_name" {
 variable "namespace" {
   type = string
 }
-variable "service_name" {
+variable "service_name1" {
   type = string
 }
 variable "traefik_rabbitmq_username" {
@@ -19,10 +19,13 @@ variable "traefik_rabbitmq_username" {
 variable "traefik_rabbitmq_password" {
   type = string
 }
+variable "service_name2" {
+  type = string
+}
 
 resource "kubernetes_secret" "secret" {
   metadata {
-    name = "${var.service_name}-secret"
+    name = "${var.service_name1}-secret"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -51,12 +54,12 @@ resource "kubernetes_secret" "secret" {
   type = "Opaque"
 }
 
-resource "kubernetes_manifest" "middleware" {
+resource "kubernetes_manifest" "middleware1" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name}"
+      name = "${var.service_name1}"
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -69,6 +72,29 @@ resource "kubernetes_manifest" "middleware" {
         # The users option is an array of authorized users. Each user will be declared using the
         # name:encoded-password format.
         secret = kubernetes_secret.secret.metadata[0].name
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "middleware2" {
+  manifest = {
+    apiVersion = "traefik.containo.us/v1alpha1"
+    kind = "Middleware"
+    metadata = {
+      name = "${var.service_name2}"
+      namespace = var.namespace
+      labels = {
+        app = var.app_name
+      }
+    }
+    #
+    spec = {
+      stripPrefix = {
+        prefixes = [
+          "/rabbitmq"
+        ]
+        forceSlash = false
       }
     }
   }

@@ -19,7 +19,10 @@ variable "middleware_gateway" {
 variable "svc_gateway" {
   type = string
 }
-variable "middleware_rabbitmq" {
+variable "middleware_rabbitmq1" {
+  type = string
+}
+variable "middleware_rabbitmq2" {
   type = string
 }
 variable "svc_rabbitmq" {
@@ -43,6 +46,8 @@ resource "kubernetes_manifest" "ingress-route" {
     #
     spec = {
       entryPoints = [  # Listening ports.
+        # "web.address=:80",
+        # "websecure.address=:443"
         "web",
         "websecure"
       ]
@@ -81,7 +86,7 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/history`) || PathPrefix(`/upload`))"
+          match = "Host(`trimino.com`) && PathPrefix(`/`)"
           priority = 10
           middlewares = [
             {
@@ -110,7 +115,11 @@ resource "kubernetes_manifest" "ingress-route" {
           priority = 10
           middlewares = [
             {
-              name = var.middleware_rabbitmq
+              name = var.middleware_rabbitmq1
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_rabbitmq2
               namespace = var.namespace
             }
           ]

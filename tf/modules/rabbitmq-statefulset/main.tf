@@ -345,7 +345,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          # The security settings that is specified for a Pod apply to all Containers in the Pod.
           security_context {
             run_as_non_root = true
             run_as_user = 1060

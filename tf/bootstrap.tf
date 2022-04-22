@@ -1,23 +1,3 @@
-###########
-# traefik #
-###########
-# The hosts file is used to map domain names (hostnames) to IP addresses. It is a plain-text file
-# used by all operating systems including, Linux, Windows, and macOS. The hosts file has priority
-# over DNS. When typing in the domain name of a web site to visit, the domain name must be
-# translated into its corresponding IP address. The operating system first checks its hosts file
-# for the corresponding domain, and if there is no entry for the domain, it will query the
-# configured DNS servers to resolve the specified domain name. This affects only the computer on
-# which the change is made, rather than how the domain is resolved worldwide. Entries in the hosts
-# file have the following format:
-#   IPAddress DomainName [DomainAliases]
-# The IP address and the domain names should be separated by at least one space or tab. The lines
-# starting with '#' are comments and are ignored.
-# On Linux, the full path to the file is /etc/hosts.
-# On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
-# kubectl get pod,middleware,ingressroute,svc -n memories
-# kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
-# kubectl get all -l "app=memories" -n memories
-# /***CCC
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
@@ -27,7 +7,8 @@ locals {
   # Middlewares #
   ###############
   middleware_dashboard = "mem-middleware-dashboard"
-  middleware_rabbitmq = "mem-middleware-rabbitmq"
+  middleware_rabbitmq1 = "mem-middleware-rabbitmq-basic-auth"
+  middleware_rabbitmq2 = "mem-middleware-rabbitmq-strip-prefix"
   middleware_gateway = "mem-middleware-gateway"
   ####################
   # Name of Services #
@@ -69,6 +50,26 @@ locals {
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
+###########
+# traefik #
+###########
+# /*** traefik
+# The hosts file is used to map domain names (hostnames) to IP addresses. It is a plain-text file
+# used by all operating systems including, Linux, Windows, and macOS. The hosts file has priority
+# over DNS. When typing in the domain name of a web site to visit, the domain name must be
+# translated into its corresponding IP address. The operating system first checks its hosts file
+# for the corresponding domain, and if there is no entry for the domain, it will query the
+# configured DNS servers to resolve the specified domain name. This affects only the computer on
+# which the change is made, rather than how the domain is resolved worldwide. Entries in the hosts
+# file have the following format:
+#   IPAddress DomainName [DomainAliases]
+# The IP address and the domain names should be separated by at least one space or tab. The lines
+# starting with '#' are comments and are ignored.
+# On Linux, the full path to the file is /etc/hosts.
+# On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
+# kubectl get pod,middleware,ingressroute,svc -n memories
+# kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
+# kubectl get all -l "app=memories" -n memories
 module "traefik" {
   source = "./modules/traefik/traefik"
   app_name = var.app_name
@@ -92,7 +93,8 @@ module "middleware-rabbitmq" {
   namespace = local.namespace
   traefik_rabbitmq_username = var.traefik_rabbitmq_username
   traefik_rabbitmq_password = var.traefik_rabbitmq_password
-  service_name = local.middleware_rabbitmq
+  service_name1 = local.middleware_rabbitmq1
+  service_name2 = local.middleware_rabbitmq2
 }
 
 module "middleware-gateway" {
@@ -109,13 +111,14 @@ module "ingress-route" {
   app_name = var.app_name
   namespace = local.namespace
   middleware_dashboard = local.middleware_dashboard
-  middleware_rabbitmq = local.middleware_rabbitmq
+  middleware_rabbitmq1 = local.middleware_rabbitmq1
+  middleware_rabbitmq2 = local.middleware_rabbitmq2
   svc_rabbitmq = local.svc_rabbitmq
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
   service_name = "mem-ingress-route"
 }
-# CCC***/
+# ***/ # traefik
 
 /***
 module "issuers" {
@@ -135,7 +138,7 @@ module "certificates" {
 ###########
 # mongodb #
 ###########
-# /***CCC
+# /*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
   source = "./modules/mongodb-deploy"
@@ -158,8 +161,9 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# CCC***/
-/***
+# ***/  # mongodb - deployment
+
+/*** mongodb - statefulset
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -204,34 +208,44 @@ module "mem-mongodb" {
     MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
   }
 }
-***/
+***/  # mongodb - statefulset
 
 ############
 # rabbitmq #
 ############
-/***
+/*** rabbitmq - deployment
 # Deployment.
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/rabbitmq-deploy"
-  dir_name = "../../mem-rabbitmq/rabbitmq"
+  # dir_name = "../../${local.svc_rabbitmq}/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
-  # image_tag = "rabbitmq:3.9.7-management-alpine"
+  image_tag = "rabbitmq:3.9.15-management-alpine"
+  imagePullPolicy = "IfNotPresent"
   # image_tag = "rabbitmq:3.9.7-alpine"
+  path_rabbitmq_files = "./utility-files/rabbitmq"
   namespace = local.namespace
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
-  cr_login_server = local.cr_login_server
-  cr_username = var.cr_username
-  cr_password = var.cr_password
-  service_name = "mem-rabbitmq"
-  service_port = 5672
-  service_target_port = 5672
+  rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
+  rabbitmq_default_pass = var.rabbitmq_default_pass
+  rabbitmq_default_user = var.rabbitmq_default_user
+  # cr_login_server = local.cr_login_server
+  # cr_username = var.cr_username
+  # cr_password = var.cr_password
+  amqp_service_port = 5672
+  amqp_service_target_port = 5672
+  # HTTP API clients, management UI, and rabbitmqadmin, without and with TLS (only if the
+  # management plugin is enabled).
+  mgmt_service_port = 15672
+  mgmt_service_target_port = 15672
+  service_name = local.svc_rabbitmq
 }
-***/
-# /***CCC
+***/  # rabbitmq - deployment
+
+# /*** rabbitmq - statefulset
 # StatefulSet.
 module "mem-rabbitmq" {
   source = "./modules/rabbitmq-statefulset"
@@ -251,7 +265,7 @@ module "mem-rabbitmq" {
   # Because several features (e.g. quorum queues, client tracking in MQTT) require a consensus
   # between cluster members, odd numbers of cluster nodes are highly recommended: 1, 3, 5, 7
   # and so on.
-  replicas = 3
+  replicas = 1
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
@@ -276,12 +290,12 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-# CCC***/
+# ***/  # rabbitmq - statefulset
 
 ###############
 # Application #
 ###############
-# /***CCC
+# /*** app
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/pri-microservice"
@@ -326,7 +340,7 @@ module "mem-history" {
   dir_name = "../../${local.svc_history}/history"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -359,7 +373,7 @@ module "mem-metadata" {
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -392,7 +406,7 @@ module "mem-video-storage" {
   dir_name = "../../${local.svc_video_storage}/video-storage"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_limits_cpu = "300m"
   qos_limits_memory = "500Mi"
@@ -424,7 +438,7 @@ module "mem-video-streaming" {
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
-  replicas = 3
+  replicas = 1
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
@@ -456,7 +470,7 @@ module "mem-video-upload" {
   dir_name = "../../${local.svc_video_upload}/video-upload"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
@@ -483,6 +497,4 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-# CCC***/
-
-
+# ***/  # app

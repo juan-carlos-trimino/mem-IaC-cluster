@@ -51,7 +51,7 @@ resource "kubernetes_secret" "secret" {
   type = "Opaque"
 }
 
-resource "kubernetes_manifest" "middleware_dashboard" {
+resource "kubernetes_manifest" "middleware" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"

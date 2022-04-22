@@ -46,12 +46,65 @@ resource "kubernetes_manifest" "ingress-route" {
     #
     spec = {
       entryPoints = [  # Listening ports.
-        # "web.address=:80",
-        # "websecure.address=:443"
         "web",
         "websecure"
       ]
       routes = [
+        {
+          kind = "Rule"
+          match = "Host(`trimino.com`) && PathPrefix(`/`)"
+          priority = 1
+          middlewares = [
+            {
+              name = var.middleware_gateway
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              # name = var.svc_gateway
+              name = var.svc_gateway
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+
+        {
+          kind = "Rule"
+          match = "Host(`trimino.com`) && PathPrefix(`/api/upload`)"
+          priority = 2
+          # middlewares = [
+          #   {
+          #     name = var.middleware_gateway
+          #     namespace = var.namespace
+          #   }
+          # ]
+          services = [
+            {
+              kind = "Service"
+              # name = var.svc_gateway
+              name = "mem-video-upload"
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+
+
         {
           kind = "Rule"
           match = "Host(`trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
@@ -86,42 +139,17 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          match = "Host(`trimino.com`) && PathPrefix(`/`)"
-          priority = 10
-          middlewares = [
-            {
-              name = var.middleware_gateway
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "Service"
-              name = var.svc_gateway
-              namespace = var.namespace
-              port = 80  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        {
-          kind = "Rule"
           match = "Host(`trimino.com`) && PathPrefix(`/rabbitmq`)"
-          priority = 10
+          priority = 11
           middlewares = [
             {
               name = var.middleware_rabbitmq1
               namespace = var.namespace
-            },
-            {
-              name = var.middleware_rabbitmq2
-              namespace = var.namespace
             }
+            # {
+            #   name = var.middleware_rabbitmq2
+            #   namespace = var.namespace
+            # }
           ]
           services = [
             {

@@ -115,8 +115,7 @@ module "ingress-route" {
   middleware_rabbitmq2 = local.middleware_rabbitmq2
   svc_rabbitmq = local.svc_rabbitmq
   middleware_gateway = local.middleware_gateway
-  # svc_gateway = local.svc_gateway
-  svc_gateway = local.svc_metadata
+  svc_gateway = local.svc_gateway
   service_name = "mem-ingress-route"
 }
 # ***/ # traefik

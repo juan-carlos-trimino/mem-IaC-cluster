@@ -63,7 +63,6 @@ resource "kubernetes_manifest" "ingress-route" {
           services = [
             {
               kind = "Service"
-              # name = var.svc_gateway
               name = var.svc_gateway
               namespace = var.namespace
               port = 80  # K8s service.
@@ -76,35 +75,6 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-
-        {
-          kind = "Rule"
-          match = "Host(`trimino.com`) && PathPrefix(`/api/upload`)"
-          priority = 2
-          # middlewares = [
-          #   {
-          #     name = var.middleware_gateway
-          #     namespace = var.namespace
-          #   }
-          # ]
-          services = [
-            {
-              kind = "Service"
-              # name = var.svc_gateway
-              name = "mem-video-upload"
-              namespace = var.namespace
-              port = 80  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-
-
         {
           kind = "Rule"
           match = "Host(`trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"

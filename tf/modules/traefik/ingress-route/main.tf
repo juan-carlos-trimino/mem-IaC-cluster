@@ -35,9 +35,10 @@ variable "service_name" {
 resource "kubernetes_manifest" "ingress-route" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
+    # This CRD is Traefik-specific.
     kind = "IngressRoute"
     metadata = {
-      name = "${var.service_name}"
+      name = var.service_name
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -52,7 +53,9 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
-          match = "Host(`trimino.com`) && PathPrefix(`/`)"
+          match = "Host(`trimino.com`)"
+          # match = "Host(`trimino.com`) && PathPrefix(`/`)"
+          # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/video`) || PathPrefix(`/upload`) || PathPrefix(`/history`) || PathPrefix(`/api/video`) || PathPrefix(`/api/upload/`))"
           priority = 1
           middlewares = [
             {

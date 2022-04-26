@@ -13,20 +13,21 @@ variable "namespace" {
 variable "service_name" {
   type = string
 }
-variable "ingress_controller_chart_name" {
+variable "chart_name" {
   type = string
   description = "Ingress Controller Helm chart name."
   default = "traefik"
 }
-variable "ingress_controller_chart_repo" {
+variable "chart_repo" {
   type = string
   description = "Using the official Traefik helm chart (Ingress Controller)."
   default = "https://helm.traefik.io/traefik"
 }
-variable "ingress_controller_chart_version" {
+variable "chart_version" {
   type = string
   description = "Ingress Controller Helm repository version."
-  default = "10.9.1"
+  # To use the latest version, go to https://artifacthub.io/ and type "traefik" on the edit box.
+  default = "10.19.4"
 }
 
 ###################################################################################################
@@ -118,12 +119,12 @@ resource "kubernetes_role" "role" {
     resources = ["ingressroutes", "middlewares", "traefikservices", "ingressroutetcps", "tlsoptions"]
   }
   rule {
-    api_groups = ["extensions"]
+    api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["get", "watch", "list"]
-    resources = ["ingresses"]
+    resources = ["ingresses", "ingressclasses"]
   }
   rule {
-    api_groups = ["extensions"]
+    api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["update"]
     resources = ["ingresses/status"]
   }
@@ -185,13 +186,15 @@ resource "kubernetes_role_binding" "role_binding" {
 #    websecure - port 8443 (exposed as port 443)
 #    traefik - port 9000 (not exposed)
 #    metrics - port 9100 (not exposed)
-resource "helm_release" "ingress_controller_traefik" {
-  # name = var.ingress_controller_chart_name
-  name = var.service_name
-  chart = var.ingress_controller_chart_name
-  repository = var.ingress_controller_chart_repo
-  version = var.ingress_controller_chart_version
+resource "helm_release" "traefik" {
+  # depends_on = [
+  #   kubernetes_namespace.ns
+  # ]
+  chart = var.chart_name
+  repository = var.chart_repo
+  version = var.chart_version
   namespace = var.namespace
+  name = var.service_name
   values = [file("./utility-files/traefik/values.yaml")]
-  timeout = 150
+  # timeout = 180  # Seconds.
 }

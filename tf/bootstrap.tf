@@ -1,4 +1,5 @@
 locals {
+  helm_release_traefik = false
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -78,6 +79,7 @@ module "traefik" {
 }
 
 module "middleware-dashboard" {
+  count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-dashboard"
   app_name = var.app_name
   namespace = local.namespace
@@ -88,6 +90,7 @@ module "middleware-dashboard" {
 }
 
 module "middleware-rabbitmq" {
+  count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rabbitmq"
   app_name = var.app_name
   namespace = local.namespace
@@ -98,6 +101,7 @@ module "middleware-rabbitmq" {
 }
 
 module "middleware-gateway" {
+  count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-gateway"
   app_name = var.app_name
   namespace = local.namespace
@@ -107,6 +111,7 @@ module "middleware-gateway" {
 }
 
 module "ingress-route" {
+  count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
@@ -120,19 +125,17 @@ module "ingress-route" {
 }
 # ***/ # traefik
 
-/***
-module "issuers" {
-  depends_on = [module.cert-manager]
-  source = "./modules/cert-manager/issuers"
-  namespace = local.namespace
-}
+# module "issuers" {
+#   depends_on = [module.cert-manager]
+#   source = "./modules/cert-manager/issuers"
+#   namespace = local.namespace
+# }
 
-module "certificates" {
-  depends_on = [module.issuers]
-  source = "./modules/cert-manager/certificates"
-  namespace = local.namespace
-}
-***/
+# module "certificates" {
+#   depends_on = [module.issuers]
+#   source = "./modules/cert-manager/certificates"
+#   namespace = local.namespace
+# }
 
 
 ###########

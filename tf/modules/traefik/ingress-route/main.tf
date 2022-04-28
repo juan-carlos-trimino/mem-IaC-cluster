@@ -28,6 +28,9 @@ variable "middleware_rabbitmq2" {
 variable "svc_rabbitmq" {
   type = string
 }
+# variable "secret_name" {
+#   type = string
+# }
 variable "service_name" {
   type = string
 }
@@ -53,16 +56,16 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
-          match = "Host(`trimino.com`)"
-          # match = "Host(`trimino.com`) && PathPrefix(`/`)"
-          # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/video`) || PathPrefix(`/upload`) || PathPrefix(`/history`) || PathPrefix(`/api/video`) || PathPrefix(`/api/upload/`))"
+          # match = "Host(`trimino.com`)"
+          # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/upload`))"
+          match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/video`) || PathPrefix(`/upload`) || PathPrefix(`/history`) || PathPrefix(`/api/video`) || PathPrefix(`/api/upload`))"
           priority = 1
-          middlewares = [
-            {
-              name = var.middleware_gateway
-              namespace = var.namespace
-            }
-          ]
+          # middlewares = [
+          #   {
+          #     name = var.middleware_gateway
+          #     namespace = var.namespace
+          #   }
+          # ]
           services = [
             {
               kind = "Service"
@@ -82,12 +85,12 @@ resource "kubernetes_manifest" "ingress-route" {
           kind = "Rule"
           match = "Host(`trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           priority = 10
-          middlewares = [
-            {
-              name = var.middleware_dashboard
-              namespace = var.namespace
-            }
-          ]
+          # middlewares = [
+          #   {
+          #     name = var.middleware_dashboard
+          #     namespace = var.namespace
+          #   }
+          # ]
           services = [
             {
               kind = "TraefikService"
@@ -114,16 +117,16 @@ resource "kubernetes_manifest" "ingress-route" {
           kind = "Rule"
           match = "Host(`trimino.com`) && PathPrefix(`/rabbitmq`)"
           priority = 11
-          middlewares = [
-            {
-              name = var.middleware_rabbitmq1
-              namespace = var.namespace
-            }
-            # {
-            #   name = var.middleware_rabbitmq2
-            #   namespace = var.namespace
-            # }
-          ]
+          # middlewares = [
+          #   {
+          #     name = var.middleware_rabbitmq1
+          #     namespace = var.namespace
+          #   }
+          #   # {
+          #   #   name = var.middleware_rabbitmq2
+          #   #   namespace = var.namespace
+          #   # }
+          # ]
           services = [
             {
               kind = "Service"
@@ -140,6 +143,15 @@ resource "kubernetes_manifest" "ingress-route" {
           ]
         }
       ]
+      # To perform an analysis of the TLS handshake using SSLLabs, go to
+      # https://www.ssllabs.com/ssltest/.
+      tls = {
+        # Use the secret created by cert-manager to terminate the TLS connection.
+        # secretName = var.secret_name
+        store = {
+          name = "default"
+        }
+      }
     }
   }
 }

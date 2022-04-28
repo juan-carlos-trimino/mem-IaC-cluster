@@ -7,20 +7,23 @@ Define input variables to the module.
 variable "namespace" {
   type = string
 }
-variable "cert_manager_chart_name" {
+variable "service_name" {
+  type = string
+}
+variable "chart_name" {
   type = string
   description = "Cert Manager Helm name."
   default = "cert-manager"
 }
-variable "cert_manager_chart_repo" {
+variable "chart_repo" {
   type = string
   description = "Cert Manager Helm repository name."
   default = "https://charts.jetstack.io"
 }
-variable "cert_manager_chart_version" {
+variable "chart_version" {
   type = string
   description = "Cert Manager Helm version."
-  default = "1.7.2"
+  default = "1.8.0"
 }
 
 /***
@@ -68,10 +71,10 @@ resource "null_resource" "certificate" {
 # You should see the cert-manager, cert-manager-cainjector, and cert-manager-webhook pods in a
 # Running state.
 resource "helm_release" "cert_manager" {
-  name = var.cert_manager_chart_name
-  repository = var.cert_manager_chart_repo
-  chart = var.cert_manager_chart_name
-  version = var.cert_manager_chart_version
+  name = var.service_name
+  repository = var.chart_repo
+  chart = var.chart_name
+  version = var.chart_version
   namespace = var.namespace
   create_namespace = false
   # values = [file("cert-manager-values.yaml")]

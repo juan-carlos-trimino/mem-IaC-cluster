@@ -116,7 +116,16 @@ resource "kubernetes_role" "role" {
   rule {
     api_groups = ["traefik.containo.us/v1alpha1"]
     verbs = ["get", "watch", "list"]
-    resources = ["ingressroutes", "middlewares", "traefikservices", "ingressroutetcps", "tlsoptions"]
+    resources = [
+      "middlewares",
+      "ingressroutes",
+      "traefikservices",
+      "ingressroutetcps",
+      "ingressrouteudps",
+      "tlsoptions",
+      "tlsstores",
+      "serverstransports"
+    ]
   }
   rule {
     api_groups = ["extensions", "networking.k8s.io"]

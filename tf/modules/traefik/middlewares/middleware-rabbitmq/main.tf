@@ -59,7 +59,7 @@ resource "kubernetes_manifest" "middleware1" {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name1}"
+      name = var.service_name1
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -82,7 +82,7 @@ resource "kubernetes_manifest" "middleware2" {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name2}"
+      name = var.service_name2
       namespace = var.namespace
       labels = {
         app = var.app_name

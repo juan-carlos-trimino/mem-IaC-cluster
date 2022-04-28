@@ -14,20 +14,20 @@ additionalArguments:
   # - "--api.insecure=true"
   # Entry point address.
   - "--entrypoints.web.address=:80"
+  - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+  - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
   - "--entrypoints.websecure.address=:443"
+  - "--entrypoints.websecure.http.tls"
   # Traefik log settings.
   - "--log=true"
-  # Log level set to traefik logs.
-  - "--log.level=INFO"
+  # - "--log.level=INFO"
+  - "--log.level=DEBUG"
   # Prometheus metrics exporter type.
   - "--metrics.prometheus=true"
   # Enable Kubernetes backend with default settings.
   - "--providers.kubernetescrd=true"
+  - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
   # - "--traefik.enable=true"
-  # - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-  # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-  # - "--entrypoints.websecure.http.tls"
-  # - "--providers.kubernetesIngress.ingressClass=traefik-cert-manager"
   # - "--ping"
 #
 # deployment:
@@ -96,13 +96,13 @@ ports:
     expose: true
     exposedPort: 80
     # (Optional) Permanent Redirect to HTTPS.
-    # redirectTo: websecure
+    redirectTo: websecure
   websecure:
-    port: 8443
-    expose: false
+    port: 443
+    expose: true
     exposedPort: 443
     tls:
-      enabled: false
+      enabled: true
       # (Optional) Set a default certificate resolver.
       # certResolver: cloudflare
 # Whether Role Based Access Control objects like roles and rolebindings should be created.

@@ -11,6 +11,11 @@ locals {
   middleware_rabbitmq1 = "mem-middleware-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-middleware-rabbitmq-strip-prefix"
   middleware_gateway = "mem-middleware-gateway"
+  middleware_security_headers = "mem-middleware-security-headers"
+  ###########
+  # Traefik #
+  ###########
+  secret_name = "traefik-cert"
   ####################
   # Name of Services #
   ####################
@@ -110,6 +115,23 @@ module "middleware-gateway" {
   service_name = local.middleware_gateway
 }
 
+module "middleware-security-headers" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-security-headers"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = "default"
+}
+
+module "tlsstore" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/tlsstore"
+  app_name = var.app_name
+  namespace = local.namespace
+  secret_name = local.secret_name
+  service_name = "default"
+}
+
 module "ingress-route" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/ingress-route"
@@ -121,22 +143,35 @@ module "ingress-route" {
   svc_rabbitmq = local.svc_rabbitmq
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
+  # secret_name = local.secret_name
   service_name = "mem-ingress-route"
 }
+
+################
+# cert manager #
+################
+# By default, Traefik is able to handle certificates in the cluster, but only if there is a single
+# pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
+# point of failure in the infrastructure.
+#
+# To solve this issue, use cert-manager to store and issue the certificates.
+module "cert-manager" {
+  source = "./modules/traefik/cert-manager/cert-manager"
+  namespace = local.namespace
+  service_name = "mem-cert-manager"
+}
+
+module "issuers" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/cert-manager/issuers"
+  app_name = var.app_name
+  namespace = local.namespace
+  dns_names = ["trimino.com"]
+  issuer_name = "dashboard-issuer"
+  certificate_name = "dashboard-cert"
+  secret_name = local.secret_name
+}
 # ***/ # traefik
-
-# module "issuers" {
-#   depends_on = [module.cert-manager]
-#   source = "./modules/cert-manager/issuers"
-#   namespace = local.namespace
-# }
-
-# module "certificates" {
-#   depends_on = [module.issuers]
-#   source = "./modules/cert-manager/certificates"
-#   namespace = local.namespace
-# }
-
 
 ###########
 # mongodb #

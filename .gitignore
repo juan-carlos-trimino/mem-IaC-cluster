@@ -55,12 +55,6 @@ tf/modules/mongodb-deploy/*
 tf/modules/mongodb-statefulset/*
 !tf/modules/mongodb-statefulset/main.tf
 #
-
-!tf/modules/pri-microservice/
-tf/modules/pri-microservice/*
-!tf/modules/pri-microservice/main.tf
-
-#
 !tf/modules/rabbitmq-deploy/
 tf/modules/rabbitmq-deploy/*
 !tf/modules/rabbitmq-deploy/main.tf
@@ -110,7 +104,6 @@ tf/modules/traefik/traefik/*
 !tf/utility-files/
 tf/utility-files/*
 !tf/utility-files/.gitkeep
-#
 !tf/utility-files/ELK/
 tf/utility-files/ELK/*
 !tf/utility-files/ELK/.gitkeep
@@ -139,6 +132,9 @@ tf/utility-files/rabbitmq/*
 !tf/utility-files/rabbitmq/configmaps/
 tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/rabbitmq/configmaps/rabbitmq.conf
+!tf/utility-files/rabbitmq/configmaps-deployment/
+tf/utility-files/rabbitmq/configmaps-deployment/*
+!tf/utility-files/rabbitmq/configmaps-deployment/rabbitmq.conf
 #
 !tf/utility-files/traefik/
 tf/utility-files/traefik/*

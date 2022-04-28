@@ -336,7 +336,7 @@ module "mem-rabbitmq" {
 # /*** app
 module "mem-gateway" {
   # Specify the location of the module, which contains the file main.tf.
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_gateway}/gateway"
   app_name = var.app_name
   app_version = var.app_version
@@ -374,7 +374,7 @@ module "mem-gateway" {
 }
 
 module "mem-history" {
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_history}/history"
   app_name = var.app_name
   app_version = var.app_version
@@ -407,7 +407,7 @@ module "mem-history" {
 }
 
 module "mem-metadata" {
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
   app_version = var.app_version
@@ -440,7 +440,7 @@ module "mem-metadata" {
 }
 
 module "mem-video-storage" {
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_storage}/video-storage"
   app_name = var.app_name
   app_version = var.app_version
@@ -471,7 +471,7 @@ module "mem-video-storage" {
 }
 
 module "mem-video-streaming" {
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_streaming}/video-streaming"
   app_name = var.app_name
   app_version = var.app_version
@@ -504,7 +504,7 @@ module "mem-video-streaming" {
 }
 
 module "mem-video-upload" {
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_upload}/video-upload"
   app_name = var.app_name
   app_version = var.app_version

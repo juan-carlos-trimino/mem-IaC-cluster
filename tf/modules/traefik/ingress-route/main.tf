@@ -10,6 +10,9 @@ variable "app_name" {
 variable "namespace" {
   type = string
 }
+variable "middleware_security_headers" {
+  type = string
+}
 variable "middleware_dashboard" {
   type = string
 }
@@ -28,9 +31,15 @@ variable "middleware_rabbitmq2" {
 variable "svc_rabbitmq" {
   type = string
 }
-# variable "secret_name" {
-#   type = string
-# }
+variable "tls_store" {
+  type = string
+}
+variable "tls_option" {
+  type = string
+}
+variable "secret_name" {
+  type = string
+}
 variable "service_name" {
   type = string
 }
@@ -49,6 +58,7 @@ resource "kubernetes_manifest" "ingress-route" {
     }
     #
     spec = {
+      # Traefik handles requests using the web (HTTP) and websecure (HTTPS) entrypoints.
       entryPoints = [  # Listening ports.
         "web",
         "websecure"
@@ -56,16 +66,23 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
-          # match = "Host(`trimino.com`)"
+          # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
+          # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
+          # one of these services, the /etc/hosts file does not need to be changed.
+          match = "Host(`169.46.32.130.nip.io`) && (PathPrefix(`/`) || PathPrefix(`/api/upload/`))"
           # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/upload`))"
-          match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/video`) || PathPrefix(`/upload`) || PathPrefix(`/history`) || PathPrefix(`/api/video`) || PathPrefix(`/api/upload`))"
+          # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/video`) || PathPrefix(`/upload`) || PathPrefix(`/history`) || PathPrefix(`/api/video`) || PathPrefix(`/api/upload`))"
           priority = 1
-          # middlewares = [
-          #   {
-          #     name = var.middleware_gateway
-          #     namespace = var.namespace
-          #   }
-          # ]
+          middlewares = [
+            {
+              name = var.middleware_gateway
+              namespace = var.namespace
+            },
+            # {
+            #   name = var.middleware_security_headers
+            #   namespace = var.namespace
+            # }
+          ]
           services = [
             {
               kind = "Service"
@@ -81,16 +98,50 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-        {
-          kind = "Rule"
-          match = "Host(`trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          priority = 10
+
+        # {
+        #   kind = "Rule"
+          # match = "Host(`trimino.com`)"
+          # match = "Host(`trimino.com`) && (PathPrefix(`/`) || PathPrefix(`/upload`))"
+          # match = "Host(`169.46.32.130.nip.io`) && (PathPrefix(`/upload`) || PathPrefix(`/api/upload`))"
+          # priority = 1
           # middlewares = [
           #   {
-          #     name = var.middleware_dashboard
+          #     name = var.middleware_gateway
           #     namespace = var.namespace
           #   }
           # ]
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = var.svc_gateway
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # },
+
+
+        {
+          kind = "Rule"
+          match = "Host(`169.46.32.130.nip.io`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          priority = 10
+          middlewares = [
+            {
+              name = var.middleware_dashboard
+              namespace = var.namespace
+            },
+            # {
+            #   name = var.middleware_security_headers
+            #   namespace = var.namespace
+            # }
+          ]
           services = [
             {
               kind = "TraefikService"
@@ -115,7 +166,7 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          match = "Host(`trimino.com`) && PathPrefix(`/rabbitmq`)"
+          match = "Host(`169.46.32.130.nip.io`) && PathPrefix(`/rabbitmq`)"
           priority = 11
           # middlewares = [
           #   {
@@ -147,10 +198,14 @@ resource "kubernetes_manifest" "ingress-route" {
       # https://www.ssllabs.com/ssltest/.
       tls = {
         # Use the secret created by cert-manager to terminate the TLS connection.
-        # secretName = var.secret_name
-        store = {
-          name = "default"
-        }
+        secretName = var.secret_name
+        # store = {
+        #   name = var.tls_store
+        # }
+        # options = {
+        #   name = var.tls_option
+        #   namespace = var.namespace
+        # }
       }
     }
   }

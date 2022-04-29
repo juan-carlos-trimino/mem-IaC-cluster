@@ -9,12 +9,10 @@
 # ... and these files under the 'tf' directory...
 !tf/
 tf/*
-!tf/cert-manager.tf
+!tf/bootstrap.tf
 !tf/data.tf
 !tf/ELK.tf
-!tf/bootstrap.tf
 !tf/namespace.tf
-!tf/pri-microservices.tf
 !tf/providers.tf
 !tf/tekton_Copy.yaml
 !tf/tekton.yaml
@@ -94,6 +92,9 @@ tf/modules/traefik/middlewares/middleware-redirect-https/*
 !tf/modules/traefik/middlewares/middleware-security-headers/
 tf/modules/traefik/middlewares/middleware-security-headers/*
 !tf/modules/traefik/middlewares/middleware-security-headers/main.tf
+!tf/modules/traefik/tlsoption/
+tf/modules/traefik/tlsoption/*
+!tf/modules/traefik/tlsoption/main.tf
 !tf/modules/traefik/tlsstore/
 tf/modules/traefik/tlsstore/*
 !tf/modules/traefik/tlsstore/main.tf

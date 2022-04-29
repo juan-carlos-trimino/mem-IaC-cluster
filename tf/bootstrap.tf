@@ -16,6 +16,8 @@ locals {
   # Traefik #
   ###########
   secret_name = "traefik-cert"
+  tls_store = "default"
+  tls_option = "tlsoptions"
   ####################
   # Name of Services #
   ####################
@@ -129,7 +131,15 @@ module "tlsstore" {
   app_name = var.app_name
   namespace = local.namespace
   secret_name = local.secret_name
-  service_name = "default"
+  service_name = local.tls_store
+}
+
+module "tlsoption" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/tlsoption"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.tls_option
 }
 
 module "ingress-route" {
@@ -137,13 +147,16 @@ module "ingress-route" {
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
+  tls_store = local.tls_store
+  tls_option = local.tls_option
+  middleware_security_headers = local.middleware_security_headers
   middleware_dashboard = local.middleware_dashboard
   middleware_rabbitmq1 = local.middleware_rabbitmq1
   middleware_rabbitmq2 = local.middleware_rabbitmq2
   svc_rabbitmq = local.svc_rabbitmq
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
-  # secret_name = local.secret_name
+  secret_name = local.secret_name
   service_name = "mem-ingress-route"
 }
 
@@ -167,8 +180,8 @@ module "issuers" {
   app_name = var.app_name
   namespace = local.namespace
   dns_names = ["trimino.com"]
-  issuer_name = "dashboard-issuer"
-  certificate_name = "dashboard-cert"
+  issuer_name = "selfsigned-issuer"
+  certificate_name = "traefik-cert"
   secret_name = local.secret_name
 }
 # ***/ # traefik

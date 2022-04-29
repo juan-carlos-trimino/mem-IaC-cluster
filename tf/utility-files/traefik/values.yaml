@@ -96,7 +96,7 @@ ports:
     expose: true
     exposedPort: 80
     # (Optional) Permanent Redirect to HTTPS.
-    redirectTo: websecure
+    # redirectTo: websecure
   websecure:
     port: 443
     expose: true

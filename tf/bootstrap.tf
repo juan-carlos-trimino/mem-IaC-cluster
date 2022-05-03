@@ -12,6 +12,7 @@ locals {
   middleware_rabbitmq2 = "mem-middleware-rabbitmq-strip-prefix"
   middleware_gateway = "mem-middleware-gateway"
   middleware_security_headers = "mem-middleware-security-headers"
+  middleware_redirect_https = "middleware-redirect-https"
   ###########
   # Traefik #
   ###########
@@ -154,6 +155,7 @@ module "ingress-route" {
   middleware_rabbitmq1 = local.middleware_rabbitmq1
   middleware_rabbitmq2 = local.middleware_rabbitmq2
   svc_rabbitmq = local.svc_rabbitmq
+  middleware_redirect_https = local.middleware_redirect_https
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
   secret_name = local.secret_name
@@ -177,11 +179,17 @@ module "cert-manager" {
 module "issuers" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/cert-manager/issuers"
+  self_signed_flag = true
   app_name = var.app_name
   namespace = local.namespace
+  common_name = "trimino.com"
   dns_names = ["trimino.com"]
   issuer_name = "selfsigned-issuer"
   certificate_name = "traefik-cert"
+
+  acme_email = "juancarlos@trimino.com"
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   secret_name = local.secret_name
 }
 # ***/ # traefik

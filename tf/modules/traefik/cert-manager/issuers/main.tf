@@ -19,22 +19,37 @@ variable "certificate_name" {
 variable "secret_name" {
   type = string
 }
+variable "common_name" {
+  type = string
+}
 variable "dns_names" {
   type = list
   default = []
+}
+variable "self_signed_flag" {
+  type = bool
+  default = true
+}
+variable "acme_email" {
+  type = string
+  default = ""
+}
+variable "acme_server" {
+  type = string
+  default = "https://acme-v02.api.letsencrypt.org/directory"
 }
 
 # Certificate authority.
 # Create a certificate with an issuer.
 # https://cert-manager.io/docs/concepts/issuer/
+# https://cert-manager.io/docs/faq/acme/#1-troubleshooting-clusterissuers
 resource "kubernetes_manifest" "issuer" {
+  # count = var.self_signed_flag ? 1 : 0
   manifest = {
     apiVersion = "cert-manager.io/v1"
     kind = "Issuer"
     metadata = {
       name = var.issuer_name
-      # name = "letsencrypt-staging"
-      # name = "letsencrypt-prod"
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -44,6 +59,32 @@ resource "kubernetes_manifest" "issuer" {
       # Since a self-signed certificate is being used, a warning will be given when connecting over
       # HTTPS.
       selfSigned = {}
+    }
+  }
+}
+
+
+
+
+
+/*
+
+# Certificate authority.
+# Create a certificate with an issuer.
+# https://cert-manager.io/docs/concepts/issuer/
+resource "kubernetes_manifest" "issuer1" {
+  count = var.self_signed_flag ? 0 : 1
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind = "Issuer"
+    metadata = {
+      name = var.issuer_name
+      namespace = var.namespace
+      labels = {
+        app = var.app_name
+      }
+    }
+    spec = {
       # ca = {
       #   secretName = "traefik-dashboard-cert"
       # }
@@ -54,45 +95,53 @@ resource "kubernetes_manifest" "issuer" {
       # service.
       #
       # See https://cert-manager.io/docs/tutorials/acme/http-validation/
-      # acme = {
-      #   # Email address used for ACME registration.
-      #   email = "juancarlos@trimino.com"
-      #   # The ACME server URL.
-      #   server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-      #   # server = "https://acme-v02.api.letsencrypt.org/directory"
-      #   # Name of a secret used to store the ACME account private key.
-      #   privateKeySecretRef = {
-      #     name = "letsencrypt-staging"
-      #     # name = "letsencrypt-prod"
-      #   }
-      #   solvers = [
-      #     {
-      #       http01 = {
-      #         ingress = {
-      #           class = "traefik-cert-manager"
-      #         }
-      #       }
-      #     }
-      #   ]
-      # }
+      acme = {
+        # Email address used for ACME registration.
+        email = var.acme_email
+        # The ACME server URL.
+        server = var.acme_server
+        # Name of a secret used to store the ACME account private key.
+        privateKeySecretRef = {
+          # Secret resource used to store the account's private key.
+          name = var.secret_name
+        }
+        solvers = [
+          {
+            http01 = {
+              ingress = {
+                class = "traefik-cert-manager"
+              }
+            }
+          }
+        ]
+      }
     }
   }
 }
 
+*/
+
+
+
+
+
+
+
+# To check the certificate:
+# $ kubectl -n memories describe certificate traefik-cert
 resource "kubernetes_manifest" "certificate" {
   manifest = {
     apiVersion = "cert-manager.io/v1"
     kind = "Certificate"
     metadata = {
       name = var.certificate_name
-      # name = "letsencrypt-staging"
-      # name = "letsencrypt-prod"
       namespace = var.namespace
       labels = {
         app = var.app_name
       }
     }
     spec = {
+      # commonName = var.common_name
       dnsNames = var.dns_names
       secretName = var.secret_name
       issuerRef = {

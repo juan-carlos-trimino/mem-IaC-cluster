@@ -11,12 +11,17 @@ additionalArguments:
   # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
   - "--api.dashboard=true"
   # Activate API directly on the entryPoint named traefik.
-  # - "--api.insecure=true"
+  - "--api.insecure=false"
   # Entry point address.
   - "--entrypoints.web.address=:80"
+  # Scheme used for the redirection.
   - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+  # Targeted entry point of the redirection.
   - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+  # Entry point address.
   - "--entrypoints.websecure.address=:443"
+  # Default TLS configuration for the routers linked to the entry point.
+  # - "--entrypoints.websecure.http.tls=true"
   - "--entrypoints.websecure.http.tls"
   # Traefik log settings.
   - "--log=true"
@@ -26,8 +31,9 @@ additionalArguments:
   - "--metrics.prometheus=true"
   # Enable Kubernetes backend with default settings.
   - "--providers.kubernetescrd=true"
+  # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for.
   - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
-  # - "--traefik.enable=true"
+  # Enable ping.
   # - "--ping"
 #
 # deployment:

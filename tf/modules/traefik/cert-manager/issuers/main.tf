@@ -30,20 +30,19 @@ variable "self_signed_flag" {
   type = bool
   default = true
 }
-variable "acme_email" {
-  type = string
-  default = ""
-}
-variable "acme_server" {
-  type = string
-  default = "https://acme-v02.api.letsencrypt.org/directory"
-}
+# variable "acme_email" {
+#   type = string
+#   default = ""
+# }
+# variable "acme_server" {
+#   type = string
+#   default = "https://acme-v02.api.letsencrypt.org/directory"
+# }
 
 # Certificate authority.
 # https://cert-manager.io/docs/concepts/issuer/
 # https://cert-manager.io/docs/faq/acme/#1-troubleshooting-clusterissuers
 resource "kubernetes_manifest" "issuer" {
-  # count = var.self_signed_flag ? 1 : 0
   manifest = {
     apiVersion = "cert-manager.io/v1"
     kind = "Issuer"
@@ -58,6 +57,30 @@ resource "kubernetes_manifest" "issuer" {
       # Since a self-signed certificate is being used, a warning will be given when connecting over
       # HTTPS.
       selfSigned = {}
+    }
+  }
+}
+
+# To check the certificate:
+# $ kubectl -n memories describe certificate traefik-cert
+resource "kubernetes_manifest" "certificate" {
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind = "Certificate"
+    metadata = {
+      name = var.certificate_name
+      namespace = var.namespace
+      labels = {
+        app = var.app_name
+      }
+    }
+    spec = {
+      dnsNames = var.dns_names
+      secretName = var.secret_name
+      issuerRef = {
+        kind = "Issuer"
+        name = var.issuer_name
+      }
     }
   }
 }
@@ -125,28 +148,3 @@ resource "kubernetes_manifest" "issuer1" {
 
 
 
-
-# To check the certificate:
-# $ kubectl -n memories describe certificate traefik-cert
-resource "kubernetes_manifest" "certificate" {
-  manifest = {
-    apiVersion = "cert-manager.io/v1"
-    kind = "Certificate"
-    metadata = {
-      name = var.certificate_name
-      namespace = var.namespace
-      labels = {
-        app = var.app_name
-      }
-    }
-    spec = {
-      # commonName = var.common_name
-      dnsNames = var.dns_names
-      secretName = var.secret_name
-      issuerRef = {
-        kind = "Issuer"
-        name = var.issuer_name
-      }
-    }
-  }
-}

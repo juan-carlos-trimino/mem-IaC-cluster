@@ -16,7 +16,8 @@ locals {
   ###########
   # Traefik #
   ###########
-  dashboard_secret_name = "dashboard-cert"
+  dashboard_secret_name = "dashboard-secret"
+  memories_secret_name = "memories-secret"
   tls_store = "default"
   tls_option = "tlsoptions"
   ####################
@@ -148,18 +149,29 @@ module "ingress-route" {
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
-  tls_store = local.tls_store
-  tls_option = local.tls_option
-  middleware_security_headers = local.middleware_security_headers
-  middleware_dashboard = local.middleware_dashboard
-  middleware_rabbitmq1 = local.middleware_rabbitmq1
-  middleware_rabbitmq2 = local.middleware_rabbitmq2
-  svc_rabbitmq = local.svc_rabbitmq
-  middleware_redirect_https = local.middleware_redirect_https
+  # tls_store = local.tls_store
+  # tls_option = local.tls_option
+  # middleware_security_headers = local.middleware_security_headers
+  # middleware_rabbitmq1 = local.middleware_rabbitmq1
+  # svc_rabbitmq = local.svc_rabbitmq
+  # middleware_redirect_https = local.middleware_redirect_https
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
-  secret_name = local.dashboard_secret_name
+  secret_name = local.memories_secret_name
   service_name = "mem-ingress-route"
+}
+
+module "ingress-route-dashboard" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/ingress-route-dashboard"
+  app_name = var.app_name
+  namespace = local.namespace
+  # tls_store = local.tls_store
+  # tls_option = local.tls_option
+  # middleware_security_headers = local.middleware_security_headers
+  middleware_dashboard = local.middleware_dashboard
+  secret_name = local.dashboard_secret_name
+  service_name = "mem-ingress-route-dashboard"
 }
 
 ################
@@ -179,19 +191,28 @@ module "cert-manager" {
 module "issuers" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/cert-manager/issuers"
-  self_signed_flag = true
   app_name = var.app_name
   namespace = local.namespace
-  common_name = "trimino.com"
+  # common_name = "trimino.com"
   dns_names = ["memories.mooo.com"]
   issuer_name = "selfsigned-issuer"
-  certificate_name = "traefik-cert"
-
-  acme_email = "juancarlos@trimino.com"
+  certificate_name = "memories-cert"
+  # acme_email = "juancarlos@trimino.com"
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  secret_name = local.memories_secret_name
+}
+
+module "issuers" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/cert-manager/issuers"
+  app_name = var.app_name
+  namespace = local.namespace
+  dns_names = ["memories.mooo.com"]
+  issuer_name = "selfsigned-issuer"
+  certificate_name = "dashboard-cert"
   secret_name = local.dashboard_secret_name
 }
 # ***/ # traefik

@@ -71,9 +71,9 @@ tf/modules/traefik/cert-manager/cert-manager/*
 !tf/modules/traefik/cert-manager/issuers/
 tf/modules/traefik/cert-manager/issuers/*
 !tf/modules/traefik/cert-manager/issuers/main.tf
-!tf/modules/traefik/ingress-route/
-tf/modules/traefik/ingress-route/*
-!tf/modules/traefik/ingress-route/main.tf
+!tf/modules/traefik/ingress-route-dashboard/
+tf/modules/traefik/ingress-route-dashboard/*
+!tf/modules/traefik/ingress-route-dashboard/main.tf
 !tf/modules/traefik/middlewares/
 tf/modules/traefik/middlewares/*
 !tf/modules/traefik/middlewares/.gitkeep

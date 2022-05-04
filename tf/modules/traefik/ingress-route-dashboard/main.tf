@@ -50,7 +50,7 @@ variable "service_name" {
   type = string
 }
 
-resource "kubernetes_manifest" "ingress-route-dashboard" {
+resource "kubernetes_manifest" "ingress-route" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     # This CRD is Traefik-specific.

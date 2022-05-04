@@ -1,5 +1,5 @@
 locals {
-  helm_release_traefik = false
+  helm_release_traefik = true
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -16,7 +16,7 @@ locals {
   ###########
   # Traefik #
   ###########
-  secret_name = "traefik-cert"
+  dashboard_secret_name = "dashboard-cert"
   tls_store = "default"
   tls_option = "tlsoptions"
   ####################
@@ -131,7 +131,7 @@ module "tlsstore" {
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = local.namespace
-  secret_name = local.secret_name
+  secret_name = local.dashboard_secret_name
   service_name = local.tls_store
 }
 
@@ -158,7 +158,7 @@ module "ingress-route" {
   middleware_redirect_https = local.middleware_redirect_https
   middleware_gateway = local.middleware_gateway
   svc_gateway = local.svc_gateway
-  secret_name = local.secret_name
+  secret_name = local.dashboard_secret_name
   service_name = "mem-ingress-route"
 }
 
@@ -183,14 +183,16 @@ module "issuers" {
   app_name = var.app_name
   namespace = local.namespace
   common_name = "trimino.com"
-  dns_names = ["trimino.com"]
+  dns_names = ["memories.mooo.com"]
   issuer_name = "selfsigned-issuer"
   certificate_name = "traefik-cert"
 
   acme_email = "juancarlos@trimino.com"
+  # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
+  # production (letsencrypt-prod).
   acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
-  secret_name = local.secret_name
+  secret_name = local.dashboard_secret_name
 }
 # ***/ # traefik
 

@@ -40,7 +40,6 @@ variable "acme_server" {
 }
 
 # Certificate authority.
-# Create a certificate with an issuer.
 # https://cert-manager.io/docs/concepts/issuer/
 # https://cert-manager.io/docs/faq/acme/#1-troubleshooting-clusterissuers
 resource "kubernetes_manifest" "issuer" {
@@ -70,7 +69,6 @@ resource "kubernetes_manifest" "issuer" {
 /*
 
 # Certificate authority.
-# Create a certificate with an issuer.
 # https://cert-manager.io/docs/concepts/issuer/
 resource "kubernetes_manifest" "issuer1" {
   count = var.self_signed_flag ? 0 : 1
@@ -109,6 +107,7 @@ resource "kubernetes_manifest" "issuer1" {
           {
             http01 = {
               ingress = {
+                # See values.yaml (providers.kubernetesingress.ingressclass).
                 class = "traefik-cert-manager"
               }
             }

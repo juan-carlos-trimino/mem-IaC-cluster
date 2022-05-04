@@ -6,7 +6,7 @@ additionalArguments:
   # (https://doc.traefik.io/traefik/reference/static-configuration/cli/)
   # (https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations).
   # Enable api/dashboard.
-  - "--api=true"
+  - "--api"
   # Activate dashboard.
   # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
   - "--api.dashboard=true"
@@ -18,6 +18,7 @@ additionalArguments:
   - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
   # Targeted entry point of the redirection.
   - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+  - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
   # Entry point address.
   - "--entrypoints.websecure.address=:443"
   # Default TLS configuration for the routers linked to the entry point.
@@ -35,6 +36,12 @@ additionalArguments:
   - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
   # Enable ping.
   # - "--ping"
+  - "--certificatesresolvers.letsencrypt.acme.email=juancarlos@trimino.com"
+  - "--certificatesresolvers.letsencrypt.acme.storage=/traefik-certs/acme.json"
+  - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+  - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+  # - "--certificatesResolvers.letsencrypt.acme.dnschallenge=true"
+  # - "--certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
 #
 # deployment:
 #   initContainers:
@@ -73,10 +80,10 @@ logs:
 # Persistent Storage.
 persistence:
   enabled: true
-  name: ssl-certs
+  name: traefik-certs
   accessMode: ReadWriteOnce
   size: 1Gi
-  path: /ssl-certs
+  path: /traefik-certs
 #
 # podSecurityContext:
 #   fsGroup: 1100

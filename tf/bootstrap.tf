@@ -1,5 +1,5 @@
 locals {
-  helm_release_traefik = true
+  helm_release_traefik = false
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -205,7 +205,7 @@ module "issuers" {
   secret_name = local.memories_secret_name
 }
 
-module "issuers" {
+module "issuers-dashboard" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/cert-manager/issuers"
   app_name = var.app_name

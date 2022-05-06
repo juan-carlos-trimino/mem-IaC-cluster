@@ -22,7 +22,6 @@ additionalArguments:
   # Entry point address.
   - "--entrypoints.websecure.address=:443"
   # Default TLS configuration for the routers linked to the entry point.
-  # - "--entrypoints.websecure.http.tls=true"
   - "--entrypoints.websecure.http.tls"
   # Traefik log settings.
   - "--log=true"

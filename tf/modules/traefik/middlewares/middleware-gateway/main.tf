@@ -65,6 +65,7 @@ resource "kubernetes_manifest" "middleware" {
     #
     spec = {
       basicAuth = {
+        headerField = "X-WebAuth-User"
         removeHeader = true
         # The users option is an array of authorized users. Each user will be declared using the
         # name:encoded-password format.

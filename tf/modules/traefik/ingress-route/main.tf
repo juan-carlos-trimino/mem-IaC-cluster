@@ -45,56 +45,56 @@ resource "kubernetes_manifest" "ingress-route" {
         "websecure"
       ]
       routes = [
-        {
-          kind = "Rule"
-          match = "Host(`memories.mooo.com`) && (Path(`/upload`) || Path(`/api/upload`))"
-          priority = 21
-          middlewares = [
-            {
-              name = var.middleware_gateway
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "Service"
-              name = var.svc_gateway
-              namespace = var.namespace
-              port = 80  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        {
-          kind = "Rule"
-          match = "Host(`memories.mooo.com`) && (Path(`/video`) || Path(`/api/video`))"
-          priority = 21
-          middlewares = [
-            {
-              name = var.middleware_gateway
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "Service"
-              name = var.svc_gateway
-              namespace = var.namespace
-              port = 80  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
+        # {
+        #   kind = "Rule"
+        #   match = "Host(`memories.mooo.com`) && (Path(`/upload`) || Path(`/api/upload`))"
+        #   priority = 21
+        #   middlewares = [
+        #     {
+        #       name = var.middleware_gateway
+        #       namespace = var.namespace
+        #     }
+        #   ]
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = var.svc_gateway
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # },
+        # {
+        #   kind = "Rule"
+        #   match = "Host(`memories.mooo.com`) && (Path(`/video`) || Path(`/api/video`))"
+        #   priority = 21
+        #   middlewares = [
+        #     {
+        #       name = var.middleware_gateway
+        #       namespace = var.namespace
+        #     }
+        #   ]
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = var.svc_gateway
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # },
         # {
         #   kind = "Rule"
         #   match = "Host(`memories.mooo.com`) && Path(`/rabbitmq`)"
@@ -125,8 +125,10 @@ resource "kubernetes_manifest" "ingress-route" {
           # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
           # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
           # one of these services, the /etc/hosts file does not need to be changed.
-          # match = "Host(`169.46.32.130.nip.io`) && PathPrefix(`/`)"
-          match = "Host(`memories.mooo.com`) && PathPrefix(`/`)"
+          match = "Host(`www.trimino.com`) && PathPrefix(`/`)"
+          # match = "Host(`169.46.32.133.nip.io`) && PathPrefix(`/`)"
+          # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
+          # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           priority = 20
           # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
           # the request is forwarded to the service.

@@ -44,7 +44,9 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
-          match = "Host(`memories.mooo.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          match = "Host(`www.trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          # match = "Host(`169.46.32.133.nip.io`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          # match = "Host(`memories.mooo.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           priority = 21
           middlewares = [
             {

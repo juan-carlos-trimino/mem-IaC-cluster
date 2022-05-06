@@ -1,5 +1,5 @@
 locals {
-  helm_release_traefik = false
+  helm_release_traefik = true
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -193,15 +193,15 @@ module "issuers" {
   source = "./modules/traefik/cert-manager/issuers"
   app_name = var.app_name
   namespace = local.namespace
-  # common_name = "trimino.com"
-  dns_names = ["memories.mooo.com"]
-  issuer_name = "selfsigned-issuer"
-  certificate_name = "memories-cert"
-  # acme_email = "juancarlos@trimino.com"
+  issuer_name = "app-issuer"
+  acme_email = "juancarlos@trimino.com"
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  certificate_name = "traefik-app-cert"
+  common_name = "memories.mooo.com"
+  dns_names = ["memories.mooo.com"]
   secret_name = local.memories_secret_name
 }
 
@@ -210,9 +210,16 @@ module "issuers-dashboard" {
   source = "./modules/traefik/cert-manager/issuers"
   app_name = var.app_name
   namespace = local.namespace
+  issuer_name = "app-issuer"
+  acme_email = "juancarlos@trimino.com"
+  # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
+  # production (letsencrypt-prod).
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  #
+  certificate_name = "traefik-dashboard-cert"
+  common_name = "memories.mooo.com"
   dns_names = ["memories.mooo.com"]
-  issuer_name = "selfsigned-issuer"
-  certificate_name = "dashboard-cert"
   secret_name = local.dashboard_secret_name
 }
 # ***/ # traefik

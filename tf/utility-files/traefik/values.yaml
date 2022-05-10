@@ -35,10 +35,9 @@ additionalArguments:
   - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
   # Enable ping.
   # - "--ping"
-  # - "--certificatesresolvers.letsencrypt.acme.email=juancarlos@trimino.com"
-  # - "--certificatesresolvers.letsencrypt.acme.storage=/traefik-certs/acme.json"
-  # - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-  # - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+  - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme/acme.json"
+  - "--certificatesresolvers.le.acme.tlschallenge=true"
+  - "--certificatesresolvers.le.acme.httpChallenge.entryPoint=http"
   # - "--certificatesResolvers.letsencrypt.acme.dnschallenge=true"
   # - "--certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
 #

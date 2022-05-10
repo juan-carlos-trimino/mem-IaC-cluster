@@ -13,7 +13,19 @@ variable "namespace" {
 variable "middleware_dashboard" {
   type = string
 }
+variable "middleware_redirect_https" {
+  type = string
+}
+variable "tls_options" {
+  type = string
+}
 variable "secret_name" {
+  type = string
+}
+variable "issuer_name" {
+  type = string
+}
+variable "host_name" {
   type = string
 }
 variable "service_name" {
@@ -31,6 +43,14 @@ resource "kubernetes_manifest" "ingress-route" {
       labels = {
         app = var.app_name
       }
+      annotations = {
+        "kubernetes.io/ingress.class" = "traefik-cert-manager"
+        # The Ingress resource has to be linked to the Issuer.
+        "cert-manager.io/issuer-kind" = "Issuer"
+        "cert-manager.io/issuer" = var.issuer_name
+        # certmanager.k8s.io/acme-challenge-type: http01
+        # traefik.ingress.kubernetes.io/frontend-entry-points: http,https
+      }
     }
     #
     spec = {
@@ -44,15 +64,17 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
-          match = "Host(`www.trimino.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          # match = "Host(`169.46.32.133.nip.io`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          # match = "Host(`memories.mooo.com`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          match = "Host(`${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           priority = 21
           middlewares = [
             {
-              name = var.middleware_dashboard
+              name = var.middleware_redirect_https
               namespace = var.namespace
             }
+            # {
+            #   name = var.middleware_gateway
+            #   namespace = var.namespace
+            # }
           ]
           services = [
             {
@@ -85,15 +107,16 @@ resource "kubernetes_manifest" "ingress-route" {
       # To perform an analysis of the TLS handshake using SSLLabs, go to
       # https://www.ssllabs.com/ssltest/.
       tls = {
+        certResolver = "le"
         # Use the secret created by cert-manager to terminate the TLS connection.
         secretName = var.secret_name
         # store = {
         #   name = var.tls_store
         # }
-        # options = {
-        #   name = var.tls_option
-        #   namespace = var.namespace
-        # }
+        options = {
+          name = var.tls_options
+          namespace = var.namespace
+        }
       }
     }
   }

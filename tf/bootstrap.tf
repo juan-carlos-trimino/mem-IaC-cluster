@@ -4,22 +4,29 @@ locals {
   cr_login_server = "docker.io"
   db_metadata = "metadata"
   db_history = "history"
-  ###############
-  # Middlewares #
-  ###############
-  middleware_dashboard = "mem-middleware-dashboard"
-  middleware_rabbitmq1 = "mem-middleware-rabbitmq-basic-auth"
-  middleware_rabbitmq2 = "mem-middleware-rabbitmq-strip-prefix"
-  middleware_gateway = "mem-middleware-gateway"
-  middleware_security_headers = "mem-middleware-security-headers"
-  middleware_redirect_https = "middleware-redirect-https"
   ###########
   # Traefik #
   ###########
-  dashboard_secret_name = "dashboard-secret"
-  memories_secret_name = "memories-secret"
+  secret_cert_name = "le-secret-cert"
+  dashboard_secret_cert_name = "le-dashboard-secret-cert"
+  issuer_name = "le-issuer"
+  dashboard_issuer_name = "le-dashboard-issuer"
   tls_store = "default"
-  tls_option = "tlsoptions"
+  tls_options = "tlsoptions"
+  ##################
+  # Ingress Routes #
+  ##################
+  ingress_route = "mem-ingress-route"
+  ingress_route_dashboard = "mem-ingress-route-dashboard"
+  ###############
+  # Middlewares #
+  ###############
+  middleware_dashboard = "mem-mw-dashboard"
+  middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
+  middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
+  middleware_gateway = "mem-mw-gateway"
+  middleware_security_headers = "mem-mw-security-headers"
+  middleware_redirect_https = "mem-mw-redirect-https"
   ####################
   # Name of Services #
   ####################
@@ -132,7 +139,7 @@ module "tlsstore" {
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = local.namespace
-  secret_name = local.dashboard_secret_name
+  secret_name = local.dashboard_secret_cert_name
   service_name = local.tls_store
 }
 
@@ -141,7 +148,7 @@ module "tlsoption" {
   source = "./modules/traefik/tlsoption"
   app_name = var.app_name
   namespace = local.namespace
-  service_name = local.tls_option
+  service_name = local.tls_options
 }
 
 module "ingress-route" {
@@ -149,16 +156,17 @@ module "ingress-route" {
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
-  # tls_store = local.tls_store
-  # tls_option = local.tls_option
-  # middleware_security_headers = local.middleware_security_headers
-  # middleware_rabbitmq1 = local.middleware_rabbitmq1
-  # svc_rabbitmq = local.svc_rabbitmq
-  # middleware_redirect_https = local.middleware_redirect_https
+  tls_options = local.tls_options
   middleware_gateway = local.middleware_gateway
+  middleware_redirect_https = local.middleware_redirect_https
   svc_gateway = local.svc_gateway
-  secret_name = local.memories_secret_name
-  service_name = "mem-ingress-route"
+  secret_name = local.secret_cert_name
+  issuer_name = local.issuer_name
+  # host_name = "www.trimino.com"
+  # host_name = "169.46.32.133.nip.io"
+  # host_name = "memories.mooo.com"
+  host_name = "www.trimino.xyz"
+  service_name = local.ingress_route
 }
 
 module "ingress-route-dashboard" {
@@ -166,12 +174,16 @@ module "ingress-route-dashboard" {
   source = "./modules/traefik/ingress-route-dashboard"
   app_name = var.app_name
   namespace = local.namespace
-  # tls_store = local.tls_store
-  # tls_option = local.tls_option
-  # middleware_security_headers = local.middleware_security_headers
+  tls_options = local.tls_options
   middleware_dashboard = local.middleware_dashboard
-  secret_name = local.dashboard_secret_name
-  service_name = "mem-ingress-route-dashboard"
+  middleware_redirect_https = local.middleware_redirect_https
+  secret_name = local.dashboard_secret_cert_name
+  issuer_name = local.dashboard_issuer_name
+  # host_name = "www.trimino.com"
+  # host_name = "169.46.32.133.nip.io"
+  # host_name = "memories.mooo.com"
+  host_name = "www.trimino.xyz"
+  service_name = local.ingress_route_dashboard
 }
 
 ################
@@ -193,16 +205,16 @@ module "issuers" {
   source = "./modules/traefik/cert-manager/issuers"
   app_name = var.app_name
   namespace = local.namespace
-  issuer_name = "app-issuer"
+  issuer_name = local.issuer_name
   acme_email = "juancarlos@trimino.com"
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
   acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
-  certificate_name = "traefik-app-cert"
-  common_name = "memories.mooo.com"
-  dns_names = ["memories.mooo.com"]
-  secret_name = local.memories_secret_name
+  certificate_name = "le-cert"
+  common_name = "trimino.xyz"
+  dns_names = ["trimino.xyz"]
+  secret_name = local.secret_cert_name
 }
 
 module "issuers-dashboard" {
@@ -210,17 +222,16 @@ module "issuers-dashboard" {
   source = "./modules/traefik/cert-manager/issuers"
   app_name = var.app_name
   namespace = local.namespace
-  issuer_name = "app-issuer"
+  issuer_name = local.dashboard_issuer_name
   acme_email = "juancarlos@trimino.com"
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
   acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
-  #
-  certificate_name = "traefik-dashboard-cert"
-  common_name = "memories.mooo.com"
-  dns_names = ["memories.mooo.com"]
-  secret_name = local.dashboard_secret_name
+  certificate_name = "le-dashboard-cert"
+  common_name = "trimino.xyz"
+  dns_names = ["trimino.xyz"]
+  secret_name = local.dashboard_secret_cert_name
 }
 # ***/ # traefik
 

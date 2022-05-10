@@ -10,13 +10,25 @@ variable "app_name" {
 variable "namespace" {
   type = string
 }
-variable "secret_name" {
-  type = string
-}
 variable "svc_gateway" {
   type = string
 }
 variable "middleware_gateway" {
+  type = string
+}
+variable "middleware_redirect_https" {
+  type = string
+}
+variable "tls_options" {
+  type = string
+}
+variable "secret_name" {
+  type = string
+}
+variable "issuer_name" {
+  type = string
+}
+variable "host_name" {
   type = string
 }
 variable "service_name" {
@@ -33,6 +45,13 @@ resource "kubernetes_manifest" "ingress-route" {
       namespace = var.namespace
       labels = {
         app = var.app_name
+      }
+      annotations = {
+        "kubernetes.io/ingress.class" = "traefik-cert-manager"
+        # The Ingress resource has to be linked to the Issuer.
+        "cert-manager.io/issuer" = var.issuer_name
+        # certmanager.k8s.io/acme-challenge-type: http01
+        # traefik.ingress.kubernetes.io/frontend-entry-points: http,https
       }
     }
     #
@@ -125,7 +144,7 @@ resource "kubernetes_manifest" "ingress-route" {
           # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
           # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
           # one of these services, the /etc/hosts file does not need to be changed.
-          match = "Host(`www.trimino.com`) && PathPrefix(`/`)"
+          match = "Host(`${var.host_name}`) && PathPrefix(`/`)"
           # match = "Host(`169.46.32.133.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
@@ -135,9 +154,13 @@ resource "kubernetes_manifest" "ingress-route" {
           # Middlewares are applied in the same order as their declaration in router.
           middlewares = [
             {
-              name = var.middleware_gateway
+              name = var.middleware_redirect_https
               namespace = var.namespace
             }
+            # {
+            #   name = var.middleware_gateway
+            #   namespace = var.namespace
+            # }
           ]
           services = [
             {
@@ -163,15 +186,16 @@ resource "kubernetes_manifest" "ingress-route" {
       # To perform an analysis of the TLS handshake using SSLLabs, go to
       # https://www.ssllabs.com/ssltest/.
       tls = {
+        certResolver = "le"
         # Use the secret created by cert-manager to terminate the TLS connection.
         secretName = var.secret_name
         # store = {
         #   name = var.tls_store
         # }
-        # options = {
-        #   name = var.tls_option
-        #   namespace = var.namespace
-        # }
+        options = {
+          name = var.tls_options
+          namespace = var.namespace
+        }
       }
     }
   }

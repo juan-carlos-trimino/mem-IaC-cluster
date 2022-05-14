@@ -44,12 +44,18 @@ resource "kubernetes_manifest" "ingress-route" {
         app = var.app_name
       }
       annotations = {
-        "kubernetes.io/ingress.class" = "traefik-cert-manager"
-        # The Ingress resource has to be linked to the Issuer.
-        "cert-manager.io/issuer-kind" = "Issuer"
+        # https://cert-manager.io/v0.15-docs/usage/ingress/#supported-annotations
         "cert-manager.io/issuer" = var.issuer_name
-        # certmanager.k8s.io/acme-challenge-type: http01
-        # traefik.ingress.kubernetes.io/frontend-entry-points: http,https
+        "acme.cert-manager.io/http01-edit-in-place" = true
+        
+        # "kubernetes.io/ingress.class" = "traefik-cert-manager"
+        # "kubernetes.io/ingress.class" = "traefik"
+      #   # The Ingress resource has to be linked to the Issuer.
+      #   "cert-manager.io/issuer-kind" = "Issuer"
+      #   "cert-manager.io/issuer" = var.issuer_name
+      #   "traefik.ingress.kubernetes.io/router.tls" = true
+      #   # certmanager.k8s.io/acme-challenge-type: http01
+      #   # traefik.ingress.kubernetes.io/frontend-entry-points: http,https
       }
     }
     #
@@ -107,8 +113,11 @@ resource "kubernetes_manifest" "ingress-route" {
       # To perform an analysis of the TLS handshake using SSLLabs, go to
       # https://www.ssllabs.com/ssltest/.
       tls = {
+        # Placing a host in the TLS config will indicate a certificate should be created.
+        # hosts = [var.host_name]
         certResolver = "le"
         # Use the secret created by cert-manager to terminate the TLS connection.
+        # cert-manager will store the created certificate in this secret.
         secretName = var.secret_name
         # store = {
         #   name = var.tls_store

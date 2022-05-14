@@ -23,6 +23,7 @@ additionalArguments:
   - "--entrypoints.websecure.address=:443"
   # Default TLS configuration for the routers linked to the entry point.
   - "--entrypoints.websecure.http.tls"
+  # - --entrypoints.websecure.http.tls.certResolver=default
   # Traefik log settings.
   - "--log=true"
   # - "--log.level=INFO"
@@ -32,7 +33,9 @@ additionalArguments:
   # Enable Kubernetes backend with default settings.
   - "--providers.kubernetescrd=true"
   # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for.
-  - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
+  # (https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik)
+  # - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
+  - "--providers.kubernetesingress.ingressclass=traefik"
   # Enable ping.
   # - "--ping"
   - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme/acme.json"

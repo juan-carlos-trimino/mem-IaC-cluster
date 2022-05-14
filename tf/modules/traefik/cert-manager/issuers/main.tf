@@ -66,14 +66,18 @@ resource "kubernetes_manifest" "issuer" {
       }
     }
     spec = {
-      # ca = {
-      #   secretName = "traefik-dashboard-cert"
-      # }
       # The "Automatic Certificate Management Environment" (ACME) protocol is a communications
       # protocol for automating interactions between certificate authorities and their users' web
       # servers, allowing the automated deployment of public key infrastructure at very low cost.
       # It was designed by the Internet Security Research Group (ISRG) for their Let's Encrypt
       # service.
+      #
+      # Use the ACME protocol to issue certificates when you need proof of domain ownership. The
+      # ACME HTTP issuer sends an HTTP request to the domains specified in the certificate request.
+      # The ACME server expects a certain web page to be published on each domain name requested in
+      # the certificate. The cert-manager service publishes the expected web page by creating a
+      # temporary pod and ingress. When validation is completed, the temporary pod and ingress are
+      # cleaned up. Then, the ACME server issues the certificate.
       #
       # See https://cert-manager.io/docs/tutorials/acme/http-validation/
       acme = {
@@ -91,7 +95,8 @@ resource "kubernetes_manifest" "issuer" {
             http01 = {
               ingress = {
                 # See values.yaml (providers.kubernetesingress.ingressclass).
-                class = "traefik-cert-manager"
+                # class = "traefik-cert-manager"
+                class = "traefik"
               }
             }
           }
@@ -120,9 +125,15 @@ resource "kubernetes_manifest" "certificate" {
       }
     }
     spec = {
+      # The certificate commonName and dnsNames are challenged by the ACME server. The certificate
+      # manager service automatically creates a pod and ingress rules to resolve the challenges.
       commonName = var.common_name
       dnsNames = var.dns_names
-      renewBefore = "360h"  # 15 days
+      # The default duration for all certificates is 90 days and the default renewal windows is 30
+      # days. This means that certificates are considered valid for 3 months and renewal will be
+      # attempted within 1 month of expiration.
+      # duration = "360h"  # 15 days.
+      # renewBefore = "24h"
       # It instructs cert-manager to store the certificate in the secretName.
       secretName = var.secret_name
       issuerRef = {

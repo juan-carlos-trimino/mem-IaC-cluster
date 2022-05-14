@@ -213,7 +213,7 @@ module "issuers" {
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   certificate_name = "le-cert"
   common_name = "trimino.xyz"
-  dns_names = ["trimino.xyz"]
+  dns_names = ["www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
 
@@ -230,7 +230,7 @@ module "issuers-dashboard" {
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   certificate_name = "le-dashboard-cert"
   common_name = "trimino.xyz"
-  dns_names = ["trimino.xyz"]
+  dns_names = ["www.trimino.xyz"]
   secret_name = local.dashboard_secret_cert_name
 }
 # ***/ # traefik

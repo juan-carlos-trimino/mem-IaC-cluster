@@ -68,9 +68,17 @@ tf/modules/traefik/cert-manager/*
 !tf/modules/traefik/cert-manager/cert-manager/
 tf/modules/traefik/cert-manager/cert-manager/*
 !tf/modules/traefik/cert-manager/cert-manager/main.tf
+
 !tf/modules/traefik/cert-manager/issuers/
 tf/modules/traefik/cert-manager/issuers/*
 !tf/modules/traefik/cert-manager/issuers/main.tf
+
+!tf/modules/traefik/cert-manager/acme-issuer/
+tf/modules/traefik/cert-manager/acme-issuer/*
+!tf/modules/traefik/cert-manager/acme-issuer/main.tf
+
+
+
 !tf/modules/traefik/ingress-route/
 tf/modules/traefik/ingress-route/*
 !tf/modules/traefik/ingress-route/main.tf

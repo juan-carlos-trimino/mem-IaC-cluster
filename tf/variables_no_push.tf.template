@@ -140,3 +140,7 @@ variable "traefik_gateway_username" {
 variable "traefik_gateway_password" {
   default = "<required>"
 }
+
+variable "traefik_dns_api_token" {
+  default = "<required>"
+}

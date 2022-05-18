@@ -26,42 +26,11 @@ variable "chart_version" {
   default = "1.8.0"
 }
 
-/***
-resource "null_resource" "issuer" {
-  depends_on = [
-    helm_release.cert_manager
-  ]
-  #
-  provisioner "local-exec" {
-    command = "kubectl apply -f ./modules/cert-manager/issuers/issuer.yml"
-  }
-  #
-  # provisioner "local-exec" {
-    # when = destroy
-    # command = "oc delete issuer letsencrypt-staging"
-  # }
-}
-
-resource "null_resource" "certificate" {
-  depends_on = [
-    null_resource.issuer
-  ]
-  #
-  provisioner "local-exec" {
-    command = "kubectl apply -f ./modules/cert-manager/certificates/traefik-dashboard-cert.yml"
-  }
-  #
-  # provisioner "local-exec" {
-    # when = destroy
-    # command = "oc delete certificate traefik-dashboard-cert"
-  # }
-}
-***/
-
-# cert-manager adds certificates and certificate issuers as resource types in Kubernetes clusters
-# and simplifies the process of obtaining, renewing, and using those certificates.
-#
-# cert-manager manages non-namespaced resources in the cluster and should only be installed once.
+# cert-manager is a powerful and extensible X.509 certificate controller for Kubernetes and
+# OpenShift workloads. It will obtain certificates from a variety of Issuers, both popular public
+# Issuers as well as private Issuers, and ensure the certificates are valid and up-to-date, and
+# will attempt to renew certificates at a configured time before expiry.
+# (cert-manager manages non-namespaced resources in the cluster and should only be installed once.)
 #
 # https://cert-manager.io/docs/
 #
@@ -77,7 +46,6 @@ resource "helm_release" "cert_manager" {
   version = var.chart_version
   namespace = var.namespace
   create_namespace = false
-  # values = [file("cert-manager-values.yaml")]
   # To automatically install and manage the CRDs as part of your Helm release, you must add the
   # --set installCRDs=true flag to your Helm installation command.
   set {

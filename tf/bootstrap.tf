@@ -1,5 +1,5 @@
 locals {
-  helm_release_traefik = true
+  helm_release_traefik = false
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -8,9 +8,8 @@ locals {
   # Traefik #
   ###########
   secret_cert_name = "le-secret-cert"
-  dashboard_secret_cert_name = "le-dashboard-secret-cert"
-  issuer_name = "le-issuer"
-  dashboard_issuer_name = "le-dashboard-issuer"
+  # dashboard_secret_cert_name = "le-dashboard-secret-cert"
+  issuer_name = "le-acme-issuer"
   tls_store = "default"
   tls_options = "tlsoptions"
   ##################
@@ -139,7 +138,7 @@ module "tlsstore" {
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = local.namespace
-  secret_name = local.dashboard_secret_cert_name
+  secret_name = local.secret_cert_name
   service_name = local.tls_store
 }
 
@@ -165,7 +164,7 @@ module "ingress-route" {
   # host_name = "www.trimino.com"
   # host_name = "169.46.32.133.nip.io"
   # host_name = "memories.mooo.com"
-  host_name = "www.trimino.xyz"
+  host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
 
@@ -177,12 +176,12 @@ module "ingress-route-dashboard" {
   tls_options = local.tls_options
   middleware_dashboard = local.middleware_dashboard
   middleware_redirect_https = local.middleware_redirect_https
-  secret_name = local.dashboard_secret_cert_name
-  issuer_name = local.dashboard_issuer_name
+  secret_name = local.secret_cert_name
+  issuer_name = local.issuer_name
   # host_name = "www.trimino.com"
   # host_name = "169.46.32.133.nip.io"
   # host_name = "memories.mooo.com"
-  host_name = "www.trimino.xyz"
+  host_name = "trimino.xyz"
   service_name = local.ingress_route_dashboard
 }
 
@@ -200,9 +199,9 @@ module "cert-manager" {
   service_name = "mem-cert-manager"
 }
 
-module "issuers" {
+module "acme-issuer" {
   count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/cert-manager/issuers"
+  source = "./modules/traefik/cert-manager/acme-issuer"
   app_name = var.app_name
   namespace = local.namespace
   issuer_name = local.issuer_name
@@ -211,28 +210,35 @@ module "issuers" {
   # production (letsencrypt-prod).
   acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  traefik_dns_api_token = var.traefik_dns_api_token
+}
+
+module "certificate" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/cert-manager/certificates"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.issuer_name
   certificate_name = "le-cert"
-  common_name = "trimino.xyz"
-  dns_names = ["www.trimino.xyz"]
+  # The A record maps a name to one or more IP addresses when the IP are known and stable.
+  # The CNAME record maps a name to another name. It should only be used when there are no other
+  # records on that name.
+  common_name = "www.trimino.xyz"
+  dns_names = ["www.trimino.xyz", "trimino.xyz"]
   secret_name = local.secret_cert_name
 }
 
-module "issuers-dashboard" {
-  count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/cert-manager/issuers"
-  app_name = var.app_name
-  namespace = local.namespace
-  issuer_name = local.dashboard_issuer_name
-  acme_email = "juancarlos@trimino.com"
-  # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
-  # production (letsencrypt-prod).
-  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
-  certificate_name = "le-dashboard-cert"
-  common_name = "trimino.xyz"
-  dns_names = ["www.trimino.xyz"]
-  secret_name = local.dashboard_secret_cert_name
-}
+# module "dashboard-certificate" {
+#   count = local.helm_release_traefik ? 0 : 1
+#   source = "./modules/traefik/cert-manager/certificates"
+#   app_name = var.app_name
+#   namespace = local.namespace
+#   issuer_name = local.issuer_name
+#   certificate_name = "le-dashboard-cert"
+#   common_name = "www.trimino.xyz"
+#   dns_names = ["www.trimino.xyz", "trimino.xyz"]
+#   secret_name = local.dashboard_secret_cert_name
+# }
 # ***/ # traefik
 
 ###########

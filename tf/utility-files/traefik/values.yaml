@@ -12,14 +12,14 @@ additionalArguments:
   - "--api.dashboard=true"
   # Activate API directly on the entryPoint named traefik.
   - "--api.insecure=false"
-  # Entry point address.
+  # Traefik will listen to incoming request on the port 80 (http).
   - "--entrypoints.web.address=:80"
-  # Scheme used for the redirection.
-  - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
   # Targeted entry point of the redirection.
   - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+  # Scheme used for the redirection.
+  - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
   - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-  # Entry point address.
+  # Traefik will listen to incoming request on the port 443 (https).
   - "--entrypoints.websecure.address=:443"
   # Default TLS configuration for the routers linked to the entry point.
   - "--entrypoints.websecure.http.tls"
@@ -32,17 +32,28 @@ additionalArguments:
   - "--metrics.prometheus=true"
   # Enable Kubernetes backend with default settings.
   - "--providers.kubernetescrd=true"
+  - "--providers.kubernetesingress=true"
   # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for.
   # (https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik)
   # - "--providers.kubernetesingress.ingressclass=traefik-cert-manager"
   - "--providers.kubernetesingress.ingressclass=traefik"
   # Enable ping.
   # - "--ping"
+  # Set up Let's Encrypt.
+  # Use a DNS-01 ACME challenge rather than HTTP-01 challenge; enable a dns challenge named "le".
+  # Note: mandatory for wildcard certificate generation.
+  - "--certificatesresolvers.le.acme.dnschallenge=true"
+  # DNS provider used.
+  - "--certificatesresolvers.le.acme.dnschallenge.provider=namesilo"
+  # - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+  # The email to provide to Let's Encrypt.
+  - "--certificatesresolvers.le.acme.email=juancarlos@trimino.com"
+  # Tell to store the certificate on a path under our volume.
   - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme/acme.json"
-  - "--certificatesresolvers.le.acme.tlschallenge=true"
-  - "--certificatesresolvers.le.acme.httpChallenge.entryPoint=http"
-  # - "--certificatesResolvers.letsencrypt.acme.dnschallenge=true"
-  # - "--certificatesResolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+  # By default, the provider will verify the TXT DNS challenge record before letting ACME verify.
+  # If delayBeforeCheck is greater than zero, this check is delayed for the configured duration in
+  # seconds. Useful if internal networks block external DNS queries.
+  - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=120"
 #
 # deployment:
 #   initContainers:
@@ -54,6 +65,12 @@ additionalArguments:
 #       volumeMounts:
 #         - name: ssl-certs
 #           mountPath: /ssl-certs
+env:
+  - name: NAMESILO_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: api-token-secret
+        key: api-token
 # Set Traefik as the default Ingress Controller (as per Kubernetes 1.19+ changes).
 ingressClass:
 # ingressController:

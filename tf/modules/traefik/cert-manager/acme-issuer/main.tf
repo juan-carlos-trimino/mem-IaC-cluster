@@ -99,7 +99,7 @@ resource "kubernetes_manifest" "issuer" {
           name = "le-acme-private-key"
         }
         solvers = [
-          # {
+          {
           #   selector = {}
           #   http01 = {
           #     ingress = {
@@ -120,21 +120,30 @@ resource "kubernetes_manifest" "issuer" {
           #   }
           # }
           # ACME DNS-01 provider configurations.
-          {
-            # An empty 'selector' means that this solver matches all domains.
-            # selector = {}
-            # Only using xxxxxxxxx to solve challenges for trimino.xyz.
-            # Alternative options such as 'matchLabels' and 'dnsZones' can be specified as part of
-            # a solver's selector as well.
-            selector = {
-              dnsNames = [
-                "trimino.xyz"
-              ]
-            }
+          # {
+          #   # An empty 'selector' means that this solver matches all domains.
+          #   # selector = {}
+          #   # Only using xxxxxxxxx to solve challenges for trimino.xyz.
+          #   # Alternative options such as 'matchLabels' and 'dnsZones' can be specified as part of
+          #   # a solver's selector as well.
+          #   selector = {
+          #     dnsNames = [
+          #       "trimino.xyz"
+          #     ]
+          #   }
+            # dns01 = {
+            #   cloudflare = {
+            #     apiTokenSecretRef = {
+            #       name = kubernetes_secret.secret.metadata[0].name
+            #       key = "api-token"
+            #     }
+            #     email = "juancarlos@trimino.com"
+            #   }
+            # }
             dns01 = {
-              namesilo = {
+              digitalocean = {
                 tokenSecretRef = {
-                  name = var.api_token_secret_name
+                  name = kubernetes_secret.secret.metadata[0].name
                   key = "api-token"
                 }
               }

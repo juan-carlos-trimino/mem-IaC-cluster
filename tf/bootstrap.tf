@@ -157,34 +157,33 @@ module "ingress-route" {
   namespace = local.namespace
   tls_options = local.tls_options
   middleware_gateway = local.middleware_gateway
+  middleware_dashboard = local.middleware_dashboard
   middleware_redirect_https = local.middleware_redirect_https
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name
-  # host_name = "www.trimino.com"
-  # host_name = "169.46.32.133.nip.io"
+  # host_name = "169.46.98.220.nip.io"
   # host_name = "memories.mooo.com"
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
 
-module "ingress-route-dashboard" {
-  count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/ingress-route-dashboard"
-  app_name = var.app_name
-  namespace = local.namespace
-  tls_options = local.tls_options
-  middleware_dashboard = local.middleware_dashboard
-  middleware_redirect_https = local.middleware_redirect_https
-  secret_name = local.secret_cert_name
-  issuer_name = local.issuer_name
-  # host_name = "www.trimino.com"
-  # host_name = "169.46.32.133.nip.io"
-  # host_name = "memories.mooo.com"
-  host_name = "trimino.xyz"
-  service_name = local.ingress_route_dashboard
-}
-
+# module "ingress-route-dashboard" {
+#   count = local.helm_release_traefik ? 0 : 1
+#   source = "./modules/traefik/ingress-route-dashboard"
+#   app_name = var.app_name
+#   namespace = local.namespace
+#   tls_options = local.tls_options
+#   middleware_dashboard = local.middleware_dashboard
+#   middleware_redirect_https = local.middleware_redirect_https
+#   secret_name = local.secret_cert_name
+#   issuer_name = local.issuer_name
+#   # host_name = "169.46.32.133.nip.io"
+#   # host_name = "memories.mooo.com"
+#   host_name = "trimino.xyz"
+#   service_name = local.ingress_route_dashboard
+# }
+/*****************
 ################
 # cert manager #
 ################
@@ -227,19 +226,7 @@ module "certificate" {
   dns_names = ["www.trimino.xyz", "trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-
-# module "dashboard-certificate" {
-#   count = local.helm_release_traefik ? 0 : 1
-#   source = "./modules/traefik/cert-manager/certificates"
-#   app_name = var.app_name
-#   namespace = local.namespace
-#   issuer_name = local.issuer_name
-#   certificate_name = "le-dashboard-cert"
-#   common_name = "www.trimino.xyz"
-#   dns_names = ["www.trimino.xyz", "trimino.xyz"]
-#   secret_name = local.dashboard_secret_cert_name
-# }
-# ***/ # traefik
+***/ # traefik
 
 ###########
 # mongodb #

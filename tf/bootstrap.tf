@@ -20,10 +20,10 @@ locals {
   ###############
   # Middlewares #
   ###############
-  middleware_dashboard = "mem-mw-dashboard"
+  middleware_dashboard = "mem-mw-dashboard-basic-auth"
   middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
-  middleware_gateway = "mem-mw-gateway"
+  middleware_gateway = "mem-mw-gateway-basic-auth"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
   ####################
@@ -93,9 +93,9 @@ module "traefik" {
   service_name = "mem-traefik"
 }
 
-module "middleware-dashboard" {
+module "middleware-dashboard-basic-auth" {
   count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-dashboard"
+  source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   # While the dashboard in itself is read-only, it is good practice to secure access to it.
@@ -106,7 +106,7 @@ module "middleware-dashboard" {
 
 module "middleware-rabbitmq" {
   count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-rabbitmq"
+  source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   traefik_rabbitmq_username = var.traefik_rabbitmq_username
@@ -115,9 +115,9 @@ module "middleware-rabbitmq" {
   service_name2 = local.middleware_rabbitmq2
 }
 
-module "middleware-gateway" {
+module "middleware-gateway-basic-auth" {
   count = local.helm_release_traefik ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-gateway"
+  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   traefik_gateway_username = var.traefik_gateway_username

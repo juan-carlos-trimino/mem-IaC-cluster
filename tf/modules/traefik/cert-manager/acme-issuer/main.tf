@@ -100,7 +100,14 @@ resource "kubernetes_manifest" "issuer" {
         }
         solvers = [
           {
-          #   selector = {}
+            # An empty 'selector' means that this solver matches all domains.
+            # Only use digitalocean to solve challenges for trimino.xyz and www.trimino.xyz.
+            selector = {
+              dnsNames = [
+                "trimino.xyz",
+                "www.trimino.xyz"
+              ]
+            }
           #   http01 = {
           #     ingress = {
           #       # See values.yaml (providers.kubernetesingress.ingressclass).
@@ -144,7 +151,6 @@ resource "kubernetes_manifest" "issuer" {
               digitalocean = {
                 tokenSecretRef = {
                   name = kubernetes_secret.secret.metadata[0].name
-                  # key = "api-token"
                   key = "access-token"
                 }
               }

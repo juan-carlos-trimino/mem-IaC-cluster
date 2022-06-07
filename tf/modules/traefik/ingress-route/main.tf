@@ -53,7 +53,7 @@ resource "kubernetes_manifest" "ingress-route" {
         # https://cert-manager.io/v0.15-docs/usage/ingress/#supported-annotations
         # "cert-manager.io/issuer" = var.issuer_name
         # "acme.cert-manager.io/http01-edit-in-place" = true
-        "kubernetes.io/ingress.class" = "traefik"
+        # "kubernetes.io/ingress.class" = "traefik"
         # "traefik.ingress.kubernetes.io/router.tls" = true
         # "traefik.http.routers.traefik.entrypoints" = "websecure"
         # "traefik.http.routers.traefik.tls.certresolver" = "le"
@@ -241,17 +241,11 @@ resource "kubernetes_manifest" "ingress-route" {
         domains = [
           {
             main = var.host_name
-            sans = [
-              "*.${var.host_name}"
+            sans = [  # URI Subject Alternative Names
+              "www.${var.host_name}"
             ]
           }
         ]
-        # certificates = [
-        #   {
-        #     certFile = "/traefik-certs/acme.json"
-        #     keyFile = "/traefik-certs/acme.json"
-        #   }
-        # ]
         # certResolver = "le"
         # Use the secret created by cert-manager to terminate the TLS connection.
         # cert-manager will store the created certificate in this secret.

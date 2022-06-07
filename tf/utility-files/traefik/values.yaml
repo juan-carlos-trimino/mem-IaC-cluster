@@ -45,6 +45,12 @@ additionalArguments:
   # File or key used for certificates storage (PV).
   - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
   # CA server to use; the default is staging.
+  # The staging environment will not issue trusted certificates but is used to ensure that the
+  # verification process is working properly before moving to production. Let's Encrypt's
+  # production environment imposes much stricter rate limits, so to reduce the chance of you
+  # hitting those limits it is highly recommended to start by using the staging environment. To
+  # move to production, simply create a new Issuer with the URL set to
+  # https://acme-v02.api.letsencrypt.org/directory.
   # Production.
   # - "--certificatesresolvers.le.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
   # Staging.
@@ -86,7 +92,7 @@ additionalArguments:
 # Environment variables to be passed to Traefik's binary
 env:
   - name: DO_AUTH_TOKEN
-    value: "dop_v1_dfb9c2df4eb9dc59b2374ad3e02afe6de838e248eabac0da97fe6ff0dad2e4c1"
+    value: "dop_v1_1bcbec15f7fa78b81b0c972945e2515f36d9d0e1d30fc677800398b225c68f8d"
 # - name: SOME_VAR_FROM_CONFIG_MAP
 #   valueFrom:
 #     configMapRef:

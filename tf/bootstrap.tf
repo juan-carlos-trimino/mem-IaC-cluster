@@ -223,8 +223,9 @@ module "certificate" {
   # The A record maps a name to one or more IP addresses when the IP are known and stable.
   # The CNAME record maps a name to another name. It should only be used when there are no other
   # records on that name.
-  common_name = "www.trimino.xyz"
-  dns_names = ["www.trimino.xyz", "trimino.xyz"]
+  # common_name = "trimino.xyz"
+  common_name = "trimino.xyz"
+  dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
 # ***/ # traefik

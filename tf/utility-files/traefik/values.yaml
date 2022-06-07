@@ -23,7 +23,7 @@ additionalArguments:
   - "--entrypoints.websecure.address=:443"
   # Default TLS configuration for the routers linked to the entry point.
   - "--entrypoints.websecure.http.tls=true"
-  # - "--entrypoints.websecure.http.tls.certresolver=le"
+  - "--entrypoints.websecure.http.tls.certresolver=le"
   # Traefik log settings.
   - "--log=true"
   # - "--log.level=INFO"
@@ -39,59 +39,83 @@ additionalArguments:
   - "--providers.kubernetesingress.ingressclass=traefik"
   # Enable ping.
   # - "--ping"
-  # Set up Let's Encrypt.
+  # Enable ACME (Let's Encrypt): automatic SSL.
+  # Email address used for registration.
+  - "--certificatesresolvers.le.acme.email=juancarlos@trimino.com"
+  # File or key used for certificates storage (PV).
+  - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
+  # CA server to use; the default is staging.
+  # Production.
+  # - "--certificatesresolvers.le.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+  # Staging.
+  - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+  # Certificates' duration in hours.
+  # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
+  - "--certificatesresolvers.le.acme.certificatesDuration=2160"
+  # Preferred chain to use.
+  # If the CA offers multiple certificate chains, prefer the chain with an issuer matching this
+  # Subject Common Name. If no match, the default offered chain will be used.
+  - "--certificatesresolvers.le.acme.preferredchain=ISRG Root X1"
+  # KeyType to use.
+  # Available values: "EC256", "EC384", "RSA2048", "RSA4096", "RSA8192"
+  - "--certificatesresolvers.le.acme.keytype=RSA4096"
   # Use the TLS-ALPN-01 challenge to generate and renew ACME certificates by provisioning a TLS
   # certificate. When using the TLS-ALPN-01 challenge, Traefik must be reachable by Let's Encrypt
   # through port 443.
-  # - "--certificatesresolvers.le.acme.tlschallenge=true"
+  - "--certificatesresolvers.le.acme.tlschallenge=false"
+  - "--certificatesresolvers.le.acme.httpchallenge=false"
   # Use a DNS-01 ACME challenge rather than HTTP-01 challenge; enable a dns challenge named "le".
   # Note: mandatory for wildcard certificate generation.
-  # - "--certificatesresolvers.le.acme.dnschallenge=true"
+  - "--certificatesresolvers.le.acme.dnschallenge=true"
+  # DNS provider used.
+  - "--certificatesresolvers.le.acme.dnschallenge.provider=digitalocean"
   # By default, the provider will verify the TXT DNS challenge record before letting ACME verify.
   # If delayBeforeCheck is greater than zero, this check is delayed for the configured duration in
   # seconds. Useful if internal networks block external DNS queries.
   # To delay DNS checks and reduce Let's Encrypt hit-rate.
-  # - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=3600"
+  - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=0"
   # Use the following DNS servers to resolve the FQDN authority.
-  # ns1.digitalocean.com (173.245.58.51), ns2.digitalocean.com (173.245.59.41), and
-  # ns3.digitalocean.com (198.41.222.173).
-  # 1.1.1.1 is a free Domain Name System (DNS) service by American company Cloudflare in
-  # partnership with APNIC.
-  # 8.8. 8.8 is the primary DNS server for Google DNS.
-  # - "--certificatesresolvers.le.acme.dnschallenge.resolvers=173.245.58.51:53,173.245.59.41:53,198.41.222.173:53"
-  # DNS provider used.
-  # - "--certificatesresolvers.le.acme.dnschallenge.provider=digitalocean"
-  # CA server to use; the default is staging.
-  # Production: https://acme-v02.api.letsencrypt.org/directory
-  # - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-  # Certificates' duration in hours.
-  # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
-  # - "--certificatesresolvers.le.acme.certificatesDuration=2160"
-  # Preferred chain to use.
-  # If the CA offers multiple certificate chains, prefer the chain with an issuer matching this
-  # Subject Common Name. If no match, the default offered chain will be used.
-  # - "--certificatesresolvers.le.acme.preferredchain=ISRG Root X1"
-  # KeyType to use.
-  # Available values: "EC256", "EC384", "RSA2048", "RSA4096", "RSA8192"
-  # - "--certificatesresolvers.le.acme.keytype=RSA4096"
-  # The email to provide to Let's Encrypt.
-  # - "--certificatesresolvers.le.acme.email=juancarlos@trimino.com"
-  # Tell to store the certificate on a path under our volume.
-  # - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme/acme.json"
+  # Digital Ocean -> ns1.digitalocean.com (173.245.58.51), ns2.digitalocean.com (173.245.59.41),
+  # and ns3.digitalocean.com (198.41.222.173).
+  # Cloudflare in partnership with APNIC -> 1.1.1.1,1.0.0.1
+  # Google -> 8.8.8.8
+  - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53,8.8.8.8:53"
 #
-# deployment:
-#   initContainers:
-#     # The "volume-permissions" init container is required if you run into permission issues.
-#     # Related issue: https://github.com/containous/traefik/issues/6972
-#     - name: volume-permissions
-#       image: busybox:latest
-#       command: ["sh", "-c", "chmod -Rv 600 /ssl-certs/*"]
-#       volumeMounts:
-#         - name: ssl-certs
-#           mountPath: /ssl-certs
+
+
+# Environment variables to be passed to Traefik's binary
+env:
+  - name: DO_AUTH_TOKEN
+    value: "dop_v1_dfb9c2df4eb9dc59b2374ad3e02afe6de838e248eabac0da97fe6ff0dad2e4c1"
+# - name: SOME_VAR_FROM_CONFIG_MAP
+#   valueFrom:
+#     configMapRef:
+#       name: configmap-name
+#       key: config-key
+# - name: SOME_SECRET
+#   valueFrom:
+#     secretKeyRef:
+#       name: secret-name
+#       key: secret-key
+
+
+
+
+
+deployment:
+  enabled: true
+  replicas: 1
+  # initContainers:
+  #   # The "volume-permissions" init container is required if you run into permission issues.
+  #   # Related issue: https://github.com/containous/traefik/issues/6972
+  #   - name: volume-permissions
+  #     image: busybox:latest
+  #     command: ["sh", "-c", "chmod -Rv 600 /traefik-certs/*"]
+  #     volumeMounts:
+  #       - name: traefik-certs
+  #         mountPath: /traefik-certs
 # Set Traefik as the default Ingress Controller (as per Kubernetes 1.19+ changes).
 ingressClass:
-# ingressController:
   enabled: true
   isDefaultClass: true
 # Create an IngressRoute for the dashboard.
@@ -145,7 +169,7 @@ ports:
     expose: true
     exposedPort: 80
     # (Optional) Permanent Redirect to HTTPS.
-    # redirectTo: websecure
+    redirectTo: websecure
   websecure:
     port: 443
     expose: true
@@ -153,7 +177,15 @@ ports:
     tls:
       enabled: true
       # (Optional) Set a default certificate resolver.
-      # certResolver: cloudflare
+      certResolver: digitalocean
+
+
+
+providers:
+  file:
+    directory: "/etc/traefik/values.yaml"
+
+
 # Whether Role Based Access Control objects like roles and rolebindings should be created.
 rbac:
   enabled: true
@@ -161,7 +193,7 @@ rbac:
   # namespaces.
   # If set to true, installs namespace-specific Role and RoleBinding and requires provider
   # configuration be set to that same namespace.
-  namespaced: true
+  namespaced: false
 #
 resources:
   # requests:
@@ -169,7 +201,7 @@ resources:
   #   memory: "150Mi"
   limits:
     cpu: "500m"
-    memory: "150Mi"
+    memory: "500Mi"
 # Set the container security context.
 # To run the container with ports below 1024 this will need to be adjust to run as root.
 securityContext:

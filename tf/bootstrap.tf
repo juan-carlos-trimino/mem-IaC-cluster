@@ -183,7 +183,7 @@ module "ingress-route" {
 #   host_name = "trimino.xyz"
 #   service_name = local.ingress_route_dashboard
 # }
-/*****************
+
 ################
 # cert manager #
 ################
@@ -209,6 +209,7 @@ module "acme-issuer" {
   # production (letsencrypt-prod).
   acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
 }
 
@@ -226,7 +227,7 @@ module "certificate" {
   dns_names = ["www.trimino.xyz", "trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-***/ # traefik
+# ***/ # traefik
 
 ###########
 # mongodb #

@@ -45,7 +45,7 @@ resource "kubernetes_manifest" "tlsoption" {
         "CurveP521",
         "CurveP384"
       ]
-      sniStrict = false
+      sniStrict = true
     }
   }
 }

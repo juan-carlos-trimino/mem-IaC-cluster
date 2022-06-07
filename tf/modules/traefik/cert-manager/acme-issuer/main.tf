@@ -29,7 +29,7 @@ variable api_token_secret_name {
 
 resource "kubernetes_secret" "secret" {
   metadata {
-    name = var.api_token_secret_name
+    name = "digitalocean-dns"  # var.api_token_secret_name
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -37,7 +37,7 @@ resource "kubernetes_secret" "secret" {
   }
   # Plain-text data.
   data = {
-    api-token = var.traefik_dns_api_token
+    access-token = var.traefik_dns_api_token
   }
   type = "Opaque"
 }
@@ -144,7 +144,8 @@ resource "kubernetes_manifest" "issuer" {
               digitalocean = {
                 tokenSecretRef = {
                   name = kubernetes_secret.secret.metadata[0].name
-                  key = "api-token"
+                  # key = "api-token"
+                  key = "access-token"
                 }
               }
             }

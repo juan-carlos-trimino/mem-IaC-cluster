@@ -98,10 +98,10 @@ resource "kubernetes_service_account" "service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
-resource "kubernetes_role" "role" {
+resource "kubernetes_cluster_role" "cluster_role" {
   metadata {
-    name = "${var.service_name}-role"
-    namespace = var.namespace
+    name = "${var.service_name}-cluster-role"
+    # namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -131,6 +131,7 @@ resource "kubernetes_role" "role" {
     api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["get", "watch", "list"]
     resources = ["ingresses", "ingressclasses"]
+    # resources = ["ingresses"]
   }
   rule {
     api_groups = ["extensions", "networking.k8s.io"]
@@ -146,10 +147,10 @@ resource "kubernetes_role" "role" {
 }
 
 # Bind the role to the service account.
-resource "kubernetes_role_binding" "role_binding" {
+resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   metadata {
-    name = "${var.service_name}-role-binding"
-    namespace = var.namespace
+    name = "${var.service_name}-cluster-role-binding"
+    # namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -157,9 +158,9 @@ resource "kubernetes_role_binding" "role_binding" {
   # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
   role_ref {
     api_group = "rbac.authorization.k8s.io"
-    kind = "Role"
+    kind = "ClusterRole"
     # This RoleBinding references the Role specified below...
-    name = kubernetes_role.role.metadata[0].name
+    name = kubernetes_cluster_role.cluster_role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
   subject {

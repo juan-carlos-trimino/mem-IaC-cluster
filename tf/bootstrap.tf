@@ -20,10 +20,10 @@ locals {
   ###############
   # Middlewares #
   ###############
-  middleware_dashboard = "mem-mw-dashboard-basic-auth"
+  middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
   middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
-  middleware_gateway = "mem-mw-gateway-basic-auth"
+  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
   ####################
@@ -101,7 +101,7 @@ module "middleware-dashboard-basic-auth" {
   # While the dashboard in itself is read-only, it is good practice to secure access to it.
   traefik_dashboard_username = var.traefik_dashboard_username
   traefik_dashboard_password = var.traefik_dashboard_password
-  service_name = local.middleware_dashboard
+  service_name = local.middleware_dashboard_basic_auth
 }
 
 module "middleware-rabbitmq" {
@@ -122,7 +122,7 @@ module "middleware-gateway-basic-auth" {
   namespace = local.namespace
   traefik_gateway_username = var.traefik_gateway_username
   traefik_gateway_password = var.traefik_gateway_password
-  service_name = local.middleware_gateway
+  service_name = local.middleware_gateway_basic_auth
 }
 
 module "middleware-security-headers" {
@@ -156,8 +156,8 @@ module "ingress-route" {
   app_name = var.app_name
   namespace = local.namespace
   tls_options = local.tls_options
-  middleware_gateway = local.middleware_gateway
-  middleware_dashboard = local.middleware_dashboard
+  middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
+  middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_redirect_https = local.middleware_redirect_https
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
@@ -167,22 +167,6 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-
-# module "ingress-route-dashboard" {
-#   count = local.helm_release_traefik ? 0 : 1
-#   source = "./modules/traefik/ingress-route-dashboard"
-#   app_name = var.app_name
-#   namespace = local.namespace
-#   tls_options = local.tls_options
-#   middleware_dashboard = local.middleware_dashboard
-#   middleware_redirect_https = local.middleware_redirect_https
-#   secret_name = local.secret_cert_name
-#   issuer_name = local.issuer_name
-#   # host_name = "169.46.32.133.nip.io"
-#   # host_name = "memories.mooo.com"
-#   host_name = "trimino.xyz"
-#   service_name = local.ingress_route_dashboard
-# }
 
 ################
 # cert manager #
@@ -223,12 +207,11 @@ module "certificate" {
   # The A record maps a name to one or more IP addresses when the IP are known and stable.
   # The CNAME record maps a name to another name. It should only be used when there are no other
   # records on that name.
-  # common_name = "trimino.xyz"
   common_name = "trimino.xyz"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-# ***/ # traefik
+# traefik
 
 ###########
 # mongodb #

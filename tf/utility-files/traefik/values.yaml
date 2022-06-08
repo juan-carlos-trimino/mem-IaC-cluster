@@ -187,9 +187,9 @@ ports:
 
 
 
-providers:
-  file:
-    directory: "/etc/traefik/values.yaml"
+#providers:
+#  file:
+#    directory: "/etc/traefik/values.yaml"
 
 
 # Whether Role Based Access Control objects like roles and rolebindings should be created.

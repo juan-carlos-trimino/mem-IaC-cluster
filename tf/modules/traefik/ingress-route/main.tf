@@ -13,10 +13,10 @@ variable "namespace" {
 variable "svc_gateway" {
   type = string
 }
-variable "middleware_gateway" {
+variable "middleware_gateway_basic_auth" {
   type = string
 }
-variable "middleware_dashboard" {
+variable "middleware_dashboard_basic_auth" {
   type = string
 }
 variable "middleware_redirect_https" {
@@ -68,7 +68,8 @@ resource "kubernetes_manifest" "ingress-route" {
       # Traefik handles requests using the web (HTTP) and websecure (HTTPS) entrypoints.
       entryPoints = [  # Listening ports.
         "web",
-        "websecure"
+        "websecure",
+        # "traefik"
       ]
       routes = [
         # {
@@ -77,7 +78,7 @@ resource "kubernetes_manifest" "ingress-route" {
         #   priority = 21
         #   middlewares = [
         #     {
-        #       name = var.middleware_gateway
+        #       name = var.middleware_gateway_basic_auth
         #       namespace = var.namespace
         #     },
         #     {
@@ -107,7 +108,7 @@ resource "kubernetes_manifest" "ingress-route" {
           priority = 21
           middlewares = [
             {
-              name = var.middleware_gateway
+              name = var.middleware_gateway_basic_auth
               namespace = var.namespace
             }
           ]
@@ -158,7 +159,7 @@ resource "kubernetes_manifest" "ingress-route" {
           # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
           # one of these services, the /etc/hosts file does not need to be changed.
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
-          # match = "Host(`${var.host_name}`) && PathPrefix(`/`)"
+          # match = "Host(`www.${var.host_name}`) && PathPrefix(`/`)"
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           priority = 21
@@ -166,14 +167,14 @@ resource "kubernetes_manifest" "ingress-route" {
           # the request is forwarded to the service.
           # Middlewares are applied in the same order as their declaration in router.
           middlewares = [
-            # {
-            #   name = var.middleware_gateway
-            #   namespace = var.namespace
-            # },
             {
-              name = var.middleware_redirect_https
+              name = var.middleware_gateway_basic_auth
               namespace = var.namespace
-            }
+            },
+            # {
+            #   name = var.middleware_redirect_https
+            #   namespace = var.namespace
+            # }
           ]
           services = [
             {
@@ -192,19 +193,19 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          # match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          match = "Host(`${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           # match = "Host(`169.46.98.220.nip.io`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          # match = "Host(`www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           priority = 20
           middlewares = [
-            # {
-            #   name = var.middleware_dashboard
-            #   namespace = var.namespace
-            # },
             {
-              name = var.middleware_redirect_https
+              name = var.middleware_dashboard_basic_auth
               namespace = var.namespace
-            }
+            },
+            # {
+            #   name = var.middleware_redirect_https
+            #   namespace = var.namespace
+            # }
           ]
           services = [
             {

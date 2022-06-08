@@ -28,6 +28,8 @@ resource "kubernetes_manifest" "tlsoption" {
     }
     spec = {
       minVersion = "VersionTLS12"
+      maxVersion = "VersionTLS13"
+      # Cipher suites defined for TLS 1.2 and below cannot be used in TLS 1.3, and vice versa.
       cipherSuites = [
         "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
         "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
@@ -41,10 +43,15 @@ resource "kubernetes_manifest" "tlsoption" {
         "TLS_CHACHA20_POLY1305_SHA256",
         "TLS_FALLBACK_SCSV"
       ]
+      # List of the elliptic curves references that will be used in an ECDHE handshake, in
+      # preference order.
       curvePreferences = [
         "CurveP521",
         "CurveP384"
       ]
+      # With strict SNI checking enabled (true), Traefik won't allow connections from clients that
+      # do not specify a server_name extension or don't match any certificate configured on the
+      # tlsOption.
       sniStrict = true
     }
   }

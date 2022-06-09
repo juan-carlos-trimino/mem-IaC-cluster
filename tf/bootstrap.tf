@@ -90,6 +90,7 @@ module "traefik" {
   source = "./modules/traefik/traefik"
   app_name = var.app_name
   namespace = local.namespace
+  api_auth_token = var.traefik_dns_api_token
   service_name = "mem-traefik"
 }
 
@@ -131,6 +132,14 @@ module "middleware-security-headers" {
   app_name = var.app_name
   namespace = local.namespace
   service_name = "default"
+}
+
+module "middleware-redirect-https" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-redirect-https"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_redirect_https
 }
 
 module "tlsstore" {
@@ -207,7 +216,7 @@ module "certificate" {
   # The A record maps a name to one or more IP addresses when the IP are known and stable.
   # The CNAME record maps a name to another name. It should only be used when there are no other
   # records on that name.
-  common_name = "trimino.xyz"
+  # common_name = "trimino.xyz"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }

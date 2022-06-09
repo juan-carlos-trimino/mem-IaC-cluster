@@ -4,23 +4,23 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
-variable "chart_name" {
+variable chart_name {
   type = string
   description = "Cert Manager Helm name."
   default = "cert-manager"
 }
-variable "chart_repo" {
+variable chart_repo {
   type = string
   description = "Cert Manager Helm repository name."
   default = "https://charts.jetstack.io"
 }
-variable "chart_version" {
+variable chart_version {
   type = string
   description = "Cert Manager Helm version."
   default = "1.8.0"
@@ -29,10 +29,10 @@ variable "chart_version" {
 # cert-manager is a powerful and extensible X.509 certificate controller for Kubernetes and
 # OpenShift workloads. It will obtain certificates from a variety of Issuers, both popular public
 # Issuers as well as private Issuers, and ensure the certificates are valid and up-to-date, and
-# will attempt to renew certificates at a configured time before expiry.
-# (cert-manager manages non-namespaced resources in the cluster and should only be installed once.)
+# will attempt to renew certificates at a configured time before expiry. (cert-manager manages
+# non-namespaced resources in the cluster and should only be installed once.)
 #
-# https://cert-manager.io/docs/
+# See https://cert-manager.io/docs/
 #
 # Once you've installed cert-manager, you can verify it is deployed correctly by checking the
 # cert-manager namespace for running pods:

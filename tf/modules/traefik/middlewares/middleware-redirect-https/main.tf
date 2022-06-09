@@ -4,13 +4,13 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
 

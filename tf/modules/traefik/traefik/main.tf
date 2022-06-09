@@ -4,60 +4,40 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
-variable "chart_name" {
+variable api_auth_token {
+  type = string
+}
+variable chart_name {
   type = string
   description = "Ingress Controller Helm chart name."
   default = "traefik"
 }
-variable "chart_repo" {
+variable chart_repo {
   type = string
   description = "Using the official Traefik helm chart (Ingress Controller)."
   default = "https://helm.traefik.io/traefik"
 }
-variable "chart_version" {
+variable chart_version {
   type = string
   description = "Ingress Controller Helm repository version."
   # To use the latest version, go to https://artifacthub.io/ and type "traefik" on the edit box.
   default = "10.19.4"
 }
 
-###################################################################################################
-# To use the service account below:                                                               #
-# (1) In this file, uncomment the lines from /***SA to SA***/.                                    #
-# (2) In the file "mem-traefik-scc.yaml", find section "users:" and change it from:               #
-#     users: [                                                                                    #
-#       # system:serviceaccount:memories:mem-traefik-service-account                              #
-#     ]                                                                                           #
-#                                                                                                 #
-#     to                                                                                          #
-#                                                                                                 #
-#     users: [                                                                                    #
-#       system:serviceaccount:memories:mem-traefik-service-account                                #
-#     ]                                                                                           #
-# (3) In the file "values.yaml", find section "serviceAccount:" and change it from:               #
-#     serviceAccount:                                                                             #
-#       # name: "mem-traefik-service-account"                                                     #
-#       name: ""                                                                                  #
-#                                                                                                 #
-#     to                                                                                          #
-#                                                                                                 #
-#     serviceAccount:                                                                             #
-#       name: "mem-traefik-service-account"                                                       #
-#       # name: ""                                                                                #
-###################################################################################################
 resource "null_resource" "scc-traefik" {
   triggers = {
     always_run = timestamp()
   }
+  #
   provisioner "local-exec" {
     command = "oc apply -f ./utility-files/traefik/mem-traefik-scc.yaml"
   }
@@ -68,7 +48,22 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-# /***SA
+# See 'env:' in ..\..\..\utility-files\traefik\values.yaml.
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "${var.service_name}-provider-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    api_auth_token = var.api_auth_token
+  }
+  type = "Opaque"
+}
+
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -84,13 +79,7 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    # annotations = {
-      # "kubernetes.io/enforce-mountable-secrets" = true
-    # }
   }
-  # secret {
-  #   name = kubernetes_secret.secret.metadata[0].name
-  # }
 }
 
 # Roles define WHAT can be done; role bindings define WHO can do it.
@@ -98,10 +87,10 @@ resource "kubernetes_service_account" "service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
-resource "kubernetes_cluster_role" "cluster_role" {
+resource "kubernetes_role" "role" {
   metadata {
-    name = "${var.service_name}-cluster-role"
-    # namespace = var.namespace
+    name = "${var.service_name}-role"
+    namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -131,7 +120,6 @@ resource "kubernetes_cluster_role" "cluster_role" {
     api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["get", "watch", "list"]
     resources = ["ingresses", "ingressclasses"]
-    # resources = ["ingresses"]
   }
   rule {
     api_groups = ["extensions", "networking.k8s.io"]
@@ -147,10 +135,10 @@ resource "kubernetes_cluster_role" "cluster_role" {
 }
 
 # Bind the role to the service account.
-resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
+resource "kubernetes_role_binding" "role_binding" {
   metadata {
-    name = "${var.service_name}-cluster-role-binding"
-    # namespace = var.namespace
+    name = "${var.service_name}-role-binding"
+    namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -158,9 +146,9 @@ resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
   # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
   role_ref {
     api_group = "rbac.authorization.k8s.io"
-    kind = "ClusterRole"
+    kind = "Role"
     # This RoleBinding references the Role specified below...
-    name = kubernetes_cluster_role.cluster_role.metadata[0].name
+    name = kubernetes_role.role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
   subject {
@@ -170,7 +158,6 @@ resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
-# SA***/
 
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits

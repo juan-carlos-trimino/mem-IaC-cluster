@@ -4,37 +4,37 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "svc_gateway" {
+variable svc_gateway {
   type = string
 }
-variable "middleware_gateway_basic_auth" {
+variable middleware_gateway_basic_auth {
   type = string
 }
-variable "middleware_dashboard_basic_auth" {
+variable middleware_dashboard_basic_auth {
   type = string
 }
-variable "middleware_redirect_https" {
+variable middleware_redirect_https {
   type = string
 }
-variable "tls_options" {
+variable tls_options {
   type = string
 }
-variable "secret_name" {
+variable secret_name {
   type = string
 }
-variable "issuer_name" {
+variable issuer_name {
   type = string
 }
-variable "host_name" {
+variable host_name {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
 
@@ -49,17 +49,6 @@ resource "kubernetes_manifest" "ingress-route" {
       labels = {
         app = var.app_name
       }
-      # annotations = {
-        # https://cert-manager.io/v0.15-docs/usage/ingress/#supported-annotations
-        # "cert-manager.io/issuer" = var.issuer_name
-        # "acme.cert-manager.io/http01-edit-in-place" = true
-        # "kubernetes.io/ingress.class" = "traefik"
-        # "traefik.ingress.kubernetes.io/router.tls" = true
-        # "traefik.http.routers.traefik.entrypoints" = "websecure"
-        # "traefik.http.routers.traefik.tls.certresolver" = "le"
-        # certmanager.k8s.io/acme-challenge-type: http01
-      #   # traefik.ingress.kubernetes.io/frontend-entry-points: http,https
-      # }
     }
     #
     spec = {
@@ -68,13 +57,11 @@ resource "kubernetes_manifest" "ingress-route" {
       # Traefik handles requests using the web (HTTP) and websecure (HTTPS) entrypoints.
       entryPoints = [  # Listening ports.
         "web",
-        "websecure",
-        # "traefik"
+        "websecure"
       ]
       routes = [
         {
           kind = "Rule"
-          # match = "Host(`169.46.98.220.nip.io`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
           priority = 25
           middlewares = [
@@ -82,10 +69,10 @@ resource "kubernetes_manifest" "ingress-route" {
               name = var.middleware_dashboard_basic_auth
               namespace = var.namespace
             },
-            # {
-            #   name = var.middleware_redirect_https
-            #   namespace = var.namespace
-            # }
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            }
           ]
           services = [
             {
@@ -114,9 +101,9 @@ resource "kubernetes_manifest" "ingress-route" {
           # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
           # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
           # one of these services, the /etc/hosts file does not need to be changed.
-          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
           priority = 24
           # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
           # the request is forwarded to the service.
@@ -126,10 +113,10 @@ resource "kubernetes_manifest" "ingress-route" {
               name = var.middleware_gateway_basic_auth
               namespace = var.namespace
             },
-            # {
-            #   name = var.middleware_redirect_https
-            #   namespace = var.namespace
-            # }
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            }
           ]
           services = [
             {
@@ -175,59 +162,10 @@ resource "kubernetes_manifest" "ingress-route" {
         #     }
         #   ]
         # },
-        /*******
-        {
-          kind = "Rule"
-          match = "Host(`memories.mooo.com`) && (Path(`/video`) || Path(`/api/video`))"
-          priority = 21
-          middlewares = [
-            {
-              name = var.middleware_gateway_basic_auth
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "Service"
-              name = var.svc_gateway
-              namespace = var.namespace
-              port = 80  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        {
-          kind = "Rule"
-          match = "Host(`memories.mooo.com`) && Path(`/rabbitmq`)"
-          priority = 21
-          middlewares = [
-            {
-              name = var.middleware_rabbitmq1
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "Service"
-              name = var.svc_rabbitmq
-              namespace = var.namespace
-              port = 15672  # K8s service.
-              weight = 1
-              passHostHeader = true
-              responseForwarding = {
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        *****/
       ]
+
+
+      
       # When a TLS section is specified, it instructs Traefik that the current router is dedicated
       # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik
       # will terminate the SSL connections (meaning that it will send decrypted data to the

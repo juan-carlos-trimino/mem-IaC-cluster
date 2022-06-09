@@ -25,7 +25,6 @@ tf/cluster_config/*
 # ... and these directories...
 !tf/modules/
 tf/modules/*
-!tf/modules/.gitkeep
 #
 !tf/modules/deployment/
 tf/modules/deployment/*
@@ -62,7 +61,6 @@ tf/modules/rabbitmq-statefulset/*
 #
 !tf/modules/traefik/
 tf/modules/traefik/*
-!tf/modules/traefik/.gitkeep
 !tf/modules/traefik/cert-manager/
 tf/modules/traefik/cert-manager/*
 !tf/modules/traefik/cert-manager/acme-issuer/

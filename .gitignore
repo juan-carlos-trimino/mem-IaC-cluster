@@ -77,7 +77,6 @@ tf/modules/traefik/ingress-route/*
 !tf/modules/traefik/ingress-route/main.tf
 !tf/modules/traefik/middlewares/
 tf/modules/traefik/middlewares/*
-!tf/modules/traefik/middlewares/.gitkeep
 !tf/modules/traefik/middlewares/middleware-dashboard-basic-auth/
 tf/modules/traefik/middlewares/middleware-dashboard-basic-auth/*
 !tf/modules/traefik/middlewares/middleware-dashboard-basic-auth/main.tf

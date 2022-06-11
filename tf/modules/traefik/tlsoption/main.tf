@@ -4,17 +4,17 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
 
-# TLS Options: https://doc.traefik.io/traefik/https/tls/#tls-options
+# See TLS Options: https://doc.traefik.io/traefik/https/tls/#tls-options
 resource "kubernetes_manifest" "tlsoption" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"

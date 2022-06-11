@@ -131,7 +131,7 @@ module "middleware-security-headers" {
   source = "./modules/traefik/middlewares/middleware-security-headers"
   app_name = var.app_name
   namespace = local.namespace
-  service_name = "default"
+  service_name = local.middleware_security_headers
 }
 
 module "middleware-redirect-https" {
@@ -146,7 +146,7 @@ module "tlsstore" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
-  namespace = local.namespace
+  namespace = "default"
   secret_name = local.secret_cert_name
   service_name = local.tls_store
 }
@@ -164,10 +164,12 @@ module "ingress-route" {
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
+  tls_store = local.tls_store
   tls_options = local.tls_options
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_redirect_https = local.middleware_redirect_https
+  middleware_security_headers = local.middleware_security_headers
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name

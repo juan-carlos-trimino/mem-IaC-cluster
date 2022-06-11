@@ -19,7 +19,7 @@ resource "kubernetes_manifest" "middleware" {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name}"
+      name = var.service_name
       namespace = var.namespace
       labels = {
         app = var.app_name

@@ -22,6 +22,12 @@ variable middleware_dashboard_basic_auth {
 variable middleware_redirect_https {
   type = string
 }
+variable middleware_security_headers {
+  type = string
+}
+variable tls_store {
+  type = string
+}
 variable tls_options {
   type = string
 }
@@ -72,6 +78,10 @@ resource "kubernetes_manifest" "ingress-route" {
             {
               name = var.middleware_redirect_https
               namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
             }
           ]
           services = [
@@ -115,6 +125,13 @@ resource "kubernetes_manifest" "ingress-route" {
             },
             {
               name = var.middleware_redirect_https
+              namespace = var.namespace
+            },
+            # See tls below.
+            # Add this Middleware to the IngressRoute, then generate a new report from SSLLabs. The
+            # configuration now reflects the highest standards in TLS security (A+).
+            {
+              name = var.middleware_security_headers
               namespace = var.namespace
             }
           ]
@@ -163,9 +180,6 @@ resource "kubernetes_manifest" "ingress-route" {
         #   ]
         # },
       ]
-
-
-      
       # When a TLS section is specified, it instructs Traefik that the current router is dedicated
       # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik
       # will terminate the SSL connections (meaning that it will send decrypted data to the
@@ -174,7 +188,21 @@ resource "kubernetes_manifest" "ingress-route" {
       # To perform an analysis of the TLS handshake using SSLLabs, go to
       # https://www.ssllabs.com/ssltest/.
       tls = {
-        # Placing a host in the TLS config will indicate a certificate should be created.
+        # Although you can configure Traefik Proxy to use multiple certificatesresolvers,  an
+        # IngressRoute is only ever associated with a single one. That association happens with the
+        # tls.certResolver key.
+        certResolver = "le"
+        # Subject Alternative Name (SAN) is an extension to the X.509 specification that allows you
+        # to secure multiple domains with a single SSL/TLS certificate. You may include any
+        # combination of domain names, subdomains, IP addresses, and local host names up to a
+        # maximum of 250 (vendor specific).
+        #
+        # SAN is a very useful tool to fix the "www" versus the root domain ("no-www") problem. If
+        # you are issued an SSL/TLS certificate for "www.trimino.xyz", it will only work for
+        # "www.trimino.xyz", but not for the root domain "trimino.xyz". By adding a SAN value of
+        # "trimino.xyz" to the certificate fixes this problem. The converse of this works as well;
+        # i.e., you can add a SAN value of "www.trimino.xyz" for a certificate issued just for the
+        # root domain "trimino.xyz".
         domains = [
           {
             main = var.host_name
@@ -183,13 +211,22 @@ resource "kubernetes_manifest" "ingress-route" {
             ]
           }
         ]
-        # certResolver = "le"
         # Use the secret created by cert-manager to terminate the TLS connection.
         # cert-manager will store the created certificate in this secret.
-        secretName = var.secret_name
-        # store = {
-        #   name = var.tls_store
-        # }
+        # secretName = var.secret_name
+        store = {
+          name = var.tls_store
+        }
+        # Traefik provides several TLS options
+        # (https://doc.traefik.io/traefik/https/tls/#tls-options) to configure some parameters of
+        # the TLS connection.
+        #
+        # Before enabling these options, perform an analysis of the TLS connection by using SSLLabs
+        # (https://www.ssllabs.com/ssltest/). The SSLLabs service provides a detailed report of
+        # various aspects of TLS with a color-coded report.
+        #
+        # Then after enabling these options, repeat the analysis and compare the new report with
+        # previous report.
         options = {
           name = var.tls_options
           namespace = var.namespace

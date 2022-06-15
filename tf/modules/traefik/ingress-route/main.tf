@@ -68,8 +68,95 @@ resource "kubernetes_manifest" "ingress-route" {
       routes = [
         {
           kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (Path(`/upload`) || Path(`/api/upload`))"
+          priority = 50
+          middlewares = [
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_gateway
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (Path(`/video`) || Path(`/api/video`))"
+          priority = 50
+          middlewares = [
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_gateway
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/history`)"
+          priority = 50
+          middlewares = [
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_gateway
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          priority = 25
+          priority = 40
           middlewares = [
             {
               name = var.middleware_dashboard_basic_auth
@@ -114,7 +201,7 @@ resource "kubernetes_manifest" "ingress-route" {
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
-          priority = 24
+          priority = 20
           # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
           # the request is forwarded to the service.
           # Middlewares are applied in the same order as their declaration in router.
@@ -149,36 +236,7 @@ resource "kubernetes_manifest" "ingress-route" {
               strategy = "RoundRobin"
             }
           ]
-        },
-        # {
-        #   kind = "Rule"
-        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (Path(`/upload`) || Path(`/api/upload`))"
-        #   priority = 21
-        #   middlewares = [
-        #     {
-        #       name = var.middleware_gateway_basic_auth
-        #       namespace = var.namespace
-        #     },
-        #     {
-        #       name = var.middleware_redirect_https
-        #       namespace = var.namespace
-        #     }
-        #   ]
-        #   services = [
-        #     {
-        #       kind = "Service"
-        #       name = var.svc_gateway
-        #       namespace = var.namespace
-        #       port = 80  # K8s service.
-        #       weight = 1
-        #       passHostHeader = true
-        #       responseForwarding = {
-        #         flushInterval = "100ms"
-        #       }
-        #       strategy = "RoundRobin"
-        #     }
-        #   ]
-        # },
+        }
       ]
       # When a TLS section is specified, it instructs Traefik that the current router is dedicated
       # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik

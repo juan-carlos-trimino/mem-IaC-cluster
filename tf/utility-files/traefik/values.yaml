@@ -74,7 +74,7 @@ additionalArguments:
   # Use the TLS-ALPN-01 challenge to generate and renew ACME certificates by provisioning a TLS
   # certificate. When using the TLS-ALPN-01 challenge, Traefik must be reachable by Let's Encrypt
   # through port 443.
-  - "--certificatesresolvers.le.acme.tlschallenge=true"
+  - "--certificatesresolvers.le.acme.tlschallenge=false"
   - "--certificatesresolvers.le.acme.httpchallenge=false"
   # Use a DNS-01 ACME challenge rather than HTTP-01 challenge; enable a dns challenge named "le".
   # Note: mandatory for wildcard certificate generation.

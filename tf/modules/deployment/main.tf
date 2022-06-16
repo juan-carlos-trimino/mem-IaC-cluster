@@ -118,6 +118,8 @@ variable "service_target_port" {
 Define local variables.
 ***/
 locals {
+  rs_label = "rs-${var.service_name}"
+  svc_label = "svc-${var.service_name}"
   image_tag = (
                 var.image_tag == "" ?
                 "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
@@ -206,27 +208,33 @@ resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
     namespace = var.namespace
-    labels = {
-      app = var.app_name
-      pod = var.service_name
-    }
   }
-  #
+  # The Deployment's specification.
   spec {
+    # The desired number of pods that should be running.
     replicas = var.replicas
+    # The label selector determines the pods the ReplicaSet manages.
     selector {
       match_labels = {
-        pod = var.service_name
+        # It must match the labels in the Pod template.
+        rs_lbl = local.rs_label
       }
     }
-    #
+    # The Pod template.
     template {
       metadata {
+        # Labels attach to the pod.
+        # The pod-template-hash label is added by the Deployment controller to every ReplicaSet
+        # that a Deployment creates or adopts.
         labels = {
-          pod = var.service_name
+          app = var.app_name
+          # It must match the label selector of the ReplicaSet.
+          rs_lbl = local.rs_label
+          # It must match the label selector of the Service.
+          svc_lbl = local.svc_label
         }
       }
-      #
+      # The Pod template's specification.
       spec {
         termination_grace_period_seconds = var.termination_grace_period_seconds
         image_pull_secrets {
@@ -318,8 +326,9 @@ resource "kubernetes_service" "service" {
   }
   #
   spec {
+    # The label selector determines which pods belong to the service.
     selector = {
-      pod = kubernetes_deployment.deployment.metadata[0].labels.pod
+      svc_lbl = local.svc_label
     }
     session_affinity = var.service_session_affinity
     port {

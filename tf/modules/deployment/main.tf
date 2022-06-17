@@ -208,8 +208,9 @@ resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    # Labels attach to the Deployment.
     labels = {
-      app = var.app_name  # Label for Deployment.
+      app = var.app_name
     }
   }
   # The Deployment's specification.
@@ -226,7 +227,7 @@ resource "kubernetes_deployment" "deployment" {
     # The Pod template.
     template {
       metadata {
-        # Labels attach to the pod.
+        # Labels attach to the Pod.
         # The pod-template-hash label is added by the Deployment controller to every ReplicaSet
         # that a Deployment creates or adopts.
         labels = {

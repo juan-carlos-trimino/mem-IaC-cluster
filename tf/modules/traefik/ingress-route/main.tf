@@ -44,6 +44,17 @@ variable service_name {
   type = string
 }
 
+# Useful commands for troubleshooting issuing ACME certificates:
+# --------------------------------------------------------------
+# $ kubectl get all -n memories
+# $ kubectl get all -l=app=memories -n memories
+# $ kubectl get ingressroute -n memories
+# $ kubectl describe ingressroute mem-ingress-route -n memories
+# $ kubectl describe ingressroute mem-ingress-route -A
+# $ kubectl get ingress -A
+#
+# For a discussion on A SINGLE POINT OF FAILURE see "LetsEncrypt Support with the Custom Resource
+# Definition Provider" at https://doc.traefik.io/traefik/v2.0/providers/kubernetes-crd/.
 resource "kubernetes_manifest" "ingress-route" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
@@ -201,6 +212,7 @@ resource "kubernetes_manifest" "ingress-route" {
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
+          # See https://doc.traefik.io/traefik/v2.0/routing/routers/#priority
           priority = 20
           # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
           # the request is forwarded to the service.

@@ -80,6 +80,7 @@ additionalArguments:
   # Note: mandatory for wildcard certificate generation.
   - "--certificatesresolvers.le.acme.dnschallenge=true"
   # DNS provider used.
+  # For supported providers, go https://doc.traefik.io/traefik/https/acme/#providers.
   - "--certificatesresolvers.le.acme.dnschallenge.provider=digitalocean"
   # By default, the provider will verify the TXT DNS challenge record before letting ACME verify.
   # If delayBeforeCheck is greater than zero, this check is delayed for the configured duration in

@@ -208,6 +208,9 @@ resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    labels = {
+      app = var.app_name  # Label for Deployment.
+    }
   }
   # The Deployment's specification.
   spec {

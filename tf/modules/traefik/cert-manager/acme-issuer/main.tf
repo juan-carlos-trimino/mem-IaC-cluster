@@ -100,6 +100,8 @@ resource "kubernetes_manifest" "issuer" {
                 "www.trimino.xyz"
               ]
             }
+            # For supported providers, go
+            # https://cert-manager.io/docs/release-notes/release-notes-0.3/#new-acme-dns01-providers.
             dns01 = {
               digitalocean = {
                 tokenSecretRef = {

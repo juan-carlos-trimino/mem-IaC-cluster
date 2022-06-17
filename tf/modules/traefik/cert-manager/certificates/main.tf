@@ -28,6 +28,7 @@ variable secret_name {
 }
 
 # Create a Let's Encrypt TLS Certificate for the domain and inject it into K8s secrets.
+# To troubleshoot issues with Let's Encrypt, go https://letsdebug.net/.
 # To check the certificate:
 # $ kubectl -n memories describe certificate le-dashboard-cert
 # $ kubectl -n memories delete certificate le-dashboard-cert

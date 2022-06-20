@@ -13,6 +13,18 @@ variable namespace {
 variable svc_gateway {
   type = string
 }
+variable svc_error_page {
+  type = string
+}
+variable middleware_rate_limit {
+  type = string
+}
+variable middleware_error_page {
+  type = string
+}
+variable middleware_compress {
+  type = string
+}
 variable middleware_gateway_basic_auth {
   type = string
 }
@@ -83,6 +95,10 @@ resource "kubernetes_manifest" "ingress-route" {
           priority = 50
           middlewares = [
             {
+              name = var.middleware_rate_limit
+              namespace = var.namespace
+            },
+            {
               name = var.middleware_redirect_https
               namespace = var.namespace
             },
@@ -112,6 +128,14 @@ resource "kubernetes_manifest" "ingress-route" {
           priority = 50
           middlewares = [
             {
+              name = var.middleware_rate_limit
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_compress
+              namespace = var.namespace
+            },
+            {
               name = var.middleware_redirect_https
               namespace = var.namespace
             },
@@ -140,6 +164,10 @@ resource "kubernetes_manifest" "ingress-route" {
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/history`)"
           priority = 50
           middlewares = [
+            {
+              name = var.middleware_rate_limit
+              namespace = var.namespace
+            },
             {
               name = var.middleware_redirect_https
               namespace = var.namespace
@@ -223,6 +251,10 @@ resource "kubernetes_manifest" "ingress-route" {
               namespace = var.namespace
             },
             {
+              name = var.middleware_rate_limit
+              namespace = var.namespace
+            },
+            {
               name = var.middleware_redirect_https
               namespace = var.namespace
             },
@@ -248,7 +280,36 @@ resource "kubernetes_manifest" "ingress-route" {
               strategy = "RoundRobin"
             }
           ]
-        }
+        },
+        # Define a low-priority catchall rule that kicks in only if other rules for defined
+        # services can't handle the request.
+        # {
+        #   kind = "Rule"
+        #   match = "HostRegexp(`{host:.+}`)"
+        #   # Set priority to 1 (lowest) to ensure this rule catches all requests not caught by the
+        #   # other rules.
+        #   priority = 1
+        #   middlewares = [
+        #     {
+        #       name = var.middleware_error_page
+        #       namespace = var.namespace
+        #     }
+        #   ]
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = var.svc_error_page
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # }
       ]
       # When a TLS section is specified, it instructs Traefik that the current router is dedicated
       # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik
@@ -261,7 +322,7 @@ resource "kubernetes_manifest" "ingress-route" {
         # Although you can configure Traefik Proxy to use multiple certificatesresolvers,  an
         # IngressRoute is only ever associated with a single one. That association happens with the
         # tls.certResolver key.
-        certResolver = "le"
+        # certResolver = "le"
         # Subject Alternative Name (SAN) is an extension to the X.509 specification that allows you
         # to secure multiple domains with a single SSL/TLS certificate. You may include any
         # combination of domain names, subdomains, IP addresses, and local host names up to a

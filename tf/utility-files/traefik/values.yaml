@@ -1,41 +1,23 @@
 # For a comprehensive sample file, go to:
 # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
 #
+# Enable Access logs.
+accessLog:
+  filters:
+    statusCodes:
+      - "200"
+      - "400-599"
+    # Keep the access logs when at least one retry has happened.
+    retryAttempts: true
+    # Keep access logs when requests take longer than the specified duration.
+    minDuration: "10ms"
+#
 additionalArguments:
   # For a list of static configuration, go to:
   # https://doc.traefik.io/traefik/reference/static-configuration/cli/
   #
-  # For a list of annotations, go to:
-  # https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations
-  # Enable api/dashboard.
-  - "--api"
-  # Activate dashboard.
-  # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
-  - "--api.dashboard=true"
-  # Activate API directly on the entryPoint named traefik.
-  - "--api.insecure=false"
-  # Traefik will listen to incoming request on the port 80 (http).
-  - "--entrypoints.web.address=:80"
-  # Targeted entry point of the redirection.
-  - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-  ### Using middleware_redirect_https ###
-  # Scheme used for the redirection.
-  # - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-  # Applies a permanent redirection.
-  # - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-  ### Using middleware_redirect_https ###
-  # Traefik will listen to incoming request on the port 443 (https).
-  - "--entrypoints.websecure.address=:443"
-  # Default TLS configuration for the routers linked to the entry point.
-  - "--entrypoints.websecure.http.tls=true"
-  # Default certificate resolver for the routers linked to the entry point.
-  - "--entrypoints.websecure.http.tls.certresolver=le"
-  # Traefik log settings.
-  - "--log=true"
-  # - "--log.level=INFO"
-  - "--log.level=DEBUG"
   # Prometheus metrics exporter type.
-  - "--metrics.prometheus=true"
+  # - "--metrics.prometheus=true"
   # Enable Kubernetes backend with default settings.
   - "--providers.kubernetescrd=true"
   # Enable Kubernetes backend with default settings.
@@ -45,69 +27,92 @@ additionalArguments:
   - "--providers.kubernetesingress.ingressclass=traefik"
   # Enable ping.
   # - "--ping"
-  # Enable ACME (Let's Encrypt).
-  # Email address used for registration.
-  - "--certificatesresolvers.le.acme.email=juancarlos@trimino.com"
-  # File or key used for certificates storage (PV).
+  # - "--ping.entrypoint=web"
+
+
+
+
   - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
-  # CA server to use; the default is staging.
-  # The staging environment will not issue trusted certificates but is used to ensure that the
-  # verification process is working properly before moving to production. Let's Encrypt's
-  # production environment imposes much stricter rate limits (https://letsencrypt.org/docs/rate-limits/),
-  # so to reduce the chance of you hitting those limits it is highly recommended to start by using
-  # the staging environment. To move to production, simply create a new Issuer with the URL set to
-  # https://acme-v02.api.letsencrypt.org/directory.
-  # Production.
-  # - "--certificatesresolvers.le.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
-  # Staging.
-  - "--certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
-  # Certificates' duration in hours.
-  # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
-  - "--certificatesresolvers.le.acme.certificatesDuration=2160"
-  # Preferred chain to use.
-  # If the CA offers multiple certificate chains, prefer the chain with an issuer matching this
-  # Subject Common Name. If no match, the default offered chain will be used.
-  - "--certificatesresolvers.le.acme.preferredchain=ISRG Root X1"
-  # KeyType to use.
-  # Available values: "EC256", "EC384", "RSA2048", "RSA4096", "RSA8192"
-  - "--certificatesresolvers.le.acme.keytype=RSA4096"
-  # Use the TLS-ALPN-01 challenge to generate and renew ACME certificates by provisioning a TLS
-  # certificate. When using the TLS-ALPN-01 challenge, Traefik must be reachable by Let's Encrypt
-  # through port 443.
-  - "--certificatesresolvers.le.acme.tlschallenge=false"
-  - "--certificatesresolvers.le.acme.httpchallenge=false"
-  # Use a DNS-01 ACME challenge rather than HTTP-01 challenge; enable a dns challenge named "le".
-  # Note: mandatory for wildcard certificate generation.
-  - "--certificatesresolvers.le.acme.dnschallenge=true"
-  # DNS provider used.
-  # For supported providers, go https://doc.traefik.io/traefik/https/acme/#providers.
-  - "--certificatesresolvers.le.acme.dnschallenge.provider=digitalocean"
-  # By default, the provider will verify the TXT DNS challenge record before letting ACME verify.
-  # If delayBeforeCheck is greater than zero, this check is delayed for the configured duration in
-  # seconds. Useful if internal networks block external DNS queries.
-  - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=0"
-  # Use the following DNS servers to resolve the FQDN authority:
-  # Cloudflare -> 1.1.1.1,1.0.0.1
-  # Google -> 8.8.8.8,8.8.4.4
-  #
-  # To check DNS propagation:
-  # https://dnschecker.org/
-  # https://www.whatsmydns.net/
-  #
-  # The Authoritative DNS servers store the most recent and accurate information (DNS records) for
-  # a domain and are able to provide the final answers for users’ DNS queries (DNS lookups).
-  # To get the Authoritative DNS servers for a domain:
-  # $ dig +short NS trimino.xyz
-  # $ nslookup -type=NS trimino.xyz
-  - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,1.0.0.1:53,8.8.8.8:53,8.8.4.4:53"
-# Environment variables to be passed to Traefik's binary.
-env:
-  - name: DO_AUTH_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: mem-traefik-provider-secret
-        key: api_auth_token
+
+
+# Enable api.
+# For a list of API enpoints, go to https://doc.traefik.io/traefik/operations/api/#endpoints.
+api:
+  # Activate dashboard.
+  # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
+  dashboard: true
+  insecure: false
+
+
 #
+certificatesResolvers:
+  # Let's Encrypt.
+  le:
+    # Enable ACME.
+    acme:
+      # email address used for registration.
+      email: 'juancarlos@trimino.com'
+      # File or key used for certificates storage (PV).
+      # storage: '/traefik-certs/acme.json'
+      # CA server to use; the default is staging.
+      # The staging environment will not issue trusted certificates but is used to ensure that the
+      # verification process is working properly before moving to production. Let's Encrypt's
+      # production environment imposes much stricter rate limits
+      # (https://letsencrypt.org/docs/rate-limits/), so to reduce the chance of you hitting those
+      # limits it is highly recommended to start by using the staging environment. To move to
+      # production, simply create a new Issuer with the URL set to
+      # https://acme-v02.api.letsencrypt.org/directory.
+      # Production.
+      # caServer: https://acme-v02.api.letsencrypt.org/directory
+      # Staging.
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      # Certificates' duration in hours.
+      # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
+      certificatesDuration: 720  # 30 days.
+      # Preferred chain to use.
+      # If the CA offers multiple certificate chains, prefer the chain with an issuer matching this
+      # Subject Common Name. If no match, the default offered chain will be used.
+      preferredChain: 'ISRG Root X1'
+      # KeyType to use.
+      # Available values: "EC256", "EC384", "RSA2048", "RSA4096", "RSA8192"
+      keyType: 'RSA4096'
+      # Use the TLS-ALPN-01 challenge to generate and renew ACME certificates by provisioning a TLS
+      # certificate. When using the TLS-ALPN-01 challenge, Traefik must be reachable by Let's
+      # Encrypt through port 443.
+      # tlsChallenge:
+      # httpChallenge:
+      # Use a DNS-01 ACME challenge rather than HTTP-01 challenge; enable a dns challenge named
+      # "le".
+      # Note: mandatory for wildcard certificate generation.
+      dnsChallenge:
+        # DNS provider used.
+        # For supported providers, go to https://doc.traefik.io/traefik/https/acme/#providers.
+        provider: digitalocean
+        # By default, the provider will verify the TXT DNS challenge record before letting ACME
+        # verify. If delayBeforeCheck is greater than zero, this check is delayed for the
+        # configured duration in seconds. Useful if internal networks block external DNS queries.
+        delayBeforeCheck: 0
+        # Use the following DNS servers to resolve the FQDN authority:
+        # Cloudflare -> 1.1.1.1,1.0.0.1
+        # Google -> 8.8.8.8,8.8.4.4
+        #
+        # To check DNS propagation:
+        # https://dnschecker.org/
+        # https://www.whatsmydns.net/
+        #
+        # The Authoritative DNS servers store the most recent and accurate information (DNS
+        # records) for a domain and are able to provide the final answers for users' DNS queries
+        # (DNS lookups).
+        # To get the Authoritative DNS servers for a domain:
+        # $ dig +short NS trimino.xyz
+        # $ nslookup -type=NS trimino.xyz
+        resolvers:
+          - '1.1.1.1:53'
+          - '1.0.0.1:53'
+          - '8.8.8.8:53'
+          - '8.8.4.4:53'
+
+
 deployment:
   enabled: true
   replicas: 1
@@ -120,6 +125,37 @@ deployment:
   #     volumeMounts:
   #       - name: traefik-certs
   #         mountPath: /traefik-certs
+# For a list of annotations, go to
+# https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations
+entryPoints:
+  # Traefik will listen to incoming request on the port 80 (http).
+  web:
+    address: ':80'
+    # Targeted entry point of the redirection.
+    http:
+      redirections:
+        entrypoint:
+          to: websecure
+          # Scheme used for the redirection.
+          scheme: https
+          # Apply a permanent redirection.
+          permanent: true
+  # Traefik will listen to incoming request on the port 443 (https).
+  websecure:
+    address: ':443'
+    http:
+      # Default TLS configuration for the routers linked to the entry point.
+      tls:
+        # Default certificate resolver for the routers linked to the entry point.
+        certResolver: le
+# Environment variables to be passed to Traefik's binary.
+env:
+  - name: DO_AUTH_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: mem-traefik-provider-secret
+        key: api_auth_token
+#
 # Set Traefik as the default Ingress Controller (as per Kubernetes 1.19+ changes).
 ingressClass:
   enabled: true
@@ -180,6 +216,16 @@ ports:
       enabled: true
       # (Optional) Set a default certificate resolver.
       certResolver: digitalocean
+# Prometheus Metrics.
+# metrics:
+#   prometheus:
+#     # Prometheus metrics buckets have been enabled for the different time series in seconds.
+#     buckets:
+#       - 0.1
+#       - 0.3
+#       - 1.2
+#       - 5.0
+#       - 10.0
 # Whether Role Based Access Control objects like roles and rolebindings should be created.
 rbac:
   enabled: true

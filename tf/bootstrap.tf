@@ -20,6 +20,9 @@ locals {
   ###############
   # Middlewares #
   ###############
+  middleware_compress = "mem-mw-compress"
+  middleware_rate_limit = "mem-mw-rate-limit"
+  middleware_error_page = "mem-mw-error-page"
   middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
   middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
@@ -29,6 +32,7 @@ locals {
   ####################
   # Name of Services #
   ####################
+  svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
   svc_kibana = "mem-kibana"
@@ -44,6 +48,7 @@ locals {
   # DNS translates hostnames to IP addresses; the container name is the hostname. When using Docker
   # and Docker Compose, DNS works automatically.
   # In K8s, a service makes the deployment accessible by other containers via DNS.
+  svc_dns_error_page = "${local.svc_error_page}.${local.namespace}.svc.cluster.local"
   svc_dns_gateway = "${local.svc_gateway}.${local.namespace}.svc.cluster.local"
   svc_dns_history = "${local.svc_history}.${local.namespace}.svc.cluster.local"
   svc_dns_metadata = "${local.svc_metadata}.${local.namespace}.svc.cluster.local"
@@ -126,6 +131,33 @@ module "middleware-gateway-basic-auth" {
   service_name = local.middleware_gateway_basic_auth
 }
 
+module "middleware-compress" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-compress"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_compress
+}
+
+module "middleware-rate-limit" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-rate-limit"
+  app_name = var.app_name
+  namespace = local.namespace
+  average = 6
+  period = "1m"
+  burst = 12
+  service_name = local.middleware_rate_limit
+}
+
+module "middleware-error-page" {
+  count = local.helm_release_traefik ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-error-page"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_error_page
+}
+
 module "middleware-security-headers" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-security-headers"
@@ -166,10 +198,14 @@ module "ingress-route" {
   namespace = local.namespace
   tls_store = local.tls_store
   tls_options = local.tls_options
+  middleware_rate_limit = local.middleware_rate_limit
+  middleware_error_page = local.middleware_error_page
+  middleware_compress = local.middleware_compress
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_redirect_https = local.middleware_redirect_https
   middleware_security_headers = local.middleware_security_headers
+  svc_error_page = local.svc_error_page
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name
@@ -178,6 +214,27 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
+
+
+
+
+
+
+
+# module "error-page" {
+#   count = local.helm_release_traefik ? 0 : 1
+#   source = "./modules/traefik/error-page"
+#   app_name = var.app_name
+#   # app_version = var.app_version
+#   image_tag = "guillaumebriday/traefik-custom-error-pages"
+#   namespace = local.namespace
+#   replicas = 1
+#   service_name = local.svc_error_page
+# }
+
+
+
+
 
 ################
 # cert manager #

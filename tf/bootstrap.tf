@@ -149,7 +149,7 @@ module "middleware-rate-limit" {
   burst = 12
   service_name = local.middleware_rate_limit
 }
-
+/***
 module "middleware-error-page" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-error-page"
@@ -157,7 +157,7 @@ module "middleware-error-page" {
   namespace = local.namespace
   service_name = local.middleware_error_page
 }
-
+***/
 module "middleware-security-headers" {
   count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-security-headers"
@@ -216,11 +216,6 @@ module "ingress-route" {
 }
 
 
-
-
-
-
-
 # module "error-page" {
 #   count = local.helm_release_traefik ? 0 : 1
 #   source = "./modules/traefik/error-page"
@@ -231,9 +226,6 @@ module "ingress-route" {
 #   replicas = 1
 #   service_name = local.svc_error_page
 # }
-
-
-
 
 
 ################

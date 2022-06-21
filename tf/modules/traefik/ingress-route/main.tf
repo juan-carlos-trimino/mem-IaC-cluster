@@ -234,6 +234,46 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/ping`)"
+          priority = 40
+          middlewares = [
+            {
+              name = var.middleware_dashboard_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_redirect_https
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "TraefikService"
+              # If you enable the API, a new special service named api@internal is created and can
+              # then be referenced in a router.
+              name = "ping@internal"
+              port = 9000  # K8s service.
+              # (default 1) A weight used by the weighted round-robin strategy (WRR).
+              weight = 1
+              # (default true) PassHostHeader controls whether to leave the request's Host Header
+              # as it was before it reached the proxy, or whether to let the proxy set it to the
+              # destination (backend) host.
+              passHostHeader = true
+              responseForwarding = {
+                # (default 100ms) Interval between flushes of the buffered response body to the
+                # client.
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
           # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
           # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
           # one of these services, the /etc/hosts file does not need to be changed.

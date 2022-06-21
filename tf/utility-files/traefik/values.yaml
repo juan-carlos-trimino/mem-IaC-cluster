@@ -18,23 +18,8 @@ additionalArguments:
   #
   # Prometheus metrics exporter type.
   # - "--metrics.prometheus=true"
-  # Enable Kubernetes backend with default settings.
-  - "--providers.kubernetescrd=true"
-  # Enable Kubernetes backend with default settings.
-  - "--providers.kubernetesingress=true"
-  # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for. See
-  # https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik.
-  - "--providers.kubernetesingress.ingressclass=traefik"
-  # Enable ping.
-  # - "--ping"
-  # - "--ping.entrypoint=web"
-
-
-
-
+  # Match the path to persistence.
   - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
-
-
 # Enable api.
 # For a list of API enpoints, go to https://doc.traefik.io/traefik/operations/api/#endpoints.
 api:
@@ -42,8 +27,6 @@ api:
   # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
   dashboard: true
   insecure: false
-
-
 #
 certificatesResolvers:
   # Let's Encrypt.
@@ -52,8 +35,6 @@ certificatesResolvers:
     acme:
       # email address used for registration.
       email: 'juancarlos@trimino.com'
-      # File or key used for certificates storage (PV).
-      # storage: '/traefik-certs/acme.json'
       # CA server to use; the default is staging.
       # The staging environment will not issue trusted certificates but is used to ensure that the
       # verification process is working properly before moving to production. Let's Encrypt's
@@ -111,8 +92,8 @@ certificatesResolvers:
           - '1.0.0.1:53'
           - '8.8.8.8:53'
           - '8.8.4.4:53'
-
-
+      # Match the path to persistence.
+      # storage: '/traefik-certs/acme.json'
 deployment:
   enabled: true
   replicas: 1
@@ -178,6 +159,8 @@ logs:
     # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL,
     # ERROR, WARN, and INFO.
     level: ERROR
+# Enable Healthcheck.
+ping: {}
 # Persistent Storage.
 persistence:
   enabled: true
@@ -226,6 +209,17 @@ ports:
 #       - 1.2
 #       - 5.0
 #       - 10.0
+# Configure providers.
+providers:
+  # Enable Kubernetes backend with default settings.
+  kubernetes.CRD:
+    enabled: true
+  # Enable Kubernetes backend with default settings.
+  kubernetesIngress:
+    enabled: true
+    # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for. See
+    # https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik.
+    ingressClass: traefik
 # Whether Role Based Access Control objects like roles and rolebindings should be created.
 rbac:
   enabled: true

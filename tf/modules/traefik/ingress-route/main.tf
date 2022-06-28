@@ -359,10 +359,9 @@ resource "kubernetes_manifest" "ingress-route" {
       # To perform an analysis of the TLS handshake using SSLLabs, go to
       # https://www.ssllabs.com/ssltest/.
       tls = {
-        # Although you can configure Traefik Proxy to use multiple certificatesresolvers,  an
-        # IngressRoute is only ever associated with a single one. That association happens with the
-        # tls.certResolver key.
-        # certResolver = "le"
+        # Although you can configure Traefik Proxy to use multiple certificatesResolvers,  an
+        # IngressRoute is only ever associated with a single one.
+        certResolver = "le"
         # Subject Alternative Name (SAN) is an extension to the X.509 specification that allows you
         # to secure multiple domains with a single SSL/TLS certificate. You may include any
         # combination of domain names, subdomains, IP addresses, and local host names up to a
@@ -383,8 +382,8 @@ resource "kubernetes_manifest" "ingress-route" {
           }
         ]
         # Use the secret created by cert-manager to terminate the TLS connection.
-        # cert-manager will store the created certificate in this secret.
-        # secretName = var.secret_name
+        # Define the secret name used to store the certificate (in the IngressRoute namespace).
+        secretName = var.secret_name
         store = {
           name = var.tls_store
         }

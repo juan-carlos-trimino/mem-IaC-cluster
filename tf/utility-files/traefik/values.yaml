@@ -150,6 +150,35 @@ ingressRoute:
     annotations: {}
     # Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels).
     labels: {}
+# Liveness and readiness probes.
+livenessProbe:
+  httpGet:
+    path: /ping
+    port: 9000
+    scheme: HTTP
+  # How long to wait after the container starts before beginning the probe.
+  initialDelaySeconds: 5
+  # The frequency of the checks.
+  periodSeconds: 10
+  # How long to wait for the probe to finish. If this time is exceeded, then K8s assumes that the
+  # probe failed.
+  timeoutSeconds: 2
+  # The minimum consecutive successes for the probe to be considered successful after it has
+  # failed.
+  successThreshold: 1
+  # The minimum consecutive failures for the probe to be considered failed after it has succeeded.
+  failureThreshold: 3
+#
+readinessProbe:
+  httpGet:
+    path: /ping
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 2
+  successThreshold: 1
+  failureThreshold: 1
 #
 logs:
   access:

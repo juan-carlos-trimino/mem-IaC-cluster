@@ -44,9 +44,9 @@ certificatesResolvers:
       # production, simply create a new Issuer with the URL set to
       # https://acme-v02.api.letsencrypt.org/directory.
       # Production.
-      # caServer: https://acme-v02.api.letsencrypt.org/directory
+      caServer: https://acme-v02.api.letsencrypt.org/directory
       # Staging.
-      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
       # Certificates' duration in hours.
       # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
       certificatesDuration: 720  # 30 days.

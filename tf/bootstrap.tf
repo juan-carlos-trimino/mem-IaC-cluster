@@ -1,5 +1,4 @@
 locals {
-  helm_release_traefik = false
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
@@ -100,7 +99,7 @@ module "traefik" {
 }
 
 module "middleware-dashboard-basic-auth" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -111,7 +110,7 @@ module "middleware-dashboard-basic-auth" {
 }
 
 module "middleware-rabbitmq" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -122,7 +121,7 @@ module "middleware-rabbitmq" {
 }
 
 module "middleware-gateway-basic-auth" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -132,7 +131,7 @@ module "middleware-gateway-basic-auth" {
 }
 
 module "middleware-compress" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-compress"
   app_name = var.app_name
   namespace = local.namespace
@@ -140,7 +139,7 @@ module "middleware-compress" {
 }
 
 module "middleware-rate-limit" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-rate-limit"
   app_name = var.app_name
   namespace = local.namespace
@@ -151,7 +150,6 @@ module "middleware-rate-limit" {
 }
 /***
 module "middleware-error-page" {
-  count = local.helm_release_traefik ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-error-page"
   app_name = var.app_name
   namespace = local.namespace
@@ -159,7 +157,7 @@ module "middleware-error-page" {
 }
 ***/
 module "middleware-security-headers" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-security-headers"
   app_name = var.app_name
   namespace = local.namespace
@@ -167,7 +165,7 @@ module "middleware-security-headers" {
 }
 
 module "middleware-redirect-https" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/middlewares/middleware-redirect-https"
   app_name = var.app_name
   namespace = local.namespace
@@ -175,7 +173,7 @@ module "middleware-redirect-https" {
 }
 
 module "tlsstore" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = "default"
@@ -184,7 +182,7 @@ module "tlsstore" {
 }
 
 module "tlsoption" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/tlsoption"
   app_name = var.app_name
   namespace = local.namespace
@@ -192,7 +190,7 @@ module "tlsoption" {
 }
 
 module "ingress-route" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.traefik]
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
@@ -215,9 +213,7 @@ module "ingress-route" {
   service_name = local.ingress_route
 }
 
-
 # module "error-page" {
-#   count = local.helm_release_traefik ? 0 : 1
 #   source = "./modules/traefik/error-page"
 #   app_name = var.app_name
 #   # app_version = var.app_version
@@ -226,7 +222,6 @@ module "ingress-route" {
 #   replicas = 1
 #   service_name = local.svc_error_page
 # }
-
 
 ################
 # cert manager #
@@ -243,7 +238,7 @@ module "cert-manager" {
 }
 
 module "acme-issuer" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.cert-manager]
   source = "./modules/traefik/cert-manager/acme-issuer"
   app_name = var.app_name
   namespace = local.namespace
@@ -251,14 +246,14 @@ module "acme-issuer" {
   acme_email = "juancarlos@trimino.com"
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
 }
 
 module "certificate" {
-  count = local.helm_release_traefik ? 0 : 1
+  depends_on = [module.cert-manager]
   source = "./modules/traefik/cert-manager/certificates"
   app_name = var.app_name
   namespace = local.namespace

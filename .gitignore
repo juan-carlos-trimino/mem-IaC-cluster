@@ -97,7 +97,7 @@ tf/modules/traefik/middlewares/middleware-rabbitmq-basic-auth/*
 !tf/modules/traefik/middlewares/middleware-rabbitmq-basic-auth/main.tf
 !tf/modules/traefik/middlewares/middleware-rate-limit/
 tf/modules/traefik/middlewares/middleware-rate-limit/*
-!tf/modules/traefik/middlewares/middleware-compress/main.tf
+!tf/modules/traefik/middlewares/middleware-rate-limit/main.tf
 !tf/modules/traefik/middlewares/middleware-redirect-https/
 tf/modules/traefik/middlewares/middleware-redirect-https/*
 !tf/modules/traefik/middlewares/middleware-redirect-https/main.tf

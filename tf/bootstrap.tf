@@ -1,3 +1,7 @@
+# $ terraform init
+# $ terraform apply -var="app_version=1.0.0" -auto-approve
+# $ terraform apply -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
+# $ terraform destroy -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
@@ -99,7 +103,7 @@ module "traefik" {
 }
 
 module "middleware-dashboard-basic-auth" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -110,7 +114,7 @@ module "middleware-dashboard-basic-auth" {
 }
 
 module "middleware-rabbitmq" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -121,7 +125,7 @@ module "middleware-rabbitmq" {
 }
 
 module "middleware-gateway-basic-auth" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
@@ -131,7 +135,7 @@ module "middleware-gateway-basic-auth" {
 }
 
 module "middleware-compress" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-compress"
   app_name = var.app_name
   namespace = local.namespace
@@ -139,7 +143,7 @@ module "middleware-compress" {
 }
 
 module "middleware-rate-limit" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rate-limit"
   app_name = var.app_name
   namespace = local.namespace
@@ -157,7 +161,7 @@ module "middleware-error-page" {
 }
 ***/
 module "middleware-security-headers" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-security-headers"
   app_name = var.app_name
   namespace = local.namespace
@@ -165,7 +169,7 @@ module "middleware-security-headers" {
 }
 
 module "middleware-redirect-https" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-redirect-https"
   app_name = var.app_name
   namespace = local.namespace
@@ -173,7 +177,7 @@ module "middleware-redirect-https" {
 }
 
 module "tlsstore" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = "default"
@@ -182,7 +186,7 @@ module "tlsstore" {
 }
 
 module "tlsoption" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/tlsoption"
   app_name = var.app_name
   namespace = local.namespace
@@ -190,7 +194,7 @@ module "tlsoption" {
 }
 
 module "ingress-route" {
-  depends_on = [module.traefik]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
@@ -238,12 +242,12 @@ module "cert-manager" {
 }
 
 module "acme-issuer" {
-  depends_on = [module.cert-manager]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/cert-manager/acme-issuer"
   app_name = var.app_name
   namespace = local.namespace
   issuer_name = local.issuer_name
-  acme_email = "juancarlos@trimino.com"
+  acme_email = var.traefik_le_email
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
   # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -253,7 +257,7 @@ module "acme-issuer" {
 }
 
 module "certificate" {
-  depends_on = [module.cert-manager]
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/cert-manager/certificates"
   app_name = var.app_name
   namespace = local.namespace
@@ -274,6 +278,7 @@ module "certificate" {
 # /*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/mongodb-deploy"
   app_name = var.app_name
   app_version = var.app_version
@@ -381,6 +386,7 @@ module "mem-rabbitmq" {
 # /*** rabbitmq - statefulset
 # StatefulSet.
 module "mem-rabbitmq" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/rabbitmq-statefulset"
   app_name = var.app_name
   app_version = var.app_version
@@ -430,6 +436,7 @@ module "mem-rabbitmq" {
 ###############
 # /*** app
 module "mem-gateway" {
+  count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/deployment"
   dir_name = "../../${local.svc_gateway}/gateway"
@@ -469,6 +476,7 @@ module "mem-gateway" {
 }
 
 module "mem-history" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/deployment"
   dir_name = "../../${local.svc_history}/history"
   app_name = var.app_name
@@ -502,6 +510,7 @@ module "mem-history" {
 }
 
 module "mem-metadata" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/deployment"
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
@@ -535,6 +544,7 @@ module "mem-metadata" {
 }
 
 module "mem-video-storage" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/deployment"
   dir_name = "../../${local.svc_video_storage}/video-storage"
   app_name = var.app_name
@@ -566,6 +576,7 @@ module "mem-video-storage" {
 }
 
 module "mem-video-streaming" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/deployment"
   dir_name = "../../${local.svc_video_streaming}/video-streaming"
   app_name = var.app_name
@@ -599,6 +610,7 @@ module "mem-video-streaming" {
 }
 
 module "mem-video-upload" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/deployment"
   dir_name = "../../${local.svc_video_upload}/video-upload"
   app_name = var.app_name

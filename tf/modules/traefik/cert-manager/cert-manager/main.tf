@@ -23,7 +23,7 @@ variable chart_repo {
 variable chart_version {
   type = string
   description = "Cert Manager Helm version."
-  default = "1.8.0"
+  default = "1.8.2"
 }
 
 # cert-manager is a powerful and extensible X.509 certificate controller for Kubernetes and

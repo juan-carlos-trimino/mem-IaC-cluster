@@ -1,37 +1,41 @@
-###########
-# traefik #
-###########
-# The hosts file is used to map domain names (hostnames) to IP addresses. It is a plain-text file
-# used by all operating systems including, Linux, Windows, and macOS. The hosts file has priority
-# over DNS. When typing in the domain name of a web site to visit, the domain name must be
-# translated into its corresponding IP address. The operating system first checks its hosts file
-# for the corresponding domain, and if there is no entry for the domain, it will query the
-# configured DNS servers to resolve the specified domain name. This affects only the computer on
-# which the change is made, rather than how the domain is resolved worldwide. Entries in the hosts
-# file have the following format:
-#   IPAddress DomainName [DomainAliases]
-# The IP address and the domain names should be separated by at least one space or tab. The lines
-# starting with '#' are comments and are ignored.
-# On Linux, the full path to the file is /etc/hosts.
-# On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
-# kubectl get pod,middleware,ingressroute,svc -n memories
-# kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
-# kubectl get all -l "app=memories" -n memories
-# /***CCC
+# $ terraform init
+# $ terraform apply -var="app_version=1.0.0" -auto-approve
+# $ terraform apply -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
+# $ terraform destroy -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
   db_metadata = "metadata"
   db_history = "history"
+  ###########
+  # Traefik #
+  ###########
+  secret_cert_name = "le-secret-cert"
+  # dashboard_secret_cert_name = "le-dashboard-secret-cert"
+  issuer_name = "le-acme-issuer"
+  tls_store = "default"
+  tls_options = "tlsoptions"
+  ##################
+  # Ingress Routes #
+  ##################
+  ingress_route = "mem-ingress-route"
+  ingress_route_dashboard = "mem-ingress-route-dashboard"
   ###############
   # Middlewares #
   ###############
-  middleware_dashboard = "mem-middleware-dashboard"
-  middleware_rabbitmq = "mem-middleware-rabbitmq"
-  middleware_gateway = "mem-middleware-gateway"
+  middleware_compress = "mem-mw-compress"
+  middleware_rate_limit = "mem-mw-rate-limit"
+  middleware_error_page = "mem-mw-error-page"
+  middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
+  middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
+  middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
+  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
+  middleware_security_headers = "mem-mw-security-headers"
+  middleware_redirect_https = "mem-mw-redirect-https"
   ####################
   # Name of Services #
   ####################
+  svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
   svc_kibana = "mem-kibana"
@@ -47,6 +51,7 @@ locals {
   # DNS translates hostnames to IP addresses; the container name is the hostname. When using Docker
   # and Docker Compose, DNS works automatically.
   # In K8s, a service makes the deployment accessible by other containers via DNS.
+  svc_dns_error_page = "${local.svc_error_page}.${local.namespace}.svc.cluster.local"
   svc_dns_gateway = "${local.svc_gateway}.${local.namespace}.svc.cluster.local"
   svc_dns_history = "${local.svc_history}.${local.namespace}.svc.cluster.local"
   svc_dns_metadata = "${local.svc_metadata}.${local.namespace}.svc.cluster.local"
@@ -69,75 +74,211 @@ locals {
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
+###########
+# traefik #
+###########
+# /*** traefik
+# The hosts file is used to map domain names (hostnames) to IP addresses. It is a plain-text file
+# used by all operating systems including, Linux, Windows, and macOS. The hosts file has priority
+# over DNS. When typing in the domain name of a web site to visit, the domain name must be
+# translated into its corresponding IP address. The operating system first checks its hosts file
+# for the corresponding domain, and if there is no entry for the domain, it will query the
+# configured DNS servers to resolve the specified domain name. This affects only the computer on
+# which the change is made, rather than how the domain is resolved worldwide. Entries in the hosts
+# file have the following format:
+#   IPAddress DomainName [DomainAliases]
+# The IP address and the domain names should be separated by at least one space or tab. The lines
+# starting with '#' are comments and are ignored.
+# On Linux, the full path to the file is /etc/hosts.
+# On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
+# kubectl get pod,middleware,ingressroute,svc -n memories
+# kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
+# kubectl get all -l "app=memories" -n memories
 module "traefik" {
   source = "./modules/traefik/traefik"
   app_name = var.app_name
   namespace = local.namespace
+  api_auth_token = var.traefik_dns_api_token
   service_name = "mem-traefik"
 }
 
-module "middleware-dashboard" {
-  source = "./modules/traefik/middlewares/middleware-dashboard"
+module "middleware-dashboard-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   # While the dashboard in itself is read-only, it is good practice to secure access to it.
   traefik_dashboard_username = var.traefik_dashboard_username
   traefik_dashboard_password = var.traefik_dashboard_password
-  service_name = local.middleware_dashboard
+  service_name = local.middleware_dashboard_basic_auth
 }
 
 module "middleware-rabbitmq" {
-  source = "./modules/traefik/middlewares/middleware-rabbitmq"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   traefik_rabbitmq_username = var.traefik_rabbitmq_username
   traefik_rabbitmq_password = var.traefik_rabbitmq_password
-  service_name = local.middleware_rabbitmq
+  service_name1 = local.middleware_rabbitmq1
+  service_name2 = local.middleware_rabbitmq2
 }
 
-module "middleware-gateway" {
-  source = "./modules/traefik/middlewares/middleware-gateway"
+module "middleware-gateway-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   traefik_gateway_username = var.traefik_gateway_username
   traefik_gateway_password = var.traefik_gateway_password
-  service_name = local.middleware_gateway
+  service_name = local.middleware_gateway_basic_auth
+}
+
+module "middleware-compress" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-compress"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_compress
+}
+
+module "middleware-rate-limit" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-rate-limit"
+  app_name = var.app_name
+  namespace = local.namespace
+  average = 6
+  period = "1m"
+  burst = 12
+  service_name = local.middleware_rate_limit
+}
+/***
+module "middleware-error-page" {
+  source = "./modules/traefik/middlewares/middleware-error-page"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_error_page
+}
+***/
+module "middleware-security-headers" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-security-headers"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_security_headers
+}
+
+module "middleware-redirect-https" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-redirect-https"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.middleware_redirect_https
+}
+
+module "tlsstore" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/tlsstore"
+  app_name = var.app_name
+  namespace = "default"
+  secret_name = local.secret_cert_name
+  service_name = local.tls_store
+}
+
+module "tlsoption" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/tlsoption"
+  app_name = var.app_name
+  namespace = local.namespace
+  service_name = local.tls_options
 }
 
 module "ingress-route" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/ingress-route"
   app_name = var.app_name
   namespace = local.namespace
-  middleware_dashboard = local.middleware_dashboard
-  middleware_rabbitmq = local.middleware_rabbitmq
-  svc_rabbitmq = local.svc_rabbitmq
-  middleware_gateway = local.middleware_gateway
+  tls_store = local.tls_store
+  tls_options = local.tls_options
+  middleware_rate_limit = local.middleware_rate_limit
+  middleware_error_page = local.middleware_error_page
+  middleware_compress = local.middleware_compress
+  middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
+  middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
+  middleware_redirect_https = local.middleware_redirect_https
+  middleware_security_headers = local.middleware_security_headers
+  svc_error_page = local.svc_error_page
   svc_gateway = local.svc_gateway
-  service_name = "mem-ingress-route"
+  secret_name = local.secret_cert_name
+  issuer_name = local.issuer_name
+  # host_name = "169.46.98.220.nip.io"
+  # host_name = "memories.mooo.com"
+  host_name = "trimino.xyz"
+  service_name = local.ingress_route
 }
-# CCC***/
 
-/***
-module "issuers" {
-  depends_on = [module.cert-manager]
-  source = "./modules/cert-manager/issuers"
+# module "error-page" {
+#   source = "./modules/traefik/error-page"
+#   app_name = var.app_name
+#   # app_version = var.app_version
+#   image_tag = "guillaumebriday/traefik-custom-error-pages"
+#   namespace = local.namespace
+#   replicas = 1
+#   service_name = local.svc_error_page
+# }
+
+################
+# cert manager #
+################
+# By default, Traefik is able to handle certificates in the cluster, but only if there is a single
+# pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
+# point of failure in the infrastructure.
+#
+# To solve this issue, use cert-manager to store and issue the certificates.
+module "cert-manager" {
+  source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
+  service_name = "mem-cert-manager"
 }
 
-module "certificates" {
-  depends_on = [module.issuers]
-  source = "./modules/cert-manager/certificates"
+module "acme-issuer" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/cert-manager/acme-issuer"
+  app_name = var.app_name
   namespace = local.namespace
+  issuer_name = local.issuer_name
+  acme_email = var.traefik_le_email
+  # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
+  # production (letsencrypt-prod).
+  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  # Digital Ocean token requires base64 encoding.
+  traefik_dns_api_token = var.traefik_dns_api_token
 }
-***/
 
+module "certificate" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/cert-manager/certificates"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.issuer_name
+  certificate_name = "le-cert"
+  # The A record maps a name to one or more IP addresses when the IP are known and stable.
+  # The CNAME record maps a name to another name. It should only be used when there are no other
+  # records on that name.
+  # common_name = "trimino.xyz"
+  dns_names = ["trimino.xyz", "www.trimino.xyz"]
+  secret_name = local.secret_cert_name
+}
+# traefik
 
 ###########
 # mongodb #
 ###########
-# /***CCC
+# /*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/mongodb-deploy"
   app_name = var.app_name
   app_version = var.app_version
@@ -158,8 +299,9 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# CCC***/
-/***
+# ***/  # mongodb - deployment
+
+/*** mongodb - statefulset
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -204,36 +346,47 @@ module "mem-mongodb" {
     MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
   }
 }
-***/
+***/  # mongodb - statefulset
 
 ############
 # rabbitmq #
 ############
-/***
+/*** rabbitmq - deployment
 # Deployment.
 module "mem-rabbitmq" {
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/rabbitmq-deploy"
-  dir_name = "../../mem-rabbitmq/rabbitmq"
+  # dir_name = "../../${local.svc_rabbitmq}/rabbitmq"
   app_name = var.app_name
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
-  # image_tag = "rabbitmq:3.9.7-management-alpine"
+  image_tag = "rabbitmq:3.9.15-management-alpine"
+  imagePullPolicy = "IfNotPresent"
   # image_tag = "rabbitmq:3.9.7-alpine"
+  path_rabbitmq_files = "./utility-files/rabbitmq"
   namespace = local.namespace
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
-  cr_login_server = local.cr_login_server
-  cr_username = var.cr_username
-  cr_password = var.cr_password
-  service_name = "mem-rabbitmq"
-  service_port = 5672
-  service_target_port = 5672
+  rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
+  rabbitmq_default_pass = var.rabbitmq_default_pass
+  rabbitmq_default_user = var.rabbitmq_default_user
+  # cr_login_server = local.cr_login_server
+  # cr_username = var.cr_username
+  # cr_password = var.cr_password
+  amqp_service_port = 5672
+  amqp_service_target_port = 5672
+  # HTTP API clients, management UI, and rabbitmqadmin, without and with TLS (only if the
+  # management plugin is enabled).
+  mgmt_service_port = 15672
+  mgmt_service_target_port = 15672
+  service_name = local.svc_rabbitmq
 }
-***/
-# /***CCC
+***/  # rabbitmq - deployment
+
+# /*** rabbitmq - statefulset
 # StatefulSet.
 module "mem-rabbitmq" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/rabbitmq-statefulset"
   app_name = var.app_name
   app_version = var.app_version
@@ -251,7 +404,7 @@ module "mem-rabbitmq" {
   # Because several features (e.g. quorum queues, client tracking in MQTT) require a consensus
   # between cluster members, odd numbers of cluster nodes are highly recommended: 1, 3, 5, 7
   # and so on.
-  replicas = 3
+  replicas = 1
   # Limits and request for CPU resources are measured in millicores. If the container needs one full
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
@@ -276,15 +429,16 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-# CCC***/
+# ***/  # rabbitmq - statefulset
 
 ###############
 # Application #
 ###############
-# /***CCC
+# /*** app
 module "mem-gateway" {
+  count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
-  source = "./modules/pri-microservice"
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_gateway}/gateway"
   app_name = var.app_name
   app_version = var.app_version
@@ -322,11 +476,12 @@ module "mem-gateway" {
 }
 
 module "mem-history" {
-  source = "./modules/pri-microservice"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_history}/history"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -355,11 +510,12 @@ module "mem-history" {
 }
 
 module "mem-metadata" {
-  source = "./modules/pri-microservice"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "50Mi"
   qos_limits_memory = "100Mi"
@@ -388,11 +544,12 @@ module "mem-metadata" {
 }
 
 module "mem-video-storage" {
-  source = "./modules/pri-microservice"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_storage}/video-storage"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_limits_cpu = "300m"
   qos_limits_memory = "500Mi"
@@ -419,12 +576,13 @@ module "mem-video-storage" {
 }
 
 module "mem-video-streaming" {
-  source = "./modules/pri-microservice"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_streaming}/video-streaming"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
-  replicas = 3
+  replicas = 1
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
   cr_login_server = local.cr_login_server
@@ -452,11 +610,12 @@ module "mem-video-streaming" {
 }
 
 module "mem-video-upload" {
-  source = "./modules/pri-microservice"
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/deployment"
   dir_name = "../../${local.svc_video_upload}/video-upload"
   app_name = var.app_name
   app_version = var.app_version
-  replicas = 3
+  replicas = 1
   namespace = local.namespace
   qos_requests_memory = "150Mi"
   qos_limits_memory = "300Mi"
@@ -483,6 +642,4 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-# CCC***/
-
-
+# ***/  # app

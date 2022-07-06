@@ -68,7 +68,9 @@ allowHostIPC: false
 # make the container's filesystem read-only, you will probably want to mount a volume in every
 # directory the app writes.
 readOnlyRootFilesystem: false
+# To get a capabilities list, go to:
 # https://man7.org/linux/man-pages/man7/capabilities.7.html
+# To see a list of runtime privilege and Linux capabilities, go to:
 # https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities
 # Provide a list of capabilities that are allowed to be added to a container. The default set of
 # capabilities are implicitly allowed. The empty set means that no additional capabilities may be
@@ -99,7 +101,6 @@ supplementalGroups:
 #
 seLinuxContext:
   type: RunAsAny
-  # type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 # system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>

@@ -4,19 +4,19 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
-variable "traefik_dashboard_username" {
+variable traefik_dashboard_username {
   type = string
 }
-variable "traefik_dashboard_password" {
+variable traefik_dashboard_password {
   type = string
 }
 
@@ -45,18 +45,18 @@ resource "kubernetes_secret" "secret" {
     # will be piped to openssl for base64 encoding.
     # $ htpasswd -nbB <username> <password> | openssl base64
     # To verify the output from htpasswd:
-    # $ echo "Output from htpasswd" | base64 -d
+    # $ echo <Output from htpasswd> | base64 -d
     users = "${var.traefik_dashboard_username}:${bcrypt(var.traefik_dashboard_password, 10)}"
   }
   type = "Opaque"
 }
 
-resource "kubernetes_manifest" "middleware_dashboard" {
+resource "kubernetes_manifest" "middleware" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = "${var.service_name}"
+      name = var.service_name
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -65,9 +65,10 @@ resource "kubernetes_manifest" "middleware_dashboard" {
     #
     spec = {
       basicAuth = {
+        headerField = "X-WebAuth-User"
         removeHeader = true
         # The users option is an array of authorized users. Each user will be declared using the
-        # name:encoded-password format.
+        # username:encoded-password format.
         secret = kubernetes_secret.secret.metadata[0].name
       }
     }

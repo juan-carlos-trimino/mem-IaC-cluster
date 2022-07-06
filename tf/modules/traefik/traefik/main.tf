@@ -4,59 +4,40 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
-variable "ingress_controller_chart_name" {
+variable api_auth_token {
+  type = string
+}
+variable chart_name {
   type = string
   description = "Ingress Controller Helm chart name."
   default = "traefik"
 }
-variable "ingress_controller_chart_repo" {
+variable chart_repo {
   type = string
   description = "Using the official Traefik helm chart (Ingress Controller)."
   default = "https://helm.traefik.io/traefik"
 }
-variable "ingress_controller_chart_version" {
+variable chart_version {
   type = string
   description = "Ingress Controller Helm repository version."
-  default = "10.9.1"
+  # To use the latest version, go to https://artifacthub.io/ and type "traefik" on the edit box.
+  default = "10.19.4"
 }
 
-###################################################################################################
-# To use the service account below:                                                               #
-# (1) In this file, uncomment the lines from /***SA to SA***/.                                    #
-# (2) In the file "mem-traefik-scc.yaml", find section "users:" and change it from:               #
-#     users: [                                                                                    #
-#       # system:serviceaccount:memories:mem-traefik-service-account                              #
-#     ]                                                                                           #
-#                                                                                                 #
-#     to                                                                                          #
-#                                                                                                 #
-#     users: [                                                                                    #
-#       system:serviceaccount:memories:mem-traefik-service-account                                #
-#     ]                                                                                           #
-# (3) In the file "values.yaml", find section "serviceAccount:" and change it from:               #
-#     serviceAccount:                                                                             #
-#       # name: "mem-traefik-service-account"                                                     #
-#       name: ""                                                                                  #
-#                                                                                                 #
-#     to                                                                                          #
-#                                                                                                 #
-#     serviceAccount:                                                                             #
-#       name: "mem-traefik-service-account"                                                       #
-#       # name: ""                                                                                #
-###################################################################################################
 resource "null_resource" "scc-traefik" {
   triggers = {
     always_run = timestamp()
   }
+  #
   provisioner "local-exec" {
     command = "oc apply -f ./utility-files/traefik/mem-traefik-scc.yaml"
   }
@@ -67,7 +48,22 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-# /***SA
+# See 'env:' in ..\..\..\utility-files\traefik\values.yaml.
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "${var.service_name}-provider-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    api_auth_token = var.api_auth_token
+  }
+  type = "Opaque"
+}
+
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -83,13 +79,7 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    # annotations = {
-      # "kubernetes.io/enforce-mountable-secrets" = true
-    # }
   }
-  # secret {
-  #   name = kubernetes_secret.secret.metadata[0].name
-  # }
 }
 
 # Roles define WHAT can be done; role bindings define WHO can do it.
@@ -115,15 +105,24 @@ resource "kubernetes_role" "role" {
   rule {
     api_groups = ["traefik.containo.us/v1alpha1"]
     verbs = ["get", "watch", "list"]
-    resources = ["ingressroutes", "middlewares", "traefikservices", "ingressroutetcps", "tlsoptions"]
+    resources = [
+      "middlewares",
+      "ingressroutes",
+      "traefikservices",
+      "ingressroutetcps",
+      "ingressrouteudps",
+      "tlsoptions",
+      "tlsstores",
+      "serverstransports"
+    ]
   }
   rule {
-    api_groups = ["extensions"]
+    api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["get", "watch", "list"]
-    resources = ["ingresses"]
+    resources = ["ingresses", "ingressclasses"]
   }
   rule {
-    api_groups = ["extensions"]
+    api_groups = ["extensions", "networking.k8s.io"]
     verbs = ["update"]
     resources = ["ingresses/status"]
   }
@@ -159,7 +158,6 @@ resource "kubernetes_role_binding" "role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
-# SA***/
 
 # Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
 # cluster. It will be responsible to make sure that when the traffic from a web application hits
@@ -185,13 +183,15 @@ resource "kubernetes_role_binding" "role_binding" {
 #    websecure - port 8443 (exposed as port 443)
 #    traefik - port 9000 (not exposed)
 #    metrics - port 9100 (not exposed)
-resource "helm_release" "ingress_controller_traefik" {
-  # name = var.ingress_controller_chart_name
-  name = var.service_name
-  chart = var.ingress_controller_chart_name
-  repository = var.ingress_controller_chart_repo
-  version = var.ingress_controller_chart_version
+resource "helm_release" "traefik" {
+  # depends_on = [
+  #   kubernetes_namespace.ns
+  # ]
+  chart = var.chart_name
+  repository = var.chart_repo
+  version = var.chart_version
   namespace = var.namespace
+  name = var.service_name
   values = [file("./utility-files/traefik/values.yaml")]
-  timeout = 150
+  # timeout = 180  # Seconds.
 }

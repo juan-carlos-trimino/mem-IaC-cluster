@@ -13,55 +13,74 @@
 variable ibmcloud_api_key {
   description = "The IBM Cloud platform API key."
   default = "<required>"
+  sensitive = true
 }
 
 variable cluster_name {
   description = "The name of an existing IBM Cloud cluster."
   default = "<required>"
+  sensitive = true
 }
 
 variable resource_group_name {
   description = "The name of the IBM Cloud resource group in which resources should be created."
   default = "<required>"
+  sensitive = true
 }
 
 variable cr_username {
   description = "Username for dockerhub."
   default = "<required>"
+  sensitive = true
 }
 
 variable cr_password {
   description = "Password for dockerhub."
   default = "<required>"
+  sensitive = true
 }
 
 variable region {
   description = "The IBM Cloud region where all resources will be deployed; e.g., us-south, eu-de, etc."
   default = "<required>"
+  sensitive = true
 }
 
 variable ibmcloud_timeout {
   description = "The timeout, expressed in seconds, for interacting with IBM Cloud APIs."
   default = "900"
+  sensitive = true
 }
 
 ################
 # Storage info #
-################
+####################################################################################################
+# To obtain the information below, find the Storage instance and select the desired bucket. Click  #
+# on the "Configuration" tab and copy the following values:                                        #
+# Bucket name (left top of screen)                                                                 #
+# Bucket instance CRN                                                                              #
+# Endpoints                                                                                        #
+#  Private                                                                                         #
+#  public                                                                                          #
+####################################################################################################
 variable storage_api_key {
   default = "<required>"
+  sensitive = true
 }
 
 variable private_endpoint {
   default = "<required>"
+  sensitive = true
 }
 
 variable public_endpoint {
   default = "<required>"
+  sensitive = true
 }
 
 variable bucket_name {
   default = "<required>"
+  sensitive = true
 }
 
 variable resource_instance_id {
@@ -71,8 +90,9 @@ variable resource_instance_id {
 ###########################
 # For StatefulSet mongoDB #
 ###########################
-variable "mongodb_database" {
+variable mongodb_database {
   default = "<required>"
+  sensitive = true
 }
 
 variable mongo_initdb_root_username {
@@ -81,54 +101,76 @@ variable mongo_initdb_root_username {
 
 variable mongo_initdb_root_password {
   default = "<required>"
+  sensitive = true
 }
 
-variable "mongodb_username" {
+variable mongodb_username {
   default = "<required>"
+  sensitive = true
 }
 
-variable "mongodb_password" {
+variable mongodb_password {
   default = "<required>"
+  sensitive = true
 }
 
 ############################
 # For StatefulSet rabbitMQ #
 ############################
-variable "rabbitmq_erlang_cookie" {
+variable rabbitmq_erlang_cookie {
   default = "<required>"
+  sensitive = true
 }
 
-variable "rabbitmq_default_pass" {
+variable rabbitmq_default_pass {
   default = "<required>"
+  sensitive = true
 }
 
-variable "rabbitmq_default_user" {
+variable rabbitmq_default_user {
   default = "<required>"
+  sensitive = true
 }
 
 ###########
 # Traefik #
 ###########
-variable "traefik_dashboard_username" {
+variable traefik_dashboard_username {
   default = "<required>"
+  sensitive = true
 }
 
-variable "traefik_dashboard_password" {
+variable traefik_dashboard_password {
   default = "<required>"
+  sensitive = true
 }
 
-variable "traefik_rabbitmq_username" {
+variable traefik_rabbitmq_username {
   default = "<required>"
+  sensitive = true
 }
 
-variable "traefik_rabbitmq_password" {
+variable traefik_rabbitmq_password {
   default = "<required>"
+  sensitive = true
 }
 
-variable "traefik_gateway_username" {
+variable traefik_gateway_username {
   default = "<required>"
+  sensitive = true
 }
 
-variable "traefik_gateway_password" {
+variable traefik_gateway_password {
   default = "<required>"
+  sensitive = true
+}
+
+variable traefik_dns_api_token {
+  default = "<required>"
+  sensitive = true
+}
+
+variable traefik_le_email {
+  default = "<required>"
+  sensitive = true
 }

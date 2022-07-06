@@ -15,7 +15,7 @@ terraform {
     #
     kubernetes = {
       source = "hashicorp/kubernetes"
-      version = ">= 2.6.1"
+      version = ">= 2.8.0"
     }
     #
     null = {
@@ -25,7 +25,13 @@ terraform {
     #
     helm = {
       source = "hashicorp/helm"
-      version = ">= 2.3.0"
+      version = ">= 2.4.1"
+    }
+    #
+    digitalocean = {
+      # Using an environment variable to set the DIGITALOCEAN_TOKEN.
+      source = "digitalocean/digitalocean"
+      version = "~> 2.0"
     }
   }
 }
@@ -60,4 +66,7 @@ provider "kubernetes" {
 }
 
 provider "null" {
+}
+
+provider "digitalocean" {
 }

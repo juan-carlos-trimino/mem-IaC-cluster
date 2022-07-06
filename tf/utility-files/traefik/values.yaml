@@ -34,7 +34,7 @@ certificatesResolvers:
     # Enable ACME.
     acme:
       # email address used for registration.
-      email: 'juancarlos@trimino.com'
+      # email: 'juancarlos@trimino.com'
       # CA server to use; the default is staging.
       # The staging environment will not issue trusted certificates but is used to ensure that the
       # verification process is working properly before moving to production. Let's Encrypt's
@@ -44,7 +44,7 @@ certificatesResolvers:
       # production, simply create a new Issuer with the URL set to
       # https://acme-v02.api.letsencrypt.org/directory.
       # Production.
-      caServer: https://acme-v02.api.letsencrypt.org/directory
+      # caServer: https://acme-v02.api.letsencrypt.org/directory
       # Staging.
       # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
       # Certificates' duration in hours.

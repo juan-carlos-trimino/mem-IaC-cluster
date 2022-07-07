@@ -58,16 +58,8 @@ IaC-cluster
  | ├ cluster_config
  | | └ .gitkeep
  | ├ modules
- | | ├ cert-manager
- | | | ├ cert-manager
- | | | | └ main.tf
- | | | ├ certificates
- | | | | ├ main.tf
- | | | | └ traefik-dashboard-cert.yml
- | | | ├ issuers
- | | | | ├ issuer.yml
- | | | | └ main.tf
- | | | └ .gitkeep
+ | | ├ deployment
+ | | | └ main.tf
  | | ├ ELK
  | | | ├ elasticsearch
  | | | | └ main.tf
@@ -81,27 +73,45 @@ IaC-cluster
  | | | └ main.tf
  | | ├ mongodb-statefulset
  | | | └ main.tf
- | | ├ pri-microservice
- | | | └ main.tf
  | | ├ rabbitmq-deploy
  | | | └ main.tf
  | | ├ rabbitmq-statefulset
  | | | └ main.tf
- | | ├ traefik
- | | | ├ ingress-route
- | | | | └ main.tf
- | | | ├ middlewares
- | | | | ├ middleware-dashboard
- | | | | | └ main.tf
- | | | | ├ middleware-gateway
- | | | | | └ main.tf
- | | | | ├ middleware-rabbitmq
- | | | | | └ main.tf
- | | | | └ .gitkeep
- | | | ├ traefik
- | | | | └ main.tf
- | | | └ .gitkeep
- | | └ .gitkeep
+ | | └ traefik
+ | |   ├ cert-manager
+ | |   | ├ acme-issuer
+ | |   | | └ main.tf
+ | |   | ├ cert-manager
+ | |   | | └ main.tf
+ | |   | └ certificates
+ | |   |   └ main.tf
+ | |   ├ error-page
+ | |   | └ main.tf
+ | |   ├ ingress-route
+ | |   | └ main.tf
+ | |   ├ middlewares
+ | |   | ├ middleware-compress
+ | |   | | └ main.tf
+ | |   | ├ middleware-dashboard-basic-auth
+ | |   | | └ main.tf
+ | |   | ├ middleware-error-page
+ | |   | | └ main.tf
+ | |   | ├ middleware-gateway-basic-auth
+ | |   | | └ main.tf
+ | |   | ├ middleware-rabbitmq-basic-auth
+ | |   | | └ main.tf
+ | |   | ├ middleware-rate-limit
+ | |   | | └ main.tf
+ | |   | ├ middleware-redirect-https
+ | |   | | └ main.tf
+ | |   | └ middleware-security-headers
+ | |   |   └ main.tf
+ | |   ├ tlsoption
+ | |   | └ main.tf
+ | |   ├ tlsstore
+ | |   | └ main.tf
+ | |   └ traefik
+ | |     └ main.tf
  | ├ utility-files
  | | ├ ELK
  | | | ├ filebeat
@@ -120,16 +130,16 @@ IaC-cluster
  | | ├ rabbitmq
  | | | ├ configmaps
  | | | | └ rabbitmq.conf
+ | | | ├ configmaps-deployment
+ | | | | └ rabbitmq.conf
  | | | └ mem-rabbitmq-scc.yaml
  | | └ traefik
  | |   ├ mem-traefik-scc.yaml
  | |   └ values.yaml
  | ├ bootstrap.tf
- | ├ cert-manager.tf
  | ├ data.tf
  | ├ ELK.tf
  | ├ namespace.tf
- | ├ post-deployment.tf
  | ├ providers.tf
  | ├ variables_no_push.tf.template
  | └ variables.tf
@@ -237,8 +247,6 @@ mem-metadata
 ```
 mem-mongodb
  ├ mongodb
- | ├ scripts
- | | └ entrypoint.sh
  | ├ .dockerignore
  | └ Dockerfile-prod
  ├ .gitignore

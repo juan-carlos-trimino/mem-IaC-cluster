@@ -350,19 +350,24 @@ To pull code changes for all repositories:
 To push code changes for all repositories:
 >$ meta git push
 
-Branching
----------
-To create a local branch based on the current branch and switch to the new branch:
-$ meta git checkout -b <branch-name>
+Branching & Merging
+-------------------
+To switch branch:
+$ meta git checkout <new-branch-name>
 
 To create a local branch based on an existing branch other than the current branch and switch to the new branch:
 $ meta git checkout -b <branch-name> <branch-name-of-existing>
 
+To create a local branch based on the current branch and switch to the new branch:
+$ meta git checkout -b <branch-name>
+
 To push a local branch to a remote repo:
 $ meta git push origin <branch-name>
 
-To switch branch:
-$ meta git checkout <new-branch-name>
+To merge a remote-tracking branch set up locally:
+$ meta git checkout <branch-name-to-merge-into>
+$ meta git merge <branch-name-to-merge-from>
+$ meta git push origin <branch-name-to-merge-into>
 
 To delete a local branch:
 $ meta git branch -d <branch-name>

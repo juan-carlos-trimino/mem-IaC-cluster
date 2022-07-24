@@ -1,35 +1,3 @@
-###################################################################################################
-# Both Pod Security Policy (PSP) and Security Context Constraints (SCC) are cluster-level (non-   #
-# namespaced) resources and allows administrator to control the security aspects of pods in       #
-# Kubernetes and OpenShift clusters, respectively.                                                #
-###################################################################################################
-# WARNING: Once privileges are given to a Security Context Constraint (SCC) and the SCC is granted
-#          to a project Service Account (for example, via a role binding), any deployer in the
-#          project can take advantage of those privileges.
-# Notes:
-# (1) By default, in OpenShift, all pods and containers will use the Restricted SCC.
-# (2) Similar to the way that RBAC resources control user access, administrators can use SCCs to
-#     control permissions for pods. These permissions include actions that a pod can perform and
-#     what resources it can access. Administrators can use SCCs to define a set of conditions that
-#     a pod must run with to be accepted into the system.
-#
-# To get a current list of SCCs:
-# $ oc get scc
-#
-# To create an SCC by passing in a file:
-# $ oc apply -f <scc-file>.yaml
-#
-# To verify that the SCC was created:
-# $ oc get scc <scc_name>
-#
-# To examine a specific SCC; e.g., the restricted SCC:
-# $ oc describe scc restricted
-#
-# To delete an SCC:
-# $ oc delete scc <scc_name>
-#
-# To link a custom SCC to a custom service account:
-# $ oc adm policy add-scc-to-user <scc-name> <service-account-name>
 kind: SecurityContextConstraints
 apiVersion: security.openshift.io/v1
 metadata:
@@ -42,7 +10,7 @@ priority: 10
 # devices on the host. This allows the container nearly all the same access as processes running on
 # the host. This is useful for containers that want to use Linux capabilities like manipulating the
 # network stack and accessing devices.
-allowPrivilegedContainer: true
+allowPrivilegedContainer: false
 # Gate whether or not a user is allowed to set the security context of a container to
 # allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
 # Setting it to false ensures that no child process of a container can gain more privileges than
@@ -91,7 +59,7 @@ requiredDropCapabilities: [
 # Control which user ID the containers are run with.
 runAsUser:
   type: RunAsAny
-  uid: 0
+  uid: 1110
 #
 fsGroup:
   type: RunAsAny
@@ -100,7 +68,7 @@ supplementalGroups:
   type: RunAsAny
 #
 seLinuxContext:
-  type: RunAsAny
+  type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 # system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>

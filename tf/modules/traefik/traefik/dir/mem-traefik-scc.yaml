@@ -35,7 +35,7 @@ allowHostIPC: false
 # volumes), set the container's securityContext.readOnlyRootFilesystem property to true. When you
 # make the container's filesystem read-only, you will probably want to mount a volume in every
 # directory the app writes.
-readOnlyRootFilesystem: false
+readOnlyRootFilesystem: true
 # To get a capabilities list, go to:
 # https://man7.org/linux/man-pages/man7/capabilities.7.html
 # To see a list of runtime privilege and Linux capabilities, go to:
@@ -59,7 +59,7 @@ requiredDropCapabilities: [
 # Control which user ID the containers are run with.
 runAsUser:
   type: RunAsAny
-  uid: 1110
+  uid: 1122
 #
 fsGroup:
   type: RunAsAny

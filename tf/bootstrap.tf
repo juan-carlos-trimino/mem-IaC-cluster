@@ -1,7 +1,7 @@
 # $ terraform init
 # $ terraform apply -var="app_version=1.0.0" -auto-approve
 # $ terraform apply -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
-# $ terraform destroy -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
+# $ terraform destroy -var="app_version=1.0.0" -auto-approve
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
@@ -152,14 +152,7 @@ module "middleware-rate-limit" {
   burst = 12
   service_name = local.middleware_rate_limit
 }
-/***
-module "middleware-error-page" {
-  source = "./modules/traefik/middlewares/middleware-error-page"
-  app_name = var.app_name
-  namespace = local.namespace
-  service_name = local.middleware_error_page
-}
-***/
+
 module "middleware-security-headers" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-security-headers"
@@ -216,20 +209,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-
-# module "error-page" {
-#   source = "./modules/traefik/error-page"
-#   app_name = var.app_name
-#   # app_version = var.app_version
-#   image_tag = "guillaumebriday/traefik-custom-error-pages"
-#   namespace = local.namespace
-#   replicas = 1
-#   service_name = local.svc_error_page
-# }
+# ***/ # traefik
 
 ################
 # cert manager #
 ################
+# /*** cert manager
 # By default, Traefik is able to handle certificates in the cluster, but only if there is a single
 # pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
 # point of failure in the infrastructure.
@@ -270,7 +255,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-# traefik
+# ***/ # cert manager
 
 ###########
 # mongodb #

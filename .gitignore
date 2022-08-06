@@ -113,10 +113,10 @@ tf/modules/traefik/tlsstore/*
 !tf/modules/traefik/traefik/
 tf/modules/traefik/traefik/*
 !tf/modules/traefik/traefik/main.tf
-!tf/modules/traefik/traefik/dir/
-tf/modules/traefik/traefik/dir/*
-!tf/modules/traefik/traefik/dir/mem-traefik-scc.yaml
-!tf/modules/traefik/traefik/dir/values.yaml
+!tf/modules/traefik/traefik/util/
+tf/modules/traefik/traefik/util/*
+!tf/modules/traefik/traefik/util/mem-traefik-scc.yaml
+!tf/modules/traefik/traefik/util/values.yaml
 #
 !tf/utility-files/
 tf/utility-files/*

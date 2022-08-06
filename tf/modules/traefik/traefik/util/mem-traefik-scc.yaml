@@ -16,8 +16,6 @@ readOnlyRootFilesystem: true
 allowedCapabilities: [
 ]
 defaultAddCapabilities: [
-  # Bind a socket to Internet domain privileged ports (port numbers less than 1024).
-  NET_BIND_SERVICE
 ]
 requiredDropCapabilities: [
   ALL

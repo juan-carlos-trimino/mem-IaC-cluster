@@ -117,6 +117,9 @@ tf/modules/traefik/traefik/*
 tf/modules/traefik/traefik/util/*
 !tf/modules/traefik/traefik/util/mem-traefik-scc.yaml
 !tf/modules/traefik/traefik/util/values.yaml
+!tf/modules/traefik/whoami/
+tf/modules/traefik/whoami/*
+!tf/modules/traefik/whoami/main.tf
 #
 !tf/utility-files/
 tf/utility-files/*

@@ -137,6 +137,12 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = local.image_tag
           image_pull_policy = var.imagePullPolicy
+          # Specifying ports in the pod definition is purely informational. Omitting them has no
+          # effect on whether clients can connect to the pod through the port or not.
+          port {
+            container_port = var.service_target_port  # The port the app is listening.
+            protocol = "TCP"
+          }
           security_context {
             read_only_root_filesystem = false
             allow_privilege_escalation = false

@@ -144,12 +144,16 @@ resource "kubernetes_deployment" "deployment" {
             protocol = "TCP"
           }
           security_context {
-            read_only_root_filesystem = false
+            read_only_root_filesystem = true
             allow_privilege_escalation = false
             capabilities {
               add = ["NET_BIND_SERVICE"]
             }
           }
+          # env {
+          #   name = "WHOAMI_PORT_NUMBER"
+          #   value = var.service_target_port
+          # }
         }
       }
     }

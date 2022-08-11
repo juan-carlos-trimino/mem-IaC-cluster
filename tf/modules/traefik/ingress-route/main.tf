@@ -350,6 +350,25 @@ resource "kubernetes_manifest" "ingress-route" {
         #     }
         #   ]
         # }
+        # {
+        #   kind = "Rule"
+        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/whoami`)"
+        #   priority = 30
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = "mem-whoami"
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # }
       ]
       # When a TLS section is specified, it instructs Traefik that the current router is dedicated
       # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik

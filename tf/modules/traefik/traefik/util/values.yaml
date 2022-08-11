@@ -1,25 +1,11 @@
 # For a comprehensive sample file, go to:
 # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
 #
-# Enable Access logs.
-accessLog:
-  filters:
-    statusCodes:
-      - "200"
-      - "400-599"
-    # Keep the access logs when at least one retry has happened.
-    retryAttempts: true
-    # Keep access logs when requests take longer than the specified duration.
-    minDuration: "10ms"
-#
-additionalArguments:
-  # For a list of static configuration, go to:
-  # https://doc.traefik.io/traefik/reference/static-configuration/cli/
-  #
-  # Prometheus metrics exporter type.
-  # - "--metrics.prometheus=true"
-  # Match the path to persistence.
-  - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
+# Default values for Traefik
+image:
+  name: traefik
+  tag: ""
+  pullPolicy: IfNotPresent
 # Enable api.
 # For a list of API enpoints, go to https://doc.traefik.io/traefik/operations/api/#endpoints.
 api:
@@ -27,6 +13,221 @@ api:
   # With Dashboard enabled, the router rule must catch requests for both /api and /dashboard.
   dashboard: true
   insecure: false
+# Configure the deployment
+deployment:
+  enabled: true
+  kind: Deployment
+  replicas: 1
+  # initContainers:
+  #   # The "volume-permissions" init container is required if you run into permission issues.
+  #   # Related issue: https://github.com/containous/traefik/issues/6972
+  #   - name: volume-permissions
+  #     image: busybox:latest
+  #     command: ["sh", "-c", "chmod -Rv 600 /traefik-certs/*"]
+  #     volumeMounts:
+  #       - name: traefik-certs
+  #         mountPath: /traefik-certs
+  terminationGracePeriodSeconds: 60
+  minReadySeconds: 0
+  shareProcessNamespace: false
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+# Environment variables to be passed to Traefik's binary.
+env: [
+  DO_AUTH_TOKEN: {
+    valueFrom: {
+      secretKeyRef: {
+        name: mem-traefik-provider-secret,
+        key: api_auth_token
+      }
+    }
+  }
+]
+# Use ingressClass. Ignored if Traefik version < 2.3 / kubernetes < 1.18.x
+# Set Traefik as the default Ingress Controller (as per Kubernetes 1.19+ changes).
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+# Create an IngressRoute for the dashboard.
+ingressRoute:
+  dashboard:
+    # Using a custom ingressRoute with basic auth instead of the default.
+    enabled: false
+    # Additional ingressRoute annotations (e.g. for kubernetes.io/ingress.class).
+    annotations: {}
+    # Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels).
+    labels: {}
+rollingUpdate:
+  maxUnavailable: 1
+  maxSurge: 1
+# Configure providers.
+providers:
+  # Enable Kubernetes backend with default settings.
+  kubernetes.CRD:
+    enabled: true
+  # Enable Kubernetes backend with default settings.
+  kubernetesIngress:
+    enabled: true
+    # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for. See
+    # https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik.
+    ingressClass: traefik
+# Logs
+logs:
+  access:
+    enabled: true
+    format: json
+    filters:
+      statusCode: "200,400-599"
+      # Keep the access logs when at least one retry has happened.
+      retryAttempts: true
+      # Keep access logs when requests take longer than the specified duration.
+      minDuration: "10ms"
+  general:
+    # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL,
+    # ERROR, WARN, and INFO.
+    level: ERROR
+# Enable Access logs.
+# accessLog:
+#   filters:
+#     statusCodes:
+#       - "200"
+#       - "400-599"
+#     # Keep the access logs when at least one retry has happened.
+#     retryAttempts: true
+#     # Keep access logs when requests take longer than the specified duration.
+#     minDuration: "10ms"
+# Liveness and readiness probes.
+livenessProbe:
+  httpGet:
+    path: /ping
+    port: 9000
+    scheme: HTTP
+  # How long to wait after the container starts before beginning the probe.
+  initialDelaySeconds: 5
+  # The frequency of the checks.
+  periodSeconds: 10
+  # How long to wait for the probe to finish. If this time is exceeded, then K8s assumes that the
+  # probe failed.
+  timeoutSeconds: 2
+  # The minimum consecutive successes for the probe to be considered successful after it has
+  # failed.
+  successThreshold: 1
+  # The minimum consecutive failures for the probe to be considered failed after it has succeeded.
+  failureThreshold: 3
+#
+readinessProbe:
+  httpGet:
+    path: /ping
+    port: 9000
+    scheme: HTTP
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 2
+  successThreshold: 1
+  failureThreshold: 1
+# Enable Healthcheck.
+ping: {}
+# Persistent Storage.
+persistence:
+  enabled: true
+  name: traefik-certs
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  path: /traefik-certs
+# Configure ports
+ports:
+  traefik:
+    port: 9000
+    # DO NOT expose the traefik port on production deployments. To access it from outside of the
+    # cluster, use `kubectl port-forward` or create a secure ingress.
+    # $ kubectl port-forward -n memories $(kubectl get pods -n memories --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
+    # From a browser, use http://127.0.0.1:9000/dashboard/ to see the Traefik dashboard; the trailing slash / in /dashboard/ is mandatory.
+    expose: false
+    # The exposed port for this service.
+    exposedPort: 9000
+    protocol: TCP
+  web:
+    port: 8080  # Traefik port.
+    expose: true
+    exposedPort: 80
+    # (Optional) Permanent Redirect to HTTPS.
+    redirectTo: websecure
+    protocol: TCP
+  websecure:
+    port: 8443
+    expose: true
+    exposedPort: 443
+    protocol: TCP
+    tls:
+      enabled: true
+      # (Optional) Set a default certificate resolver.
+      certResolver: digitalocean
+  metrics:
+    port: 9100
+    expose: false
+    # The exposed port for this service.
+    exposedPort: 9100
+    protocol: TCP
+# For a list of annotations, go to
+# https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations
+entryPoints:
+  # Traefik will listen to incoming request on the port 80 (http).
+  web:
+    address: ':80'
+    # Targeted entry point of the redirection.
+    http:
+      redirections:
+        entrypoint:
+          to: websecure
+          # Scheme used for the redirection.
+          scheme: https
+          # Apply a permanent redirection.
+          permanent: true
+  # Traefik will listen to incoming request on the port 443 (https).
+  websecure:
+    address: ':443'
+    http:
+      # Default TLS configuration for the routers linked to the entry point.
+      tls:
+        # Default certificate resolver for the routers linked to the entry point.
+        certResolver: le
+# Options for the main traefik service, where the entrypoints traffic comes
+# from.
+service:
+  enabled: true
+  type: LoadBalancer
+  # Additional annotations applied to both TCP and UDP services (e.g. for cloud provider specific config)
+  annotations: {}
+  # Additional annotations for TCP service only
+  annotationsTCP: {}
+  # Additional annotations for UDP service only
+  annotationsUDP: {}
+  # Additional service labels (e.g. for filtering Service by custom labels)
+  labels: {}
+  # Additional entries here will be added to the service spec.
+  # Cannot contain type, selector or ports entries.
+  spec: {}
+  loadBalancerSourceRanges: []
+  externalIPs: []
+# Create HorizontalPodAutoscaler object.
+#
+autoscaling:
+  enabled: false
+# If hostNetwork is true, runs traefik in the host network namespace
+# To prevent unschedulabel pods due to port collisions, if hostNetwork=true
+# and replicas>1, a pod anti-affinity is recommended and will be set if the
+# affinity is left as default.
+hostNetwork: false
+# Configure Traefik static configuration
+# Additional arguments to be passed at Traefik's binary
+# All available options available on https://docs.traefik.io/reference/static-configuration/cli/
+# Use curly braces to pass values: `helm install --set="additionalArguments={--providers.kubernetesingress.ingressclass=traefik-internal,--log.level=DEBUG}"`
+additionalArguments:
+  # Prometheus metrics exporter type.
+  # - "--metrics.prometheus=true"
+  # Match the path to persistence.
+  - "--certificatesresolvers.le.acme.storage=/traefik-certs/acme.json"
 #
 certificatesResolvers:
   # Let's Encrypt.
@@ -94,140 +295,6 @@ certificatesResolvers:
           - '8.8.4.4:53'
       # Match the path to persistence.
       # storage: '/traefik-certs/acme.json'
-deployment:
-  enabled: true
-  replicas: 1
-  # initContainers:
-  #   # The "volume-permissions" init container is required if you run into permission issues.
-  #   # Related issue: https://github.com/containous/traefik/issues/6972
-  #   - name: volume-permissions
-  #     image: busybox:latest
-  #     command: ["sh", "-c", "chmod -Rv 600 /traefik-certs/*"]
-  #     volumeMounts:
-  #       - name: traefik-certs
-  #         mountPath: /traefik-certs
-# For a list of annotations, go to
-# https://doc.traefik.io/traefik/routing/providers/kubernetes-ingress/#annotations
-entryPoints:
-  # Traefik will listen to incoming request on the port 80 (http).
-  web:
-    address: ':80'
-    # Targeted entry point of the redirection.
-    http:
-      redirections:
-        entrypoint:
-          to: websecure
-          # Scheme used for the redirection.
-          scheme: https
-          # Apply a permanent redirection.
-          permanent: true
-  # Traefik will listen to incoming request on the port 443 (https).
-  websecure:
-    address: ':443'
-    http:
-      # Default TLS configuration for the routers linked to the entry point.
-      tls:
-        # Default certificate resolver for the routers linked to the entry point.
-        certResolver: le
-# Environment variables to be passed to Traefik's binary.
-env:
-  - name: DO_AUTH_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: mem-traefik-provider-secret
-        key: api_auth_token
-#
-# Set Traefik as the default Ingress Controller (as per Kubernetes 1.19+ changes).
-ingressClass:
-  enabled: true
-  isDefaultClass: true
-# Create an IngressRoute for the dashboard.
-ingressRoute:
-  dashboard:
-    # Using a custom ingressRoute with basic auth instead of the default.
-    enabled: false
-    # Additional ingressRoute annotations (e.g. for kubernetes.io/ingress.class).
-    annotations: {}
-    # Additional ingressRoute labels (e.g. for filtering IngressRoute by custom labels).
-    labels: {}
-# Liveness and readiness probes.
-livenessProbe:
-  httpGet:
-    path: /ping
-    port: 9000
-    scheme: HTTP
-  # How long to wait after the container starts before beginning the probe.
-  initialDelaySeconds: 5
-  # The frequency of the checks.
-  periodSeconds: 10
-  # How long to wait for the probe to finish. If this time is exceeded, then K8s assumes that the
-  # probe failed.
-  timeoutSeconds: 2
-  # The minimum consecutive successes for the probe to be considered successful after it has
-  # failed.
-  successThreshold: 1
-  # The minimum consecutive failures for the probe to be considered failed after it has succeeded.
-  failureThreshold: 3
-#
-readinessProbe:
-  httpGet:
-    path: /ping
-    port: 9000
-    scheme: HTTP
-  initialDelaySeconds: 5
-  periodSeconds: 10
-  timeoutSeconds: 2
-  successThreshold: 1
-  failureThreshold: 1
-#
-logs:
-  access:
-    enabled: true
-    format: json
-  general:
-    # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL,
-    # ERROR, WARN, and INFO.
-    level: ERROR
-# Enable Healthcheck.
-ping: {}
-# Persistent Storage.
-persistence:
-  enabled: true
-  name: traefik-certs
-  accessMode: ReadWriteOnce
-  size: 1Gi
-  path: /traefik-certs
-#
-ports:
-  metrics:
-    port: 9100
-    # See traefik below.
-    expose: false
-    # The exposed port for this service.
-    exposedPort: 9100
-  traefik:
-    port: 9000
-    # DO NOT expose the traefik port on production deployments. To access it from outside of the
-    # cluster, use `kubectl port-forward` or create a secure ingress.
-    # $ kubectl port-forward -n memories $(kubectl get pods -n memories --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
-    # From a browser, use http://127.0.0.1:9000/dashboard/ to see the Traefik dashboard; the trailing slash / in /dashboard/ is mandatory.
-    expose: false
-    # The exposed port for this service.
-    exposedPort: 9000
-  web:
-    port: 80  # Traefik port.
-    expose: true
-    exposedPort: 80
-    # (Optional) Permanent Redirect to HTTPS.
-    redirectTo: websecure
-  websecure:
-    port: 443
-    expose: true
-    exposedPort: 443
-    tls:
-      enabled: true
-      # (Optional) Set a default certificate resolver.
-      certResolver: digitalocean
 # Prometheus Metrics.
 # metrics:
 #   prometheus:
@@ -238,17 +305,6 @@ ports:
 #       - 1.2
 #       - 5.0
 #       - 10.0
-# Configure providers.
-providers:
-  # Enable Kubernetes backend with default settings.
-  kubernetes.CRD:
-    enabled: true
-  # Enable Kubernetes backend with default settings.
-  kubernetesIngress:
-    enabled: true
-    # Value of kubernetes.io/ingress.class annotation or IngressClass name to watch for. See
-    # https://cert-manager.io/docs/installation/upgrading/ingress-class-compatibility/#traefik.
-    ingressClass: traefik
 # Whether Role Based Access Control objects like roles and rolebindings should be created.
 rbac:
   enabled: true
@@ -257,6 +313,15 @@ rbac:
   # If set to true, installs namespace-specific Role and RoleBinding and requires provider
   # configuration be set to that same namespace.
   namespaced: true
+# Enable to create a PodSecurityPolicy and assign it to the Service Account via RoleBinding or ClusterRoleBinding
+podSecurityPolicy:
+  enabled: false
+# The service account the pods will use to interact with the Kubernetes API.
+serviceAccount:
+  # If set, an existing service account is used.
+  # If not set, a service account is created automatically using the fullname template.
+  # name: ""
+  name: "mem-traefik-service-account"
 # QoS (Guaranteed).
 resources:
   # requests:
@@ -270,14 +335,9 @@ resources:
 securityContext:
   capabilities:
     drop: [ALL]
-    add: [NET_BIND_SERVICE]
   readOnlyRootFilesystem: true
-  runAsGroup: 0
-  runAsNonRoot: false
-  runAsUser: 0
-# The service account the pods will use to interact with the Kubernetes API.
-serviceAccount:
-  # If set, an existing service account is used.
-  # If not set, a service account is created automatically using the fullname template.
-  # name: ""
-  name: "mem-traefik-service-account"
+  runAsGroup: 1234
+  runAsNonRoot: true
+  runAsUser: 1234
+podSecurityContext:
+  fsGroup: 1234

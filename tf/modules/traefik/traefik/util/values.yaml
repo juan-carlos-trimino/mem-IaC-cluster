@@ -35,7 +35,8 @@ podDisruptionBudget:
   enabled: false
 # Environment variables to be passed to Traefik's binary.
 env: [
-  DO_AUTH_TOKEN: {
+  {
+    name: DO_AUTH_TOKEN,
     valueFrom: {
       secretKeyRef: {
         name: mem-traefik-provider-secret,
@@ -76,6 +77,9 @@ providers:
 logs:
   access:
     enabled: true
+    # By default, logs are written using the Common Log Format (CLF).
+    # To write logs in JSON, use json in the format option.
+    # If the given format is unsupported, the default (CLF) is used instead.
     format: json
     filters:
       statusCode: "200,400-599"
@@ -84,8 +88,10 @@ logs:
       # Keep access logs when requests take longer than the specified duration.
       minDuration: "10ms"
   general:
-    # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL,
-    # ERROR, WARN, and INFO.
+    # By default, the logs use a text format (common), but you can
+    # also ask for the json format in the format option
+    format: json
+    # By default, the level is set to ERROR. Alternative logging levels are DEBUG, PANIC, FATAL, ERROR, WARN, and INFO.
     level: ERROR
 # Enable Access logs.
 # accessLog:

@@ -28,9 +28,8 @@ variable chart_repo {
 }
 variable chart_version {
   type = string
-  description = "Ingress Controller Helm repository version."
   # To use the latest version, go to https://artifacthub.io/ and type "traefik" on the edit box.
-  default = "10.19.4"
+  description = "Ingress Controller Helm repository version."
 }
 
 resource "null_resource" "scc-traefik" {
@@ -39,7 +38,7 @@ resource "null_resource" "scc-traefik" {
   }
   #
   provisioner "local-exec" {
-    command = "oc apply -f ./utility-files/traefik/mem-traefik-scc.yaml"
+    command = "oc apply -f ./modules/traefik/traefik/util/mem-traefik-scc.yaml"
   }
   #
   provisioner "local-exec" {
@@ -48,7 +47,7 @@ resource "null_resource" "scc-traefik" {
   }
 }
 
-# See 'env:' in ..\..\..\utility-files\traefik\values.yaml.
+# See 'env:' in ./modules/traefik/traefik/util/values.yaml.
 resource "kubernetes_secret" "secret" {
   metadata {
     name = "${var.service_name}-provider-secret"
@@ -79,6 +78,15 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
+    # This annotation indicates that pods running as this service account may only reference Secret
+    # API objects specified in the service account's secrets field.
+    annotations = {
+      "kubernetes.io/enforce-mountable-secrets" = true
+    }
+  }
+  #
+  secret {
+    name = kubernetes_secret.secret.metadata[0].name
   }
 }
 
@@ -159,39 +167,12 @@ resource "kubernetes_role_binding" "role_binding" {
   }
 }
 
-# Traefik is a Cloud Native Edge Router that will work as an ingress controller to a Kubernetes
-# cluster. It will be responsible to make sure that when the traffic from a web application hits
-# the Kubernetes cluster, it will go to the right Service. Also, it makes it very easy to assign
-# an SSL/TLS certificate to the web application.
-#
-# Notes:
-# 1. To watch the traefik's logs:
-#    $ kubectl logs -n memories -l app.kubernetes.io/name=traefik -f
-# 2. Traefik supports the ACME protocol used by Let's Encrypt.
-# 3. By default, the chart will deploy Traefik in LoadBalancer mode.
-# 4. EntryPoints are the network entry points into Traefik. They define the port which will receive
-#    the packets, and whether to listen for TCP or UDP. The Traefik Helm chart deployment creates
-#    the following entrypoints:
-#    * web: It is used for all HTTP requests. The Kubernetes LoadBalancer service maps port 80 to
-#           the web entrypoint.
-#    * websecure: It is used for all HTTPS requests. The Kubernetes LoadBalancer service maps port
-#                 443 to the websecure entrypoint.
-#    * traefik: Kubernetes uses the Traefik Proxy entrypoint for pod liveliness check. The Traefik
-#               dashboard and API are available on the Traefik entrypoint.
-#    Applications are configured either on the web or the websecure entrypoints.
-#    web - port 8000 (exposed as port 80)
-#    websecure - port 8443 (exposed as port 443)
-#    traefik - port 9000 (not exposed)
-#    metrics - port 9100 (not exposed)
 resource "helm_release" "traefik" {
-  # depends_on = [
-  #   kubernetes_namespace.ns
-  # ]
   chart = var.chart_name
   repository = var.chart_repo
   version = var.chart_version
   namespace = var.namespace
   name = var.service_name
-  values = [file("./utility-files/traefik/values.yaml")]
+  values = [file("./modules/traefik/traefik/util/values.yaml")]
   # timeout = 180  # Seconds.
 }

@@ -113,6 +113,13 @@ tf/modules/traefik/tlsstore/*
 !tf/modules/traefik/traefik/
 tf/modules/traefik/traefik/*
 !tf/modules/traefik/traefik/main.tf
+!tf/modules/traefik/traefik/util/
+tf/modules/traefik/traefik/util/*
+!tf/modules/traefik/traefik/util/mem-traefik-scc.yaml
+!tf/modules/traefik/traefik/util/values.yaml
+!tf/modules/traefik/whoami/
+tf/modules/traefik/whoami/*
+!tf/modules/traefik/whoami/main.tf
 #
 !tf/utility-files/
 tf/utility-files/*
@@ -147,8 +154,3 @@ tf/utility-files/rabbitmq/configmaps/*
 !tf/utility-files/rabbitmq/configmaps-deployment/
 tf/utility-files/rabbitmq/configmaps-deployment/*
 !tf/utility-files/rabbitmq/configmaps-deployment/rabbitmq.conf
-#
-!tf/utility-files/traefik/
-tf/utility-files/traefik/*
-!tf/utility-files/traefik/mem-traefik-scc.yaml
-!tf/utility-files/traefik/values.yaml

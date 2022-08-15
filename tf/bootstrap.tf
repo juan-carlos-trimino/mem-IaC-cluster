@@ -1,7 +1,7 @@
 # $ terraform init
 # $ terraform apply -var="app_version=1.0.0" -auto-approve
 # $ terraform apply -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
-# $ terraform destroy -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
+# $ terraform destroy -var="app_version=1.0.0" -auto-approve
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
@@ -78,19 +78,6 @@ locals {
 # traefik #
 ###########
 # /*** traefik
-# The hosts file is used to map domain names (hostnames) to IP addresses. It is a plain-text file
-# used by all operating systems including, Linux, Windows, and macOS. The hosts file has priority
-# over DNS. When typing in the domain name of a web site to visit, the domain name must be
-# translated into its corresponding IP address. The operating system first checks its hosts file
-# for the corresponding domain, and if there is no entry for the domain, it will query the
-# configured DNS servers to resolve the specified domain name. This affects only the computer on
-# which the change is made, rather than how the domain is resolved worldwide. Entries in the hosts
-# file have the following format:
-#   IPAddress DomainName [DomainAliases]
-# The IP address and the domain names should be separated by at least one space or tab. The lines
-# starting with '#' are comments and are ignored.
-# On Linux, the full path to the file is /etc/hosts.
-# On Windows, the full path to the file is C:\Windows\System32\drivers\etc\hosts.
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -98,6 +85,7 @@ module "traefik" {
   source = "./modules/traefik/traefik"
   app_name = var.app_name
   namespace = local.namespace
+  chart_version = "10.24.0"
   api_auth_token = var.traefik_dns_api_token
   service_name = "mem-traefik"
 }
@@ -152,14 +140,7 @@ module "middleware-rate-limit" {
   burst = 12
   service_name = local.middleware_rate_limit
 }
-/***
-module "middleware-error-page" {
-  source = "./modules/traefik/middlewares/middleware-error-page"
-  app_name = var.app_name
-  namespace = local.namespace
-  service_name = local.middleware_error_page
-}
-***/
+
 module "middleware-security-headers" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-security-headers"
@@ -216,20 +197,23 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
+# ***/ # traefik
 
-# module "error-page" {
-#   source = "./modules/traefik/error-page"
-#   app_name = var.app_name
-#   # app_version = var.app_version
-#   image_tag = "guillaumebriday/traefik-custom-error-pages"
-#   namespace = local.namespace
-#   replicas = 1
-#   service_name = local.svc_error_page
-# }
+/*** # web service app for testing Traefik
+module "whoiam" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/whoami"
+  app_name = var.app_name
+  app_version = var.app_version
+  namespace = local.namespace
+  service_name = "mem-whoami"
+}
+***/ # Web service
 
 ################
 # cert manager #
 ################
+# /*** cert manager
 # By default, Traefik is able to handle certificates in the cluster, but only if there is a single
 # pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
 # point of failure in the infrastructure.
@@ -270,7 +254,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-# traefik
+# ***/ # cert manager
 
 ###########
 # mongodb #

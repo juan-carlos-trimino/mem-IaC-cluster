@@ -1,3 +1,4 @@
+# Configure Traefik static configuration
 # For a comprehensive sample file, go to:
 # https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
 #
@@ -225,10 +226,6 @@ autoscaling:
 # and replicas>1, a pod anti-affinity is recommended and will be set if the
 # affinity is left as default.
 hostNetwork: false
-# Configure Traefik static configuration
-# Additional arguments to be passed at Traefik's binary
-# All available options available on https://docs.traefik.io/reference/static-configuration/cli/
-# Use curly braces to pass values: `helm install --set="additionalArguments={--providers.kubernetesingress.ingressclass=traefik-internal,--log.level=DEBUG}"`
 # additionalArguments:
   # Prometheus metrics exporter type.
   # - "--metrics.prometheus=true"

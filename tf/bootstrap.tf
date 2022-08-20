@@ -214,14 +214,10 @@ module "whoiam" {
 # cert manager #
 ################
 # /*** cert manager
-# By default, Traefik is able to handle certificates in the cluster, but only if there is a single
-# pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
-# point of failure in the infrastructure.
-#
-# To solve this issue, use cert-manager to store and issue the certificates.
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
+  chart_version = "1.9.1"
   service_name = "mem-cert-manager"
 }
 

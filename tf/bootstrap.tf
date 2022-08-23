@@ -232,6 +232,7 @@ module "acme-issuer" {
   # production (letsencrypt-prod).
   # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
 }

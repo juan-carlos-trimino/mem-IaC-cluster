@@ -236,7 +236,7 @@ certificatesResolvers:
     # Enable ACME.
     acme:
       # email address used for registration.
-      # email: 'juancarlos@trimino.com'
+      # email: 'someone@trimino.xyz'
       # Production.
       # caServer: https://acme-v02.api.letsencrypt.org/directory
       # Staging.
@@ -245,7 +245,7 @@ certificatesResolvers:
       storage: '/traefik-certs/acme.json'
       # Certificates' duration in hours.
       # Let's Encrypt certificates' duration defaults to 2160 hours (90 days).
-      certificatesDuration: 720  # 30 days.
+      certificatesDuration: 2160
       # Preferred chain to use.
       # If the CA offers multiple certificate chains, prefer the chain with an issuer matching this
       # Subject Common Name. If no match, the default offered chain will be used.

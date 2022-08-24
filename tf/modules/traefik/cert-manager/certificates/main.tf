@@ -34,11 +34,13 @@ resource "kubernetes_manifest" "certificate" {
       namespace = var.namespace
       labels = {
         app = var.app_name
-        use-http01-solver = true
       }
     }
     spec = {
-      isCA = true
+      # isCA will mark this Certificate as valid for certificate signing. This will automatically
+      # add the cert sign usage to the list of usages. See the "Basic Constraints" section of
+      # RFC5280 (https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9).
+      isCA = false
       privateKey = {
         # Setting the rotationPolicy to Always won't rotate the private key immediately. In order
         # to rotate the private key, the certificate objects must be reissued.
@@ -56,8 +58,8 @@ resource "kubernetes_manifest" "certificate" {
       # The default duration for all certificates is 90 days and the default renewal windows is 30
       # days. This means that certificates are considered valid for 3 months and renewal will be
       # attempted within 1 month of expiration.
-      # duration = "360h"  # 15 days.
-      # renewBefore = "24h"
+      duration = "2160h"  # 90 days.
+      renewBefore = "360h" # 15 days
       # The signed certificate will be stored in a Secret resource named 'var.secret_name' in the
       # same namespace as the Certificate once the issuer has successfully issued the requested
       # certificate.
@@ -67,6 +69,9 @@ resource "kubernetes_manifest" "certificate" {
       issuerRef = {
         kind = "Issuer"
         name = var.issuer_name
+        # This is optional since cert-manager will default to this value; however, if you are using
+        # an external issuer, change this to that issuer group.
+        group = "cert-manager.io"
       }
     }
   }

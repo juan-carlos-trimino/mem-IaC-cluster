@@ -13,13 +13,7 @@ variable namespace {
 variable svc_gateway {
   type = string
 }
-variable svc_error_page {
-  type = string
-}
 variable middleware_rate_limit {
-  type = string
-}
-variable middleware_error_page {
   type = string
 }
 variable middleware_compress {
@@ -29,9 +23,6 @@ variable middleware_gateway_basic_auth {
   type = string
 }
 variable middleware_dashboard_basic_auth {
-  type = string
-}
-variable middleware_redirect_https {
   type = string
 }
 variable middleware_security_headers {
@@ -56,17 +47,6 @@ variable service_name {
   type = string
 }
 
-# Useful commands for troubleshooting issuing ACME certificates:
-# --------------------------------------------------------------
-# $ kubectl get all -n memories
-# $ kubectl get all -l=app=memories -n memories
-# $ kubectl get ingressroute -n memories
-# $ kubectl describe ingressroute mem-ingress-route -n memories
-# $ kubectl describe ingressroute mem-ingress-route -A
-# $ kubectl get ingress -A
-#
-# For a discussion on A SINGLE POINT OF FAILURE see "LetsEncrypt Support with the Custom Resource
-# Definition Provider" at https://doc.traefik.io/traefik/v2.0/providers/kubernetes-crd/.
 resource "kubernetes_manifest" "ingress-route" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
@@ -81,9 +61,6 @@ resource "kubernetes_manifest" "ingress-route" {
     }
     #
     spec = {
-      # If not specified, HTTP routers will accept requests from all defined entry points. If you
-      # want to limit the router scope to a set of entry points, set the entryPoints option.
-      # Traefik handles requests using the web (HTTP) and websecure (HTTPS) entrypoints.
       entryPoints = [  # Listening ports.
         "web",
         "websecure"
@@ -96,10 +73,6 @@ resource "kubernetes_manifest" "ingress-route" {
           middlewares = [
             {
               name = var.middleware_rate_limit
-              namespace = var.namespace
-            },
-            {
-              name = var.middleware_redirect_https
               namespace = var.namespace
             },
             {
@@ -136,10 +109,6 @@ resource "kubernetes_manifest" "ingress-route" {
               namespace = var.namespace
             },
             {
-              name = var.middleware_redirect_https
-              namespace = var.namespace
-            },
-            {
               name = var.middleware_security_headers
               namespace = var.namespace
             }
@@ -169,10 +138,6 @@ resource "kubernetes_manifest" "ingress-route" {
               namespace = var.namespace
             },
             {
-              name = var.middleware_redirect_https
-              namespace = var.namespace
-            },
-            {
               name = var.middleware_security_headers
               namespace = var.namespace
             }
@@ -199,10 +164,6 @@ resource "kubernetes_manifest" "ingress-route" {
           middlewares = [
             {
               name = var.middleware_dashboard_basic_auth
-              namespace = var.namespace
-            },
-            {
-              name = var.middleware_redirect_https
               namespace = var.namespace
             },
             {
@@ -242,10 +203,6 @@ resource "kubernetes_manifest" "ingress-route" {
               namespace = var.namespace
             },
             {
-              name = var.middleware_redirect_https
-              namespace = var.namespace
-            },
-            {
               name = var.middleware_security_headers
               namespace = var.namespace
             }
@@ -274,9 +231,6 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          # For testing, use one of the free wildcard DNS services for IP addresses (xip.io,
-          # nip.io (https://nip.io/), sslip.io (https://sslip.io/), ip6.name, and hipio). By using
-          # one of these services, the /etc/hosts file does not need to be changed.
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
@@ -294,13 +248,6 @@ resource "kubernetes_manifest" "ingress-route" {
               name = var.middleware_rate_limit
               namespace = var.namespace
             },
-            {
-              name = var.middleware_redirect_https
-              namespace = var.namespace
-            },
-            # See tls below.
-            # Add this Middleware to the IngressRoute, then generate a new report from SSLLabs. The
-            # configuration now reflects the highest standards in TLS security (A+).
             {
               name = var.middleware_security_headers
               namespace = var.namespace
@@ -370,28 +317,8 @@ resource "kubernetes_manifest" "ingress-route" {
         #   ]
         # }
       ]
-      # When a TLS section is specified, it instructs Traefik that the current router is dedicated
-      # to HTTPS requests only (and that the router should ignore HTTP (non TLS) requests). Traefik
-      # will terminate the SSL connections (meaning that it will send decrypted data to the
-      # services).
-      #
-      # To perform an analysis of the TLS handshake using SSLLabs, go to
-      # https://www.ssllabs.com/ssltest/.
       tls = {
-        # Although you can configure Traefik Proxy to use multiple certificatesResolvers,  an
-        # IngressRoute is only ever associated with a single one.
         certResolver = "le"
-        # Subject Alternative Name (SAN) is an extension to the X.509 specification that allows you
-        # to secure multiple domains with a single SSL/TLS certificate. You may include any
-        # combination of domain names, subdomains, IP addresses, and local host names up to a
-        # maximum of 250 (vendor specific).
-        #
-        # SAN is a very useful tool to fix the "www" versus the root domain ("no-www") problem. If
-        # you are issued an SSL/TLS certificate for "www.trimino.xyz", it will only work for
-        # "www.trimino.xyz", but not for the root domain "trimino.xyz". By adding a SAN value of
-        # "trimino.xyz" to the certificate fixes this problem. The converse of this works as well;
-        # i.e., you can add a SAN value of "www.trimino.xyz" for a certificate issued just for the
-        # root domain "trimino.xyz".
         domains = [
           {
             main = var.host_name
@@ -400,22 +327,10 @@ resource "kubernetes_manifest" "ingress-route" {
             ]
           }
         ]
-        # Use the secret created by cert-manager to terminate the TLS connection.
-        # Define the secret name used to store the certificate (in the IngressRoute namespace).
         secretName = var.secret_name
         store = {
           name = var.tls_store
         }
-        # Traefik provides several TLS options
-        # (https://doc.traefik.io/traefik/https/tls/#tls-options) to configure some parameters of
-        # the TLS connection.
-        #
-        # Before enabling these options, perform an analysis of the TLS connection by using SSLLabs
-        # (https://www.ssllabs.com/ssltest/). The SSLLabs service provides a detailed report of
-        # various aspects of TLS with a color-coded report.
-        #
-        # Then after enabling these options, repeat the analysis and compare the new report with
-        # previous report.
         options = {
           name = var.tls_options
           namespace = var.namespace

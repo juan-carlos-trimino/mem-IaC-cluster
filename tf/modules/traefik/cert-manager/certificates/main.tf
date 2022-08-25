@@ -37,32 +37,16 @@ resource "kubernetes_manifest" "certificate" {
       }
     }
     spec = {
-      # isCA will mark this Certificate as valid for certificate signing. This will automatically
-      # add the cert sign usage to the list of usages. See the "Basic Constraints" section of
-      # RFC5280 (https://www.rfc-editor.org/rfc/rfc5280#section-4.2.1.9).
       isCA = false
       privateKey = {
-        # Setting the rotationPolicy to Always won't rotate the private key immediately. In order
-        # to rotate the private key, the certificate objects must be reissued.
         rotationPolicy = "Always"
         size = 4096
         algorithm = "RSA"
         encoding = "PKCS1"
       }
-      # The certificate commonName and dnsNames are challenged by the ACME server. The certificate
-      # manager service automatically creates a pod and ingress rules to resolve the challenges.
-      # (The use of the common name field has been deprecated since 2000 and is discouraged from
-      # being used.)
-      # commonName = var.common_name  # This is the main DNS name for the cert.
       dnsNames = var.dns_names  # Add subdomains.
-      # The default duration for all certificates is 90 days and the default renewal windows is 30
-      # days. This means that certificates are considered valid for 3 months and renewal will be
-      # attempted within 1 month of expiration.
       duration = "2160h"  # 90 days.
-      renewBefore = "360h" # 15 days
-      # The signed certificate will be stored in a Secret resource named 'var.secret_name' in the
-      # same namespace as the Certificate once the issuer has successfully issued the requested
-      # certificate.
+      renewBefore = "720h" # 30 days
       secretName = var.secret_name
       # The Certificate will be issued using the issuer named 'var.issuer_name' in the
       # 'var.namespace' namespace (the same namespace as the Certificate resource).

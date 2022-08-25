@@ -14,7 +14,6 @@ variable service_name {
   type = string
 }
 
-# See TLS Options: https://doc.traefik.io/traefik/https/tls/#tls-options
 resource "kubernetes_manifest" "tlsoption" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"

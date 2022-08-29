@@ -182,13 +182,10 @@ module "ingress-route" {
   tls_store = local.tls_store
   tls_options = local.tls_options
   middleware_rate_limit = local.middleware_rate_limit
-  middleware_error_page = local.middleware_error_page
   middleware_compress = local.middleware_compress
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
-  middleware_redirect_https = local.middleware_redirect_https
   middleware_security_headers = local.middleware_security_headers
-  svc_error_page = local.svc_error_page
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name

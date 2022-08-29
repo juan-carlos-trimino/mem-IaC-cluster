@@ -104,9 +104,9 @@ tf/modules/traefik/middlewares/middleware-redirect-https/*
 !tf/modules/traefik/middlewares/middleware-security-headers/
 tf/modules/traefik/middlewares/middleware-security-headers/*
 !tf/modules/traefik/middlewares/middleware-security-headers/main.tf
-!tf/modules/traefik/tlsoption/
-tf/modules/traefik/tlsoption/*
-!tf/modules/traefik/tlsoption/main.tf
+!tf/modules/traefik/tlsoptions/
+tf/modules/traefik/tlsoptions/*
+!tf/modules/traefik/tlsoptions/main.tf
 !tf/modules/traefik/tlsstore/
 tf/modules/traefik/tlsstore/*
 !tf/modules/traefik/tlsstore/main.tf

@@ -74,9 +74,9 @@ locals {
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
-###########
-# traefik #
-###########
+###################################################################################################
+# traefik                                                                                         #
+###################################################################################################
 # /*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
@@ -166,7 +166,7 @@ module "tlsstore" {
   service_name = local.tls_store
 }
 
-module "tlsoption" {
+module "tlsoptions" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/tlsoption"
   app_name = var.app_name
@@ -207,9 +207,9 @@ module "whoiam" {
 }
 ***/ # Web service
 
-################
-# cert manager #
-################
+###################################################################################################
+# cert manager                                                                                    #
+###################################################################################################
 # /*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
@@ -250,9 +250,9 @@ module "certificate" {
 }
 # ***/ # cert manager
 
-###########
-# mongodb #
-###########
+###################################################################################################
+# mongodb                                                                                         #
+###################################################################################################
 # /*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
@@ -326,9 +326,9 @@ module "mem-mongodb" {
 }
 ***/  # mongodb - statefulset
 
-############
-# rabbitmq #
-############
+###################################################################################################
+# rabbitmq                                                                                        #
+###################################################################################################
 /*** rabbitmq - deployment
 # Deployment.
 module "mem-rabbitmq" {
@@ -409,9 +409,9 @@ module "mem-rabbitmq" {
 }
 # ***/  # rabbitmq - statefulset
 
-###############
-# Application #
-###############
+###################################################################################################
+# Application                                                                                     #
+###################################################################################################
 # /*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1

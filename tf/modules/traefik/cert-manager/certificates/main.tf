@@ -37,7 +37,7 @@ resource "kubernetes_manifest" "certificate" {
       }
     }
     spec = {
-      isCA = false
+      isCA = null
       privateKey = {
         rotationPolicy = "Always"
         size = 4096
@@ -45,8 +45,8 @@ resource "kubernetes_manifest" "certificate" {
         encoding = "PKCS1"
       }
       dnsNames = var.dns_names  # Add subdomains.
-      duration = "2160h"  # 90 days.
-      renewBefore = "720h" # 30 days
+      duration = "2160h0m0s"  # 90 days.
+      renewBefore = "720h0m0s" # 30 days
       secretName = var.secret_name
       # The Certificate will be issued using the issuer named 'var.issuer_name' in the
       # 'var.namespace' namespace (the same namespace as the Certificate resource).

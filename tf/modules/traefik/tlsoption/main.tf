@@ -14,7 +14,7 @@ variable service_name {
   type = string
 }
 
-resource "kubernetes_manifest" "tlsoption" {
+resource "kubernetes_manifest" "tlsoptions" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "TLSOption"

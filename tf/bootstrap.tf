@@ -168,7 +168,7 @@ module "tlsstore" {
 
 module "tlsoptions" {
   count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/tlsoption"
+  source = "./modules/traefik/tlsoptions"
   app_name = var.app_name
   namespace = local.namespace
   service_name = local.tls_options

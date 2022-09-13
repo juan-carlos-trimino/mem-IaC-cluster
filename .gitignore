@@ -38,6 +38,10 @@ tf/modules/ELK/elasticsearch/*
 !tf/modules/ELK/filebeat/
 tf/modules/ELK/filebeat/*
 !tf/modules/ELK/filebeat/main.tf
+!tf/modules/ELK/filebeat/util/
+tf/modules/ELK/filebeat/util/*
+!tf/modules/ELK/filebeat/util/filebeat.yml
+!tf/modules/ELK/filebeat/util/mem-filebeat-scc.yaml
 !tf/modules/ELK/kibana/
 tf/modules/ELK/kibana/*
 !tf/modules/ELK/kibana/main.tf
@@ -120,16 +124,6 @@ tf/modules/traefik/traefik/util/*
 !tf/modules/traefik/whoami/
 tf/modules/traefik/whoami/*
 !tf/modules/traefik/whoami/main.tf
-#
-!tf/utility-files/
-tf/utility-files/*
-!tf/utility-files/ELK/
-tf/utility-files/ELK/*
-!tf/utility-files/ELK/.gitkeep
-!tf/utility-files/ELK/filebeat/
-tf/utility-files/ELK/filebeat/*
-!tf/utility-files/ELK/filebeat/filebeat.yml
-!tf/utility-files/ELK/filebeat/mem-filebeat-scc.yaml
 #
 !tf/utility-files/mongodb/
 tf/utility-files/mongodb/*

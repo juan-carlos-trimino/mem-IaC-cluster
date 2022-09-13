@@ -371,7 +371,7 @@ module "mem-rabbitmq" {
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
   imagePullPolicy = "IfNotPresent"
-  path_rabbitmq_files = "./utility-files/rabbitmq"
+  path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
   rabbitmq_default_pass = var.rabbitmq_default_pass

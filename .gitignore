@@ -62,6 +62,10 @@ tf/modules/rabbitmq-deploy/*
 !tf/modules/rabbitmq-statefulset/
 tf/modules/rabbitmq-statefulset/*
 !tf/modules/rabbitmq-statefulset/main.tf
+!tf/modules/rabbitmq-statefulset/util/
+tf/modules/rabbitmq-statefulset/util/*
+!tf/modules/rabbitmq-statefulset/util/mem-rabbitmq-scc.yaml
+!tf/modules/rabbitmq-statefulset/util/rabbitmq.conf
 #
 !tf/modules/traefik/
 tf/modules/traefik/*
@@ -141,10 +145,6 @@ tf/utility-files/mongodb/scripts/*
 #
 !tf/utility-files/rabbitmq/
 tf/utility-files/rabbitmq/*
-!tf/utility-files/rabbitmq/mem-rabbitmq-scc.yaml
-!tf/utility-files/rabbitmq/configmaps/
-tf/utility-files/rabbitmq/configmaps/*
-!tf/utility-files/rabbitmq/configmaps/rabbitmq.conf
 !tf/utility-files/rabbitmq/configmaps-deployment/
 tf/utility-files/rabbitmq/configmaps-deployment/*
 !tf/utility-files/rabbitmq/configmaps-deployment/rabbitmq.conf

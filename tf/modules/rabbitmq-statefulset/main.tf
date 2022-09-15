@@ -131,7 +131,7 @@ resource "null_resource" "scc-rabbitmq" {
     always_run = timestamp()
   }
   provisioner "local-exec" {
-    command = "oc apply -f ./utility-files/rabbitmq/mem-rabbitmq-scc.yaml"
+    command = "oc apply -f ${var.path_rabbitmq_files}/mem-rabbitmq-scc.yaml"
   }
   #
   provisioner "local-exec" {
@@ -262,7 +262,7 @@ resource "kubernetes_config_map" "config" {
     # together with configuration files. The file contains a list of plugin names ending with
     # a dot.
     "enabled_plugins" = "[rabbitmq_management, rabbitmq_peer_discovery_k8s]."
-    "rabbitmq.conf" = "${file("${var.path_rabbitmq_files}/configmaps/rabbitmq.conf")}"
+    "rabbitmq.conf" = "${file("${var.path_rabbitmq_files}/rabbitmq.conf")}"
   }
 }
 

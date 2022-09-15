@@ -25,7 +25,7 @@ resource "kubernetes_manifest" "middleware" {
         app = var.app_name
       }
     }
-    # See https://doc.traefik.io/traefik/middlewares/http/headers/#using-security-headers
+    #
     spec = {
       headers = {
         # Set frameDeny to true to add the X-Frame-Options header with the value of DENY.

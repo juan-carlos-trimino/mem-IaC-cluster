@@ -74,9 +74,9 @@ locals {
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
-###########
-# traefik #
-###########
+###################################################################################################
+# traefik                                                                                         #
+###################################################################################################
 # /*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
@@ -166,9 +166,9 @@ module "tlsstore" {
   service_name = local.tls_store
 }
 
-module "tlsoption" {
+module "tlsoptions" {
   count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/tlsoption"
+  source = "./modules/traefik/tlsoptions"
   app_name = var.app_name
   namespace = local.namespace
   service_name = local.tls_options
@@ -182,13 +182,10 @@ module "ingress-route" {
   tls_store = local.tls_store
   tls_options = local.tls_options
   middleware_rate_limit = local.middleware_rate_limit
-  middleware_error_page = local.middleware_error_page
   middleware_compress = local.middleware_compress
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
-  middleware_redirect_https = local.middleware_redirect_https
   middleware_security_headers = local.middleware_security_headers
-  svc_error_page = local.svc_error_page
   svc_gateway = local.svc_gateway
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name
@@ -210,18 +207,14 @@ module "whoiam" {
 }
 ***/ # Web service
 
-################
-# cert manager #
-################
+###################################################################################################
+# cert manager                                                                                    #
+###################################################################################################
 # /*** cert manager
-# By default, Traefik is able to handle certificates in the cluster, but only if there is a single
-# pod of Traefik running. This, of course, is not acceptable because this pod becomes a single
-# point of failure in the infrastructure.
-#
-# To solve this issue, use cert-manager to store and issue the certificates.
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
+  chart_version = "1.9.1"
   service_name = "mem-cert-manager"
 }
 
@@ -236,6 +229,7 @@ module "acme-issuer" {
   # production (letsencrypt-prod).
   # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
   acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
 }
@@ -256,9 +250,9 @@ module "certificate" {
 }
 # ***/ # cert manager
 
-###########
-# mongodb #
-###########
+###################################################################################################
+# mongodb                                                                                         #
+###################################################################################################
 # /*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
@@ -332,9 +326,9 @@ module "mem-mongodb" {
 }
 ***/  # mongodb - statefulset
 
-############
-# rabbitmq #
-############
+###################################################################################################
+# rabbitmq                                                                                        #
+###################################################################################################
 /*** rabbitmq - deployment
 # Deployment.
 module "mem-rabbitmq" {
@@ -377,7 +371,7 @@ module "mem-rabbitmq" {
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
   imagePullPolicy = "IfNotPresent"
-  path_rabbitmq_files = "./utility-files/rabbitmq"
+  path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
   rabbitmq_default_pass = var.rabbitmq_default_pass
@@ -415,9 +409,9 @@ module "mem-rabbitmq" {
 }
 # ***/  # rabbitmq - statefulset
 
-###############
-# Application #
-###############
+###################################################################################################
+# Application                                                                                     #
+###################################################################################################
 # /*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1

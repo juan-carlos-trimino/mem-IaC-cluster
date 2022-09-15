@@ -196,17 +196,6 @@ module "ingress-route" {
 }
 # ***/ # traefik
 
-/*** # web service app for testing Traefik
-module "whoiam" {
-  count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/whoami"
-  app_name = var.app_name
-  app_version = var.app_version
-  namespace = local.namespace
-  service_name = "mem-whoami"
-}
-***/ # Web service
-
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
@@ -249,6 +238,20 @@ module "certificate" {
   secret_name = local.secret_cert_name
 }
 # ***/ # cert manager
+
+###################################################################################################
+# whoami                                                                                          #
+###################################################################################################
+/*** # web service app for testing Traefik
+module "whoiam" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/whoami"
+  app_name = var.app_name
+  app_version = var.app_version
+  namespace = local.namespace
+  service_name = "mem-whoami"
+}
+***/ # Web service
 
 ###################################################################################################
 # elk                                                                                             #

@@ -99,6 +99,9 @@ tf/modules/traefik/middlewares/middleware-error-page/*
 !tf/modules/traefik/middlewares/middleware-gateway-basic-auth/
 tf/modules/traefik/middlewares/middleware-gateway-basic-auth/*
 !tf/modules/traefik/middlewares/middleware-gateway-basic-auth/main.tf
+!tf/modules/traefik/middlewares/middleware-kibana-basic-auth/
+tf/modules/traefik/middlewares/middleware-kibana-basic-auth/*
+!tf/modules/traefik/middlewares/middleware-kibana-basic-auth/main.tf
 !tf/modules/traefik/middlewares/middleware-rabbitmq-basic-auth/
 tf/modules/traefik/middlewares/middleware-rabbitmq-basic-auth/*
 !tf/modules/traefik/middlewares/middleware-rabbitmq-basic-auth/main.tf

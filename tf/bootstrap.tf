@@ -26,10 +26,11 @@ locals {
   middleware_compress = "mem-mw-compress"
   middleware_rate_limit = "mem-mw-rate-limit"
   middleware_error_page = "mem-mw-error-page"
+  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
+  middleware_kibana_basic_auth = "mem-mw-kibana-basic-auth"
   middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
-  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
   ####################
@@ -38,13 +39,14 @@ locals {
   svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
-  svc_kibana = "mem-kibana"
   svc_metadata = "mem-metadata"
   svc_mongodb = "mem-mongodb"
   svc_rabbitmq = "mem-rabbitmq"
   svc_video_storage = "mem-video-storage"
   svc_video_streaming = "mem-video-streaming"
   svc_video_upload = "mem-video-upload"
+  svc_elastic_search = "mem-elasticsearch"
+  svc_kibana = "mem-kibana"
   ############
   # Services #
   ############
@@ -70,7 +72,7 @@ locals {
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
-  # svc_dns_elasticsearch = "mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
+  svc_dns_elasticsearch = "mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
@@ -90,6 +92,16 @@ module "traefik" {
   service_name = "mem-traefik"
 }
 
+module "middleware-gateway-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
+  app_name = var.app_name
+  namespace = local.namespace
+  traefik_gateway_username = var.traefik_gateway_username
+  traefik_gateway_password = var.traefik_gateway_password
+  service_name = local.middleware_gateway_basic_auth
+}
+
 module "middleware-dashboard-basic-auth" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
@@ -101,6 +113,16 @@ module "middleware-dashboard-basic-auth" {
   service_name = local.middleware_dashboard_basic_auth
 }
 
+module "middleware-kibana-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-kibana-basic-auth"
+  app_name = var.app_name
+  namespace = local.namespace
+  kibana_username = var.kibana_username
+  kibana_password = var.kibana_password
+  service_name = local.middleware_kibana_basic_auth
+}
+
 module "middleware-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
@@ -110,16 +132,6 @@ module "middleware-rabbitmq" {
   traefik_rabbitmq_password = var.traefik_rabbitmq_password
   service_name1 = local.middleware_rabbitmq1
   service_name2 = local.middleware_rabbitmq2
-}
-
-module "middleware-gateway-basic-auth" {
-  count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
-  app_name = var.app_name
-  namespace = local.namespace
-  traefik_gateway_username = var.traefik_gateway_username
-  traefik_gateway_password = var.traefik_gateway_password
-  service_name = local.middleware_gateway_basic_auth
 }
 
 module "middleware-compress" {
@@ -186,7 +198,9 @@ module "ingress-route" {
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_security_headers = local.middleware_security_headers
+  middleware_kibana_basic_auth = local.middleware_kibana_basic_auth
   svc_gateway = local.svc_gateway
+  svc_kibana = local.svc_kibana
   secret_name = local.secret_cert_name
   issuer_name = local.issuer_name
   # host_name = "169.46.98.220.nip.io"
@@ -308,9 +322,10 @@ module "whoiam" {
 # http://localhost:9200/_nodes/mem-elasticsearch-1/stats?pretty
 # Index-Only Stats:
 # http://localhost:9200/_nodes/stats/indices?pretty
-/***XXX
+
+# /*** elk
 module "mem-elasticsearch" {
-  source = "./modules/ELK/elasticsearch"
+  source = "./modules/elk/elasticsearch"
   app_name = var.app_name
   image_tag = "docker.elastic.co/elasticsearch/elasticsearch:7.5.0"
   imagePullPolicy = "IfNotPresent"
@@ -352,7 +367,7 @@ module "mem-elasticsearch" {
   rest_api_service_target_port = 9200
   inter_node_service_port = 9300
   inter_node_service_target_port = 9300
-  service_name = "mem-elasticsearch"
+  service_name = local.svc_elastic_search
 }
 
 # To check the state of the deployment, use the 'port-forward' command.
@@ -367,7 +382,7 @@ module "mem-elasticsearch" {
 # From a web browser:
 # http://localhost:5601
 module "mem-kibana" {
-  source = "./modules/ELK/kibana"
+  source = "./modules/elk/kibana"
   app_name = var.app_name
   image_tag = "docker.elastic.co/kibana/kibana:7.5.0"
   imagePullPolicy = "IfNotPresent"
@@ -391,11 +406,11 @@ module "mem-kibana" {
   # service_type = "NodePort"
   service_port = 5601
   service_target_port = 5601
-  service_name = "mem-kibana"
+  service_name = local.svc_kibana
 }
 
 module "mem-logstash" {
-  source = "./modules/ELK/logstash"
+  source = "./modules/elk/logstash"
   app_name = var.app_name
   image_tag = "docker.elastic.co/logstash/logstash:7.5.0"
   imagePullPolicy = "IfNotPresent"
@@ -405,7 +420,7 @@ module "mem-logstash" {
   service_target_port = 5044
   service_name = "mem-logstash"
 }
-XXX***/
+# ***/  # elk
 /***
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {

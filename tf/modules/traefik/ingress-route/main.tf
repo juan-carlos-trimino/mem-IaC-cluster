@@ -13,6 +13,9 @@ variable namespace {
 variable svc_gateway {
   type = string
 }
+variable svc_kibana {
+  type = string
+}
 variable middleware_rate_limit {
   type = string
 }
@@ -23,6 +26,9 @@ variable middleware_gateway_basic_auth {
   type = string
 }
 variable middleware_dashboard_basic_auth {
+  type = string
+}
+variable middleware_kibana_basic_auth {
   type = string
 }
 variable middleware_security_headers {
@@ -268,6 +274,43 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
+
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/kibana`)"
+          priority = 40
+          middlewares = [
+            {
+              name = var.middleware_kibana_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_kibana
+              namespace = var.namespace
+              port = 5601  # K8s service.
+              # (default 1) A weight used by the weighted round-robin strategy (WRR).
+              weight = 1
+              # (default true) PassHostHeader controls whether to leave the request's Host Header
+              # as it was before it reached the proxy, or whether to let the proxy set it to the
+              # destination (backend) host.
+              passHostHeader = true
+              responseForwarding = {
+                # (default 100ms) Interval between flushes of the buffered response body to the
+                # client.
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        
         # Define a low-priority catchall rule that kicks in only if other rules for defined
         # services can't handle the request.
         # {

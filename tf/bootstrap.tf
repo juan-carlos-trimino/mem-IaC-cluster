@@ -72,14 +72,14 @@ locals {
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
-  svc_dns_elasticsearch = "mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
+  svc_dns_elasticsearch = "${local.svc_elastic_search}.${local.namespace}.svc.cluster.local:9200"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
 ###################################################################################################
 # traefik                                                                                         #
 ###################################################################################################
-# /*** traefik
+/*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -208,12 +208,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-# ***/ # traefik
+***/ # traefik
 
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-# /*** cert manager
+/*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
@@ -251,7 +251,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.secret_cert_name
 }
-# ***/ # cert manager
+***/ # cert manager
 
 ###################################################################################################
 # whoami                                                                                          #
@@ -325,9 +325,12 @@ module "whoiam" {
 
 # /*** elk
 module "mem-elasticsearch" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:7.5.0"
+  # https://www.docker.elastic.co/r/elasticsearch/elasticsearch-oss
+  # https://hub.docker.com/_/elasticsearch
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
   imagePullPolicy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -338,30 +341,38 @@ module "mem-elasticsearch" {
   qos_limits_cpu = "1000m"
   qos_requests_cpu = "100m"
   # By default, Elasticsearch allocates 2GB of system memory for the database.
-  qos_limits_memory = "3Gi"
+  qos_limits_memory = "4Gi"
   qos_requests_memory = "2Gi"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "50Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
-    # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
-    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     # A node can only join a cluster when it shares its cluster.name with all the other nodes in
     # the cluster. The default name is elasticsearch, but you should change it to an appropriate
     # name which describes the purpose of the cluster.
-    "cluster.name": "elk-logs"
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name
+    "cluster.name": "cluster-elk"
+    "node.master": true
+    "node.data": false
+    # node.ml: "false"
+    "node.ingest": false
+    # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
+    # ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     # It is vitally important to the health of your node that none of the JVM is ever swapped out
     # to disk.
-    ##### "bootstrap.memory_lock": true  # Swapping is disabled.
-    # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
-    # determines the set of master-eligible nodes whose votes are counted in the first election.
-    # In development mode, with no discovery settings configured, this step is performed
-    # automatically by the nodes themselves.
-    #
-    # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
-    # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
-    # the very first election.
-    "cluster.initial_master_nodes": "mem-elasticsearch-0, mem-elasticsearch-1, mem-elasticsearch-2"
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/_memory_lock_check.html
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/setup-configuration-memory.html#bootstrap-memory_lock
+    # "bootstrap.memory_lock": true  # Swapping is disabled.
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host
+    "network.host": "0.0.0.0"
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/security-settings.html#general-security-settings
+    # "xpack.security.transport.ssl.enabled": true
+    # In Elasticsearch 8.0 and later, security is enabled automatically when you start Elasticsearch for the first time.
+    "xpack.security.enabled": false
+    "xpack.license.self_generated.type": "trial"
+    "xpack.security.http.ssl.enabled": false
+    "xpack.monitoring.collection.enabled": true
+    "xpack.security.transport.ssl.enabled": false
   }
   rest_api_service_port = 9200
   rest_api_service_target_port = 9200
@@ -382,9 +393,12 @@ module "mem-elasticsearch" {
 # From a web browser:
 # http://localhost:5601
 module "mem-kibana" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/kibana"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/kibana/kibana:7.5.0"
+  # image_tag = "docker.elastic.co/kibana/kibana:7.5.0"
+  image_tag = "docker.elastic.co/kibana/kibana:8.4.1"
+  # image_tag = "docker.elastic.co/kibana/kibana:8.4.1@sha256:47450186126bf6e780376842812d1f9e7b084087d7f75f200ad3597b0b4cd975"
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
@@ -396,12 +410,16 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    ELASTICSEARCH_URL: "http://${local.svc_dns_elasticsearch}"
+    ELASTICSEARCH_URL: "http://${local.svc_elastic_search}-headless:9200"
+    CLUSTER_NAME: "cluster-elk"
     # # ELASTICSEARCH_HOSTS: "mem-elasticsearch-0, mem-elasticsearch-1, mem-elasticsearch-2"
     # ELASTICSEARCH_USER: "user"
     # ELASTICSEARCH_PASSWORD: "paasw"
     # SVC_DNS_KIBANA: local.svc_dns_kibana
-    XPACK_SECURITY_ENABLED: true
+    XPACK_SECURITY_ENABLED: false
+    XPACK_MONITORING_ENABLED: false
+    XPACK_ML_ENABLED: false
+    XPACK_GRAPH_ENABLED: false
   }
   # service_type = "NodePort"
   service_port = 5601
@@ -409,7 +427,9 @@ module "mem-kibana" {
   service_name = local.svc_kibana
 }
 
+/**
 module "mem-logstash" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/logstash"
   app_name = var.app_name
   image_tag = "docker.elastic.co/logstash/logstash:7.5.0"
@@ -420,10 +440,12 @@ module "mem-logstash" {
   service_target_port = 5044
   service_name = "mem-logstash"
 }
+**/
 # ***/  # elk
 /***
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
+  count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/ELK/filebeat"
   path_to_files = "./utility-files/ELK/filebeat"
   app_name = var.app_name
@@ -445,7 +467,7 @@ module "mem-filebeat" {
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-# /*** mongodb - deployment
+/*** mongodb - deployment
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -469,7 +491,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# ***/  # mongodb - deployment
+***/  # mongodb - deployment
 
 /*** mongodb - statefulset
 # StatefulSet.
@@ -553,7 +575,7 @@ module "mem-rabbitmq" {
 }
 ***/  # rabbitmq - deployment
 
-# /*** rabbitmq - statefulset
+/*** rabbitmq - statefulset
 # StatefulSet.
 module "mem-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -599,12 +621,12 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-# ***/  # rabbitmq - statefulset
+***/  # rabbitmq - statefulset
 
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-# /*** app
+/*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -812,4 +834,4 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-# ***/  # app
+***/  # app

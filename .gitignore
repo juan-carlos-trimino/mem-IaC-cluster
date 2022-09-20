@@ -34,6 +34,12 @@ tf/modules/elk/*
 !tf/modules/elk/elasticsearch/
 tf/modules/elk/elasticsearch/*
 !tf/modules/elk/elasticsearch/main.tf
+
+!tf/modules/elk/elasticsearch/es-master
+tf/modules/elk/elasticsearch/es-master/*
+!tf/modules/elk/elasticsearch/main.tf
+
+
 !tf/modules/elk/filebeat/
 tf/modules/elk/filebeat/*
 !tf/modules/elk/filebeat/main.tf

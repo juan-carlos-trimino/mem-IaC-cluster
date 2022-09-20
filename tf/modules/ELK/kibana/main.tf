@@ -93,10 +93,11 @@ resource "kubernetes_config_map" "config" {
   data = {
     "kibana.yml" = <<EOF
       server.name: "Kibana"
-      xpack.monitoring.ui.container.elasticsearch.enabled: true
       server.port: 5601
+      # https://www.elastic.co/guide/en/kibana/8.4/reporting-settings-kb.html#general-reporting-settings
+      xpack.reporting.enabled: true
+      xpack.monitoring.ui.container.elasticsearch.enabled: true
       # elasticsearch.url: ["http://mem-elasticsearch.memories:9200"]
-      elasticsearch.hosts: ["http://mem-elasticsearch.memories:9200"]
       server.host: "0.0.0.0"
       EOF
   }
@@ -134,6 +135,12 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
+          security_context {
+          #   run_as_group = 0
+          #   run_as_non_root = false
+          #   run_as_user = 0
+            read_only_root_filesystem = false
+          }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other

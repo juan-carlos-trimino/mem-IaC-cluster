@@ -33,7 +33,7 @@ tf/modules/deployment/*
 tf/modules/ELK/*
 !tf/modules/ELK/elasticsearch/
 tf/modules/ELK/elasticsearch/*
-tf/modules/ELK/elasticsearch/main.tf
+!tf/modules/ELK/elasticsearch/main.tf
 
 !tf/modules/ELK/elasticsearch/es-master/
 tf/modules/ELK/elasticsearch/es-master/*

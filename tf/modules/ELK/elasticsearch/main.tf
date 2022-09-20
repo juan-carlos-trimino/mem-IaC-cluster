@@ -128,6 +128,21 @@ locals {
   service_name = "${var.service_name}-headless"
 }
 
+resource "null_resource" "scc-elasticsearch" {
+  triggers = {
+    always_run = timestamp()
+  }
+  #
+  provisioner "local-exec" {
+    command = "oc apply -f ./modules/elk/elasticsearch/util/mem-elasticsearch-scc.yaml"
+  }
+  #
+  provisioner "local-exec" {
+    when = destroy
+    command = "oc delete scc mem-elasticsearch-scc"
+  }
+}
+
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -170,6 +185,12 @@ resource "kubernetes_role" "role" {
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
     resources = ["endpoints", "services", "namespaces"]
+  }
+  rule {
+    api_groups = ["security.openshift.io"]
+    verbs = ["use"]
+    resources = ["securitycontextconstraints"]
+    resource_names = ["mem-elasticsearch-scc"]
   }
 }
 
@@ -220,14 +241,14 @@ resource "kubernetes_stateful_set" "stateful_set" {
     replicas = var.replicas
     pod_management_policy = var.pod_management_policy
     revision_history_limit = var.revision_history_limit
-    # Headless service that gives network identity to the RabbitMQ nodes and enables them to
+    # Headless service that gives network identity to the Elasticsearch nodes and enables them to
     # cluster. The name of the service that governs this StatefulSet. This service must exist
     # before the StatefulSet and is responsible for the network identity of the set. Pods get
     # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
     service_name = local.service_name
     selector {
       match_labels = {
-        pod = var.service_name
+        pod = var.service_name  # has to match .spec.template.metadata.labels
       }
     }
     # updateStrategy:
@@ -275,31 +296,89 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
+        #
+        init_container {
+          name = "fix-permissions"
+          image = "busybox:1.34.1"
+          image_pull_policy = "IfNotPresent"
+          # Docker (ENTRYPOINT)
+          command = ["/bin/sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          security_context {
+            # run_as_group = 0
+            # run_as_non_root = false
+            # run_as_user = 0
+            read_only_root_filesystem = false
+            privileged = true
+          }
+          volume_mount {
+            name = "elasticsearch-storage"
+            mount_path = "/usr/share/elasticsearch/data"
+          }
+        }
+
+
+        #
+        # init_container {
+        #   name = "lock-memory"
+        #   image = "busybox:1.34.1"
+        #   image_pull_policy = "IfNotPresent"
+        #   # Docker (ENTRYPOINT)
+        #   command = ["ulimit -l unlimited"]
+        #   security_context {
+        #     # run_as_group = 0
+        #     run_as_non_root = false
+        #     run_as_user = 0
+        #     read_only_root_filesystem = false
+        #     # privileged = true
+        #   }
+        # }
+
+
+
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
-        # init_container {
-        #   name = "increase-vm-max-map-count"
-        #   image = "busybox:latest"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["/sbin/sysctl", "-w", "vm.max_map_count=262144"]
-        #   security_context {
-        #     privileged = true
-        #   }
-        # }
+        init_container {
+          name = "increase-vm-max-map-count"
+          image = "busybox:1.34.1"
+          image_pull_policy = "IfNotPresent"
+          # Docker (ENTRYPOINT)
+          command = ["sysctl", "-w", "vm.max_map_count=262144"]
+          security_context {
+            # run_as_group = 0
+            # run_as_non_root = false
+            # run_as_user = 0
+            read_only_root_filesystem = true
+            privileged = true
+          }
+        }
         # Increase the max number of open file descriptors.
-        # init_container {
-        #   name = "increase-fd-ulimit"
-        #   image = "busybox:latest"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["/bin/sh", "-c", "ulimit -n 65536"]
-        #   security_context {
-        #     privileged = true
-        #   }
-        # }
+        init_container {
+          name = "increase-fd-ulimit"
+          image = "busybox:1.34.1"
+          image_pull_policy = "IfNotPresent"
+          # Docker (ENTRYPOINT)
+          command = ["/bin/sh", "-c", "ulimit -n 65536"]
+          security_context {
+            # run_as_group = 0
+            # run_as_non_root = false
+            # run_as_user = 0
+            read_only_root_filesystem = true
+            privileged = true
+          }
+        }
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
+          security_context {
+            capabilities {
+              drop = ["ALL"]
+            }
+            run_as_group = 1000
+            run_as_non_root = true
+            run_as_user = 1000
+            read_only_root_filesystem = false
+          }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -330,6 +409,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
               memory = var.qos_limits_memory
             }
           }
+          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name
           # By default, Elasticsearch will take the 7 first character of the randomly generated
           # uuid used as the node id. Note that the node id is persisted and does not change when a
           # node restarts and therefore the default node name will also not change.
@@ -346,9 +426,23 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # cluster that are master-eligible and likely to be live and contactable to seed the
           # discovery process. Each address can be either an IP address or a hostname that resolves
           # to one or more IP addresses via DNS.
+          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
           env {
             name = "discovery.seed_hosts"
-            value = "mem-elasticsearch-0.${local.service_name}, mem-elasticsearch-1.${local.service_name}, mem-elasticsearch-2.${local.service_name}"
+            value = "${var.service_name}-0.${var.service_name}, ${var.service_name}-1.${var.service_name}, ${var.service_name}-2.${var.service_name}"
+          }
+          # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
+          # determines the set of master-eligible nodes whose votes are counted in the first election.
+          # In development mode, with no discovery settings configured, this step is performed
+          # automatically by the nodes themselves.
+          #
+          # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
+          # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
+          # the very first election.
+          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
+          env {
+            name = "cluster.initial_master_nodes"
+            value = "${var.service_name}-0, ${var.service_name}-1, ${var.service_name}-2"
           }
           dynamic "env" {
             for_each = var.env
@@ -376,10 +470,10 @@ resource "kubernetes_stateful_set" "stateful_set" {
           #   period_seconds = 60
           #   timeout_seconds = 10
           # }
-          volume_mount {
-            name = "elasticsearch-storage"
-            mount_path = "/usr/share/elasticsearch/data"
-          }
+          # volume_mount {
+          #   name = "elasticsearch-storage"
+          #   mount_path = "/usr/share/elasticsearch/data"
+          # }
         }
       }
     }
@@ -462,26 +556,26 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
 }
 
 # Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-resource "kubernetes_service" "service" {
-  metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  #
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = var.service_session_affinity
-    port {
-      name = "rest-api"  # Node discovery.
-      port = var.rest_api_service_port
-      target_port = var.rest_api_service_target_port
-      protocol = "TCP"
-    }
-    type = var.service_type
-  }
-}
+# resource "kubernetes_service" "service" {
+#   metadata {
+#     name = var.dns_name != "" ? var.dns_name : var.service_name
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   #
+#   spec {
+#     selector = {
+#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+#     }
+#     session_affinity = var.service_session_affinity
+#     port {
+#       name = "rest-api"  # Node discovery.
+#       port = var.rest_api_service_port
+#       target_port = var.rest_api_service_target_port
+#       protocol = "TCP"
+#     }
+#     type = var.service_type
+#   }
+# }

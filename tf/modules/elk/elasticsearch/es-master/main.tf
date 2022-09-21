@@ -4,9 +4,9 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "image_tag" {}
-variable "namespace" {
+variable app_name {}
+variable image_tag {}
+variable namespace {
   default = "default"
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
@@ -16,62 +16,65 @@ variable "namespace" {
 # When using a tag other that latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable imagePullPolicy {
   default = "Always"
 }
-variable "env" {
+variable env {
   default = {}
   type = map
 }
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
 }
-variable "replicas" {
+variable replicas {
   default = 1
   type = number
 }
-variable "revision_history_limit" {
+variable revision_history_limit {
   default = 2
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
 # seconds to terminate gracefully before they're killed forcibly.
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
 # To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
 # guarantee.
-variable "pod_management_policy" {
+variable pod_management_policy {
   default = "OrderedReady"
 }
 # The primary use case for setting this field is to use a StatefulSet's Headless Service to
 # propagate SRV records for its Pods without respect to their readiness for purpose of peer
 # discovery.
-variable "publish_not_ready_addresses" {
+variable publish_not_ready_addresses {
   default = "false"
   type = bool
 }
-variable "pvc_access_modes" {
+variable pvc_access_modes {
   default = []
   type = list
 }
-variable "pvc_storage_class_name" {
+variable pvc_storage_class_name {
   default = ""
 }
-variable "pvc_storage_size" {
+variable pvc_storage_size {
   default = "20Gi"
 }
-variable "service_name" {
+variable service_name {
+  default = ""
+}
+variable service_name_headless {
   default = ""
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
@@ -86,27 +89,27 @@ variable "service_name" {
 # open, a random pod is selected and then all network packets belonging to that connection
 # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
 # always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
 }
-variable "rest_api_service_port" {
+variable rest_api_service_port {
   type = number
 }
-variable "rest_api_service_target_port" {
+variable rest_api_service_target_port {
   type = number
 }
-variable "inter_node_service_port" {
+variable inter_node_service_port {
   type = number
 }
-variable "inter_node_service_target_port" {
+variable inter_node_service_target_port {
   type = number
 }
-variable "dns_name" {
+variable dns_name {
   default = ""
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
 }
 #
@@ -125,7 +128,6 @@ locals {
   # always get hit (until the connection is closed).
   session_affinity = "None"
   service_type = "ClusterIP"
-  service_name = "${var.service_name}-headless"
 }
 
 resource "null_resource" "scc-elasticsearch" {
@@ -173,8 +175,8 @@ resource "kubernetes_service_account" "service_account" {
 # resource "kubernetes_cluster_role" "cluster_role" {
 resource "kubernetes_role" "role" {
   metadata {
-    # name = "${var.service_name}-cluster-role"
     name = "${var.service_name}-role"
+    namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -198,8 +200,8 @@ resource "kubernetes_role" "role" {
 # resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
 resource "kubernetes_role_binding" "role_binding" {
   metadata {
-    # name = "${var.service_name}-cluster-role-binding"
     name = "${var.service_name}-role-binding"
+    namespace = var.namespace
     labels = {
       app = var.app_name
     }
@@ -234,6 +236,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     labels = {
       app = var.app_name
       pod = var.service_name
+      role = "master"
     }
   }
   #
@@ -245,7 +248,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # cluster. The name of the service that governs this StatefulSet. This service must exist
     # before the StatefulSet and is responsible for the network identity of the set. Pods get
     # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
-    service_name = local.service_name
+    service_name = var.service_name_headless
     selector {
       match_labels = {
         pod = var.service_name  # has to match .spec.template.metadata.labels
@@ -315,26 +318,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             mount_path = "/usr/share/elasticsearch/data"
           }
         }
-
-
-        #
-        # init_container {
-        #   name = "lock-memory"
-        #   image = "busybox:1.34.1"
-        #   image_pull_policy = "IfNotPresent"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["ulimit -l unlimited"]
-        #   security_context {
-        #     # run_as_group = 0
-        #     run_as_non_root = false
-        #     run_as_user = 0
-        #     read_only_root_filesystem = false
-        #     # privileged = true
-        #   }
-        # }
-
-
-
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
         init_container {
@@ -378,6 +361,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
             run_as_non_root = true
             run_as_user = 1000
             read_only_root_filesystem = false
+            privileged = false
           }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -421,6 +405,15 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
+          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host
+          env {
+            name = "network.host"
+            value_from {
+              field_ref {
+                field_path = "status.podIP"
+              }
+            }
+          }
           # When you want to form a cluster with nodes on other hosts, use the static
           # discovery.seed_hosts setting. This setting provides a list of other nodes in the
           # cluster that are master-eligible and likely to be live and contactable to seed the
@@ -429,7 +422,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
           env {
             name = "discovery.seed_hosts"
-            value = "${var.service_name}-0.${var.service_name}, ${var.service_name}-1.${var.service_name}, ${var.service_name}-2.${var.service_name}"
+            value = <<-EOL
+              "${var.service_name}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+               ${var.service_name}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+               ${var.service_name}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
+            EOL
           }
           # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
           # determines the set of master-eligible nodes whose votes are counted in the first election.
@@ -442,7 +439,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
           env {
             name = "cluster.initial_master_nodes"
-            value = "${var.service_name}-0, ${var.service_name}-1, ${var.service_name}-2"
+            value = <<-EOL
+              "${var.service_name}-0,
+               ${var.service_name}-1,
+               ${var.service_name}-2"
+            EOL
           }
           dynamic "env" {
             for_each = var.env
@@ -525,10 +526,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
 # $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-elasticsearch-headless.memories.svc.cluster.local
 resource "kubernetes_service" "headless_service" {  # For inter-node communication.
   metadata {
-    name = local.service_name
+    name = var.service_name_headless
     namespace = var.namespace
     labels = {
       app = var.app_name
+      role = "master"
     }
   }
   #

@@ -49,6 +49,7 @@ locals {
   svc_elasticsearch_headless = "mem-elasticsearch-headless"
   svc_elasticsearch_master = "mem-elasticsearch-master"
   svc_elasticsearch_data = "mem-elasticsearch-data"
+  svc_elasticsearch_ingest = "mem-elasticsearch-ingest"
   svc_kibana = "mem-kibana"
   ############
   # Services #
@@ -346,9 +347,6 @@ module "mem-elasticsearch-master" {
   # By default, Elasticsearch allocates 2GB of system memory for the database.
   qos_limits_memory = "4Gi"
   qos_requests_memory = "2Gi"
-  pvc_access_modes = ["ReadWriteOnce"]
-  pvc_storage_size = "50Gi"
-  pvc_storage_class_name = "ibmc-block-silver"
   env = {
     # A node can only join a cluster when it shares its cluster.name with all the other nodes in
     # the cluster. The default name is elasticsearch, but you should change it to an appropriate
@@ -444,6 +442,43 @@ module "mem-elasticsearch-data" {
   service_name = local.svc_elasticsearch_data
 }
 
+module "mem-elasticsearch-ingest" {
+  depends_on = [
+    module.mem-elasticsearch-master
+  ]
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/elasticsearch/es-ingest"
+  app_name = var.app_name
+  # https://www.docker.elastic.co/r/elasticsearch/elasticsearch-oss
+  # https://hub.docker.com/_/elasticsearch
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
+  imagePullPolicy = "IfNotPresent"
+  namespace = local.namespace
+  replicas = 2
+  # Limits and request for CPU resources are measured in millicores. If the container needs one full
+  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
+  # '250m.'
+  qos_limits_cpu = "1000m"
+  qos_requests_cpu = "100m"
+  # By default, Elasticsearch allocates 2GB of system memory for the database.
+  qos_limits_memory = "4Gi"
+  qos_requests_memory = "2Gi"
+  env = {
+    "cluster.name": "${local.elasticsearch_cluster_name}"
+    HTTP_ENABLE: true
+    ES_PATH_CONF: "/usr/share/elasticsearch/config"
+    "node.roles": "[ingest]"
+    "xpack.security.enabled": false
+    "xpack.license.self_generated.type": "trial"
+    "xpack.security.http.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": false
+  }
+  service_port = 9200
+  service_target_port = 9200
+  service_name_master = local.svc_elasticsearch_master
+  service_name = local.svc_elasticsearch_ingest
+}
+
 # To check the state of the deployment, use the 'port-forward' command.
 #
 # $ kubectl port-forward <pod-name-or-svc-headless> 5601:5601 -n memories
@@ -473,18 +508,21 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_master}-headless:9200"
+    # ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_headless}:9200"
+    # ELASTICSEARCH_URL: "http://${local.svc_elasticsearch}:9200"
     CLUSTER_NAME: "cluster-elk"
-    # # ELASTICSEARCH_HOSTS: "mem-elasticsearch-0, mem-elasticsearch-1, mem-elasticsearch-2"
-    # ELASTICSEARCH_USER: "user"
-    # ELASTICSEARCH_PASSWORD: "paasw"
+    # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).
+    "server.host": "0.0.0.0"
+    "elasticsearch.hosts": "[mem-elasticsearch-master-0,mem-elasticsearch-master-1,mem-elasticsearch-master-2]"
+    "node.roles": "ui"
+    # "elasticsearch.username": "kibana"
+    # "elasticsearch.password": "kibana"
     # SVC_DNS_KIBANA: local.svc_dns_kibana
-    XPACK_SECURITY_ENABLED: false
-    XPACK_MONITORING_ENABLED: false
-    XPACK_ML_ENABLED: false
-    XPACK_GRAPH_ENABLED: false
+    # XPACK_SECURITY_ENABLED: false
+    # XPACK_MONITORING_ENABLED: false
+    # XPACK_ML_ENABLED: false
+    # XPACK_GRAPH_ENABLED: false
   }
-  # service_type = "NodePort"
   service_port = 5601
   service_target_port = 5601
   service_name = local.svc_kibana

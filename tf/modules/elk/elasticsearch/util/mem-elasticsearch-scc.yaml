@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/description: mem-elasticsearch-scc provides all features of the restricted SCC but allows users to run with any UID and any GID.
 priority: 10
 allowPrivilegedContainer: true
-allowPrivilegeEscalation: false
+allowPrivilegeEscalation: true
 allowHostDirVolumePlugin: false
 allowHostNetwork: false
 allowHostPorts: false

@@ -478,6 +478,10 @@ resource "kubernetes_stateful_set" "stateful_set" {
           #   name = "elasticsearch-storage"
           #   mount_path = "/usr/share/elasticsearch/data"
           # }
+          volume_mount {
+            name = "elasticsearch-storage"
+            mount_path = "/usr/share/elasticsearch/data"
+          }
         }
       }
     }

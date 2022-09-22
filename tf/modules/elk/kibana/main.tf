@@ -56,7 +56,7 @@ variable "service_name" {
 # ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
 #
-# Session affinity and Web Browsers (for LoadBalancer Services)
+# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxSession affinity and Web Browsers (for LoadBalancer Services)
 # Since the service is now exposed externally, accessing it with a web browser will hit
 # the same pod every time. If the sessionAffinity is set to None, then why? The browser
 # is using keep-alive connections and sends all its requests through a single connection.
@@ -73,34 +73,10 @@ variable "service_port" {
 variable "service_target_port" {
   type = number
 }
-variable "dns_name" {
-  default = ""
-}
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable "service_type" {
   default = "ClusterIP"
-}
-
-resource "kubernetes_config_map" "config" {
-  metadata {
-    name = "${var.service_name}-config"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  data = {
-    "kibana.yml" = <<EOF
-      server.name: "Kibana"
-      server.port: 5601
-      # https://www.elastic.co/guide/en/kibana/8.4/reporting-settings-kb.html#general-reporting-settings
-      xpack.reporting.enabled: true
-      xpack.monitoring.ui.container.elasticsearch.enabled: true
-      # elasticsearch.url: ["http://mem-elasticsearch.memories:9200"]
-      server.host: "0.0.0.0"
-      EOF
-  }
 }
 
 resource "kubernetes_deployment" "deployment" {
@@ -121,7 +97,6 @@ resource "kubernetes_deployment" "deployment" {
         pod = var.service_name
       }
     }
-    #
     template {
       metadata {
         labels = {
@@ -136,9 +111,6 @@ resource "kubernetes_deployment" "deployment" {
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
           security_context {
-          #   run_as_group = 0
-          #   run_as_non_root = false
-          #   run_as_user = 0
             read_only_root_filesystem = false
           }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -166,28 +138,19 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
+          env {
+            name = "server.name"
+            value_from {
+              field_ref {
+                field_path = "metadata.name"
+              }
+            }
+          }
           dynamic "env" {
             for_each = var.env
             content {
               name = env.key
               value = env.value
-            }
-          }
-          volume_mount {
-            name = "config"
-            mount_path = "/usr/share/kibana/config/kibana.yml"
-            sub_path = "kibana.yml"
-            read_only = true
-          }
-        }
-        volume {
-          name = "config"
-          config_map {
-            name = kubernetes_config_map.config.metadata[0].name
-            default_mode = "0400"  # Octal
-            items {
-              key = "kibana.yml"
-              path = "kibana.yml"  #File name.
             }
           }
         }
@@ -200,7 +163,7 @@ resource "kubernetes_deployment" "deployment" {
 # cluster.
 resource "kubernetes_service" "service" {
   metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
+    name = var.service_name
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -216,7 +179,6 @@ resource "kubernetes_service" "service" {
       name = "kibana"
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
-      # node_port = "30888"
       protocol = "TCP"
     }
     type = var.service_type

@@ -61,16 +61,6 @@ variable publish_not_ready_addresses {
   default = "false"
   type = bool
 }
-variable pvc_access_modes {
-  default = []
-  type = list
-}
-variable pvc_storage_class_name {
-  default = ""
-}
-variable pvc_storage_size {
-  default = "20Gi"
-}
 variable service_name {
   default = ""
 }
@@ -81,7 +71,7 @@ variable service_name_headless {
 # ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
 #
-# Session affinity and Web Browsers (for LoadBalancer Services)
+########################################## Session affinity and Web Browsers (for LoadBalancer Services)
 # Since the service is now exposed externally, accessing it with a web browser will hit
 # the same pod every time. If the sessionAffinity is set to None, then why? The browser
 # is using keep-alive connections and sends all its requests through a single connection.
@@ -111,23 +101,6 @@ variable dns_name {
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
   default = "ClusterIP"
-}
-#
-locals {
-  # The service normally forwards each connection to a randomly selected backing pod. To
-  # ensure that connections from a particular client are passed to the same Pod each time,
-  # set the service's sessionAffinity property to ClientIP instead of None (default).
-  #
-  # Session affinity and Web Browsers (for LoadBalancer Services)
-  # Since the service is now exposed externally, accessing it with a web browser will hit
-  # the same pod every time. If the sessionAffinity is set to None, then why? The browser
-  # is using keep-alive connections and sends all its requests through a single connection.
-  # Services work at the connection level, and when a connection to a service is initially
-  # open, a random pod is selected and then all network packets belonging to that connection
-  # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-  # always get hit (until the connection is closed).
-  session_affinity = "None"
-  service_type = "ClusterIP"
 }
 
 resource "null_resource" "scc-elasticsearch" {
@@ -299,25 +272,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        #
-        init_container {
-          name = "fix-permissions"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          # Docker (ENTRYPOINT)
-          command = ["/bin/sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
-          security_context {
-            # run_as_group = 0
-            # run_as_non_root = false
-            # run_as_user = 0
-            read_only_root_filesystem = false
-            privileged = true
-          }
-          volume_mount {
-            name = "elasticsearch-storage"
-            mount_path = "/usr/share/elasticsearch/data"
-          }
-        }
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
         init_container {
@@ -478,36 +432,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
       }
     }
-    # This template will be used to create a PersistentVolumeClaim for each pod.
-    # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
-    # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
-    # pods in the same namespace.
-    #
-    # In order for RabbitMQ nodes to retain data between Pod restarts, node's data directory must
-    # use durable storage. A Persistent Volume must be attached to each RabbitMQ Pod.
-    #
-    # If a transient volume is used to back a RabbitMQ node, the node will lose its identity and
-    # all of its local data in case of a restart. This includes both schema and durable queue data.
-    # Syncing all of this data on every node restart would be highly inefficient. In case of a loss
-    # of quorum during a rolling restart, this will also lead to data loss.
-    volume_claim_template {
-      metadata {
-        name = "elasticsearch-storage"
-        namespace = var.namespace
-        labels = {
-          app = var.app_name
-        }
-      }
-      spec {
-        access_modes = var.pvc_access_modes
-        storage_class_name = var.pvc_storage_class_name
-        resources {
-          requests = {
-            storage = var.pvc_storage_size
-          }
-        }
-      }
-    }
   }
 }
 
@@ -530,15 +454,13 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
     namespace = var.namespace
     labels = {
       app = var.app_name
-      role = "master"
     }
   }
-  #
   spec {
     selector = {
       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
     }
-    session_affinity = local.session_affinity
+    session_affinity = var.service_session_affinity
     port {
       name = "rest-api"  # Node discovery.
       port = var.rest_api_service_port
@@ -551,33 +473,8 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
       target_port = var.inter_node_service_target_port
       protocol = "TCP"
     }
-    type = local.service_type
+    type = var.service_type
     cluster_ip = "None"  # Headless Service.
     publish_not_ready_addresses = var.publish_not_ready_addresses
   }
 }
-
-# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-# resource "kubernetes_service" "service" {
-#   metadata {
-#     name = var.dns_name != "" ? var.dns_name : var.service_name
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   #
-#   spec {
-#     selector = {
-#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-#     }
-#     session_affinity = var.service_session_affinity
-#     port {
-#       name = "rest-api"  # Node discovery.
-#       port = var.rest_api_service_port
-#       target_port = var.rest_api_service_target_port
-#       protocol = "TCP"
-#     }
-#     type = var.service_type
-#   }
-# }

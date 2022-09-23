@@ -181,6 +181,6 @@ resource "kubernetes_service" "service" {
       target_port = var.service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = var.service_type
+    type = "LoadBalancer"  #var.service_type
   }
 }

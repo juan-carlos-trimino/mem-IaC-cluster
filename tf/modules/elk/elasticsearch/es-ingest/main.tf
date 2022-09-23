@@ -76,6 +76,12 @@ variable service_port {
 variable service_target_port {
   type = number
 }
+variable inter_node_service_port {
+  type = number
+}
+variable inter_node_service_target_port {
+  type = number
+}
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
@@ -295,8 +301,13 @@ resource "kubernetes_deployment" "deployment" {
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
           port {
-            name = "http3"
+            name = "http"
             container_port = var.service_target_port  # The port the app is listening.
+            protocol = "TCP"
+          }
+          port {
+            name = "inter-node"
+            container_port = var.inter_node_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
           resources {
@@ -357,14 +368,14 @@ resource "kubernetes_deployment" "deployment" {
           # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
           # the very first election.
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
-          env {
-            name = "cluster.initial_master_nodes"
-            value = <<-EOL
-              "mem-elasticsearch-master-0,
-               mem-elasticsearch-master-1,
-               mem-elasticsearch-master-2"
-            EOL
-          }
+          # env {
+          #   name = "cluster.initial_master_nodes"
+          #   value = <<-EOL
+          #     "mem-elasticsearch-master-0,
+          #      mem-elasticsearch-master-1,
+          #      mem-elasticsearch-master-2"
+          #   EOL
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -404,7 +415,7 @@ resource "kubernetes_service" "service" {
     }
     session_affinity = var.service_session_affinity
     port {
-      name = "http3"
+      name = "http"
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
       protocol = "TCP"

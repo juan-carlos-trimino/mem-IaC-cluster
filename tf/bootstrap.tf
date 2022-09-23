@@ -332,8 +332,6 @@ module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
   app_name = var.app_name
-  # https://www.docker.elastic.co/r/elasticsearch/elasticsearch-oss
-  # https://hub.docker.com/_/elasticsearch
   image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
   imagePullPolicy = "IfNotPresent"
   publish_not_ready_addresses = true
@@ -355,9 +353,6 @@ module "mem-elasticsearch-master" {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
     "node.roles": "[master]"
-    # "node.data": false
-    # node.ml: "false"
-    # "node.ingest": false
     # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
     # ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     # It is vitally important to the health of your node that none of the JVM is ever swapped out
@@ -374,11 +369,11 @@ module "mem-elasticsearch-master" {
     # deprecated "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
   }
-  rest_api_service_port = 9200
-  rest_api_service_target_port = 9200
+  # rest_api_service_port = 9200
+  # rest_api_service_target_port = 9200
   inter_node_service_port = 9300
   inter_node_service_target_port = 9300
-  service_name_headless = local.svc_elasticsearch_headless
+  service_name_headless = "${local.svc_elasticsearch_headless}-master"
   service_name = local.svc_elasticsearch_master
 }
 
@@ -433,11 +428,11 @@ module "mem-elasticsearch-data" {
     # "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
   }
-  rest_api_service_port = 9200
-  rest_api_service_target_port = 9200
+  # rest_api_service_port = 9200
+  # rest_api_service_target_port = 9200
   inter_node_service_port = 9300
   inter_node_service_target_port = 9300
-  service_name_headless = local.svc_elasticsearch_headless
+  service_name_headless = "${local.svc_elasticsearch_headless}-data"
   service_name_master = local.svc_elasticsearch_master
   service_name = local.svc_elasticsearch_data
 }
@@ -475,6 +470,8 @@ module "mem-elasticsearch-ingest" {
   }
   service_port = 9200
   service_target_port = 9200
+  inter_node_service_port = 9300
+  inter_node_service_target_port = 9300
   service_name_master = local.svc_elasticsearch_master
   service_name = local.svc_elasticsearch_ingest
 }
@@ -508,20 +505,24 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    # ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_headless}:9200"
-    # ELASTICSEARCH_URL: "http://${local.svc_elasticsearch}:9200"
+    # ELASTICSEARCH_URL: "http://mem-elasticsearch-ingest.memories.svc.cluster.local:9200"
+    # ELASTICSEARCH_URL: "http://${local.svc_elasticsearch}:9200"  http://mem-elasticsearch-ingest.memories:9200
     CLUSTER_NAME: "cluster-elk"
     # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).
     "server.host": "0.0.0.0"
-    "elasticsearch.hosts": "[mem-elasticsearch-master-0,mem-elasticsearch-master-1,mem-elasticsearch-master-2]"
+    # https://www.elastic.co/guide/en/kibana/current/settings.html
+    # "elasticsearch.hosts": "[mem-elasticsearch-ingest-0.memories,mem-elasticsearch-ingest-1.memories]"
+    "elasticsearch.hosts": "[mem-elasticsearch-ingest.memories]"
     "node.roles": "ui"
     # "elasticsearch.username": "kibana"
     # "elasticsearch.password": "kibana"
     # SVC_DNS_KIBANA: local.svc_dns_kibana
     # XPACK_SECURITY_ENABLED: false
-    # XPACK_MONITORING_ENABLED: false
-    # XPACK_ML_ENABLED: false
-    # XPACK_GRAPH_ENABLED: false
+    # This deprecated setting has no effect.
+    "xpack.monitoring.enabled": false
+    # If set to false, the machine learning APIs are disabled on the node.
+    "xpack.ml.enabled": false
+    # "xpack.graph.enabled": false
   }
   service_port = 5601
   service_target_port = 5601

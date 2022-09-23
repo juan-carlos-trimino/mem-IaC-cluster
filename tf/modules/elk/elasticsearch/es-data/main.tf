@@ -95,42 +95,22 @@ variable service_name_master {
 variable service_session_affinity {
   default = "None"
 }
-variable rest_api_service_port {
-  type = number
-}
-variable rest_api_service_target_port {
-  type = number
-}
+# variable rest_api_service_port {
+#   type = number
+# }
+# variable rest_api_service_target_port {
+#   type = number
+# }
 variable inter_node_service_port {
   type = number
 }
 variable inter_node_service_target_port {
   type = number
 }
-variable dns_name {
-  default = ""
-}
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
   default = "ClusterIP"
-}
-#
-locals {
-  # The service normally forwards each connection to a randomly selected backing pod. To
-  # ensure that connections from a particular client are passed to the same Pod each time,
-  # set the service's sessionAffinity property to ClientIP instead of None (default).
-  #
-  # Session affinity and Web Browsers (for LoadBalancer Services)
-  # Since the service is now exposed externally, accessing it with a web browser will hit
-  # the same pod every time. If the sessionAffinity is set to None, then why? The browser
-  # is using keep-alive connections and sends all its requests through a single connection.
-  # Services work at the connection level, and when a connection to a service is initially
-  # open, a random pod is selected and then all network packets belonging to that connection
-  # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-  # always get hit (until the connection is closed).
-  session_affinity = "None"
-  service_type = "ClusterIP"
 }
 
 # resource "null_resource" "scc-elasticsearch" {
@@ -239,7 +219,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     labels = {
       app = var.app_name
       pod = var.service_name
-      role = "master"
+      role = "data"
     }
   }
   #
@@ -302,7 +282,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        #
+        # Fix the permissions on the volume.
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
         init_container {
           name = "fix-permissions"
           image = "busybox:1.34.1"
@@ -323,6 +304,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
+        # Increase the default vm.max_map_count to 262144
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
         init_container {
           name = "increase-vm-max-map-count"
           image = "busybox:1.34.1"
@@ -338,6 +321,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         # Increase the max number of open file descriptors.
+        # Increase the ulimit
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
         init_container {
           name = "increase-fd-ulimit"
           image = "busybox:1.34.1"
@@ -372,11 +357,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          port {
-            name = "rest-api"
-            container_port = var.rest_api_service_target_port  # The port the app is listening.
-            protocol = "TCP"
-          }
+          # port {
+          #   name = "rest-api"
+          #   container_port = var.rest_api_service_target_port  # The port the app is listening.
+          #   protocol = "TCP"
+          # }
           port {
             name = "inter-node"
             container_port = var.inter_node_service_target_port  # The port the app is listening.
@@ -440,14 +425,14 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
           # the very first election.
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
-          env {
-            name = "cluster.initial_master_nodes"
-            value = <<-EOL
-              "mem-elasticsearch-master-0,
-               mem-elasticsearch-master-1,
-               mem-elasticsearch-master-2"
-            EOL
-          }
+          # env {
+          #   name = "cluster.initial_master_nodes"
+          #   value = <<-EOL
+          #     "mem-elasticsearch-master-0,
+          #      mem-elasticsearch-master-1,
+          #      mem-elasticsearch-master-2"
+          #   EOL
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -515,5 +500,49 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
       }
     }
+  }
+}
+
+# Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
+# reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
+# the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
+# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
+# governing Service belongs to the default namespace and is called service1, and the pod name is
+# pod-0, the pod can be reached by its fully qualified domain name of
+# pod-0.service1.default.svc.cluster.local.
+#
+# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
+# the cluster:
+# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
+#
+# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-elasticsearch-headless.memories.svc.cluster.local
+resource "kubernetes_service" "headless_service" {  # For inter-node communication.
+  metadata {
+    name = var.service_name_headless
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  spec {
+    selector = {
+      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+    }
+    session_affinity = var.service_session_affinity
+    # port {
+    #   name = "rest-api"  # Node discovery.
+    #   port = var.rest_api_service_port
+    #   target_port = var.rest_api_service_target_port
+    #   protocol = "TCP"
+    # }
+    port {
+      name = "inter-node"  # Inter-node communication.
+      port = var.inter_node_service_port
+      target_port = var.inter_node_service_target_port
+      protocol = "TCP"
+    }
+    type = var.service_type
+    cluster_ip = "None"  # Headless Service.
+    publish_not_ready_addresses = var.publish_not_ready_addresses
   }
 }

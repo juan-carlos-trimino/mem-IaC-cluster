@@ -95,16 +95,16 @@ variable service_name_master {
 variable service_session_affinity {
   default = "None"
 }
-# variable rest_api_service_port {
+# variable http_service_port {
 #   type = number
 # }
-# variable rest_api_service_target_port {
+# variable http_service_target_port {
 #   type = number
 # }
-variable inter_node_service_port {
+variable transport_service_port {
   type = number
 }
-variable inter_node_service_target_port {
+variable transport_service_target_port {
   type = number
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
@@ -283,7 +283,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
         # Fix the permissions on the volume.
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
         init_container {
           name = "fix-permissions"
           image = "busybox:1.34.1"
@@ -305,7 +304,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
         # this number to a higher value, feel free to remove the init container.
         # Increase the default vm.max_map_count to 262144
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
         init_container {
           name = "increase-vm-max-map-count"
           image = "busybox:1.34.1"
@@ -322,7 +320,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
         }
         # Increase the max number of open file descriptors.
         # Increase the ulimit
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
         init_container {
           name = "increase-fd-ulimit"
           image = "busybox:1.34.1"
@@ -364,7 +361,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # }
           port {
             name = "inter-node"
-            container_port = var.inter_node_service_target_port  # The port the app is listening.
+            container_port = var.transport_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
           resources {
@@ -537,8 +534,8 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
     # }
     port {
       name = "inter-node"  # Inter-node communication.
-      port = var.inter_node_service_port
-      target_port = var.inter_node_service_target_port
+      port = var.transport_service_port
+      target_port = var.transport_service_target_port
       protocol = "TCP"
     }
     type = var.service_type

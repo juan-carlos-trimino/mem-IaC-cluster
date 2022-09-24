@@ -82,16 +82,16 @@ variable service_name_headless {
 variable service_session_affinity {
   default = "None"
 }
-# variable rest_api_service_port {
+# variable http_service_port {
 #   type = number
 # }
-# variable rest_api_service_target_port {
+# variable http_service_target_port {
 #   type = number
 # }
-variable inter_node_service_port {
+variable transport_service_port {
   type = number
 }
-variable inter_node_service_target_port {
+variable transport_service_target_port {
   type = number
 }
 variable dns_name {
@@ -348,7 +348,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # }
           port {
             name = "inter-node"
-            container_port = var.inter_node_service_target_port  # The port the app is listening.
+            container_port = var.transport_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
           resources {
@@ -487,8 +487,8 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
     # }
     port {
       name = "inter-node"  # Inter-node communication.
-      port = var.inter_node_service_port
-      target_port = var.inter_node_service_target_port
+      port = var.transport_service_port
+      target_port = var.transport_service_target_port
       protocol = "TCP"
     }
     type = var.service_type

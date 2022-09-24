@@ -70,18 +70,18 @@ variable service_name_master {
 variable service_session_affinity {
   default = "None"
 }
-variable service_port {
+variable http_service_port {
   type = number
 }
-variable service_target_port {
+variable http_service_target_port {
   type = number
 }
-variable inter_node_service_port {
-  type = number
-}
-variable inter_node_service_target_port {
-  type = number
-}
+# variable transport_service_port {
+#   type = number
+# }
+# variable transport_service_target_port {
+#   type = number
+# }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
@@ -302,14 +302,14 @@ resource "kubernetes_deployment" "deployment" {
           # everyone using the cluster can quickly see what ports each pod exposes.
           port {
             name = "http"
-            container_port = var.service_target_port  # The port the app is listening.
+            container_port = var.http_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
-          port {
-            name = "inter-node"
-            container_port = var.inter_node_service_target_port  # The port the app is listening.
-            protocol = "TCP"
-          }
+          # port {
+          #   name = "inter-node"
+          #   container_port = var.transport_service_target_port  # The port the app is listening.
+          #   protocol = "TCP"
+          # }
           resources {
             requests = {
               # If a Container specifies its own memory limit, but does not specify a memory
@@ -416,10 +416,10 @@ resource "kubernetes_service" "service" {
     session_affinity = var.service_session_affinity
     port {
       name = "http"
-      port = var.service_port  # Service port.
-      target_port = var.service_target_port  # Pod port.
+      port = var.http_service_port  # Service port.
+      target_port = var.http_service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = var.service_type
+    type = "LoadBalancer" # var.service_type
   }
 }

@@ -49,7 +49,7 @@ locals {
   svc_elasticsearch_headless = "mem-elasticsearch-headless"
   svc_elasticsearch_master = "mem-elasticsearch-master"
   svc_elasticsearch_data = "mem-elasticsearch-data"
-  svc_elasticsearch_ingest = "mem-elasticsearch-ingest"
+  svc_elasticsearch_ingest = "mem-elasticsearch-client"
   svc_kibana = "mem-kibana"
   ############
   # Services #
@@ -369,10 +369,10 @@ module "mem-elasticsearch-master" {
     # deprecated "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
   }
-  # rest_api_service_port = 9200
-  # rest_api_service_target_port = 9200
-  inter_node_service_port = 9300
-  inter_node_service_target_port = 9300
+  # http_service_port = 9200
+  # http_service_target_port = 9200
+  transport_service_port = 9300
+  transport_service_target_port = 9300
   service_name_headless = "${local.svc_elasticsearch_headless}-master"
   service_name = local.svc_elasticsearch_master
 }
@@ -428,16 +428,16 @@ module "mem-elasticsearch-data" {
     # "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
   }
-  # rest_api_service_port = 9200
-  # rest_api_service_target_port = 9200
-  inter_node_service_port = 9300
-  inter_node_service_target_port = 9300
+  # http_service_port = 9200
+  # http_service_target_port = 9200
+  transport_service_port = 9300
+  transport_service_target_port = 9300
   service_name_headless = "${local.svc_elasticsearch_headless}-data"
   service_name_master = local.svc_elasticsearch_master
   service_name = local.svc_elasticsearch_data
 }
 
-module "mem-elasticsearch-ingest" {
+module "mem-elasticsearch-client" {
   depends_on = [
     module.mem-elasticsearch-master
   ]
@@ -462,16 +462,17 @@ module "mem-elasticsearch-ingest" {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     HTTP_ENABLE: true
     ES_PATH_CONF: "/usr/share/elasticsearch/config"
-    "node.roles": "[ingest]"
+    # a coordinating node
+    "node.roles": "[]"
     "xpack.security.enabled": false
     "xpack.license.self_generated.type": "trial"
     "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": false
   }
-  service_port = 9200
-  service_target_port = 9200
-  inter_node_service_port = 9300
-  inter_node_service_target_port = 9300
+  http_service_port = 9200
+  http_service_target_port = 9200
+  # transport_service_port = 9300
+  # transport_service_target_port = 9300
   service_name_master = local.svc_elasticsearch_master
   service_name = local.svc_elasticsearch_ingest
 }
@@ -512,7 +513,7 @@ module "mem-kibana" {
     "server.host": "0.0.0.0"
     # https://www.elastic.co/guide/en/kibana/current/settings.html
     # "elasticsearch.hosts": "[mem-elasticsearch-ingest-0.memories,mem-elasticsearch-ingest-1.memories]"
-    "elasticsearch.hosts": "[mem-elasticsearch-ingest.memories]"
+    "elasticsearch.hosts": "[mem-elasticsearch-client.memories]"
     "node.roles": "ui"
     # "elasticsearch.username": "kibana"
     # "elasticsearch.password": "kibana"

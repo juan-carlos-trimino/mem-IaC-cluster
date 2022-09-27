@@ -140,7 +140,6 @@ resource "kubernetes_role" "role" {
 }
 
 # Bind the role to the service account.
-# resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
 resource "kubernetes_role_binding" "role_binding" {
   metadata {
     name = "${var.service_name}-role-binding"
@@ -420,6 +419,6 @@ resource "kubernetes_service" "service" {
       target_port = var.http_service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = "LoadBalancer" # var.service_type
+    type = "LoadBalancer"  #var.service_type
   }
 }

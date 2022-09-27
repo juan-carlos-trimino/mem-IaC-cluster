@@ -110,9 +110,9 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
-          security_context {
-            read_only_root_filesystem = false
-          }
+          # security_context {
+          #   read_only_root_filesystem = false
+          # }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other

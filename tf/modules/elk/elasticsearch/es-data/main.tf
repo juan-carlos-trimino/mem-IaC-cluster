@@ -77,9 +77,9 @@ variable service_name {
 variable service_name_headless {
   default = ""
 }
-variable service_name_master {
-  default = ""
-}
+# variable service_name_master {
+#   default = ""
+# }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
@@ -219,7 +219,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
     labels = {
       app = var.app_name
       pod = var.service_name
-      role = "data"
     }
   }
   #
@@ -288,7 +287,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
           # Docker (ENTRYPOINT)
-          command = ["/bin/sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
+          # command = ["/bin/sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
           security_context {
             # run_as_group = 0
             # run_as_non_root = false
@@ -297,8 +297,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
             privileged = true
           }
           volume_mount {
-            name = "elasticsearch-storage"
-            mount_path = "/usr/share/elasticsearch/data"
+            name = "es-storage-data"
+            # mount_path = "/usr/share/elasticsearch/data"
+            mount_path = "/es-data"
           }
         }
         # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
@@ -327,9 +328,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # Docker (ENTRYPOINT)
           command = ["/bin/sh", "-c", "ulimit -n 65536"]
           security_context {
-            # run_as_group = 0
-            # run_as_non_root = false
-            # run_as_user = 0
+            run_as_non_root = false
+            run_as_user = 0
+            run_as_group = 0
             read_only_root_filesystem = true
             privileged = true
           }
@@ -342,9 +343,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
             capabilities {
               drop = ["ALL"]
             }
-            run_as_group = 1000
             run_as_non_root = true
             run_as_user = 1000
+            run_as_group = 1000
             read_only_root_filesystem = false
             privileged = false
           }
@@ -405,14 +406,14 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # discovery process. Each address can be either an IP address or a hostname that resolves
           # to one or more IP addresses via DNS.
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
-          env {
-            name = "discovery.seed_hosts"
-            value = <<-EOL
-              "${var.service_name_master}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-               ${var.service_name_master}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-               ${var.service_name_master}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
-            EOL
-          }
+          # env {
+          #   name = "discovery.seed_hosts"
+          #   value = <<-EOL
+          #     "${var.service_name_master}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+          #      ${var.service_name_master}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+          #      ${var.service_name_master}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
+          #   EOL
+          # }
           # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
           # determines the set of master-eligible nodes whose votes are counted in the first election.
           # In development mode, with no discovery settings configured, this step is performed
@@ -461,8 +462,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
           #   mount_path = "/usr/share/elasticsearch/data"
           # }
           volume_mount {
-            name = "elasticsearch-storage"
-            mount_path = "/usr/share/elasticsearch/data"
+            name = "es-storage-data"
+            # mount_path = "/usr/share/elasticsearch/data"
+            mount_path = "/es-data"
           }
         }
       }
@@ -481,7 +483,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # of quorum during a rolling restart, this will also lead to data loss.
     volume_claim_template {
       metadata {
-        name = "elasticsearch-storage"
+        name = "es-storage-data"
         namespace = var.namespace
         labels = {
           app = var.app_name
@@ -513,33 +515,33 @@ resource "kubernetes_stateful_set" "stateful_set" {
 # $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
 #
 # $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-elasticsearch-headless.memories.svc.cluster.local
-resource "kubernetes_service" "headless_service" {  # For inter-node communication.
-  metadata {
-    name = var.service_name_headless
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = var.service_session_affinity
-    # port {
-    #   name = "rest-api"  # Node discovery.
-    #   port = var.rest_api_service_port
-    #   target_port = var.rest_api_service_target_port
-    #   protocol = "TCP"
-    # }
-    port {
-      name = "inter-node"  # Inter-node communication.
-      port = var.transport_service_port
-      target_port = var.transport_service_target_port
-      protocol = "TCP"
-    }
-    type = var.service_type
-    cluster_ip = "None"  # Headless Service.
-    publish_not_ready_addresses = var.publish_not_ready_addresses
-  }
-}
+# resource "kubernetes_service" "headless_service" {  # For inter-node communication.
+#   metadata {
+#     name = var.service_name_headless
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   spec {
+#     selector = {
+#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+#     }
+#     session_affinity = var.service_session_affinity
+#     # port {
+#     #   name = "rest-api"  # Node discovery.
+#     #   port = var.rest_api_service_port
+#     #   target_port = var.rest_api_service_target_port
+#     #   protocol = "TCP"
+#     # }
+#     port {
+#       name = "inter-node"  # Inter-node communication.
+#       port = var.transport_service_port
+#       target_port = var.transport_service_target_port
+#       protocol = "TCP"
+#     }
+#     type = var.service_type
+#     cluster_ip = "None"  # Headless Service.
+#     publish_not_ready_addresses = var.publish_not_ready_addresses
+#   }
+# }

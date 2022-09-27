@@ -61,6 +61,16 @@ variable publish_not_ready_addresses {
   default = "false"
   type = bool
 }
+variable pvc_access_modes {
+  default = []
+  type = list
+}
+variable pvc_storage_class_name {
+  default = ""
+}
+variable pvc_storage_size {
+  default = "20Gi"
+}
 variable service_name {
   default = ""
 }
@@ -294,12 +304,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = "increase-vm-max-map-count"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
-          # Docker (ENTRYPOINT)
+          # Docker (ENTRYPOINT)  #[  # ["sysctl", "-w", "vm.max_map_count=262144"]
           command = ["sysctl", "-w", "vm.max_map_count=262144"]
           security_context {
-            # run_as_group = 0
-            # run_as_non_root = false
-            # run_as_user = 0
+            run_as_non_root = false
+            run_as_user = 0
+            run_as_group = 0
             read_only_root_filesystem = true
             privileged = true
           }
@@ -307,19 +317,25 @@ resource "kubernetes_stateful_set" "stateful_set" {
         # Increase the max number of open file descriptors.
         # Increase the ulimit
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
-        init_container {
-          name = "increase-fd-ulimit"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          # Docker (ENTRYPOINT)
-          command = ["/bin/sh", "-c", "ulimit -n 65536"]
-          security_context {
-            # run_as_group = 0
-            # run_as_non_root = false
-            # run_as_user = 0
-            read_only_root_filesystem = true
-            privileged = true
-          }
+        # init_container {
+        #   name = "increase-fd-ulimit"
+        #   image = "busybox:1.34.1"
+        #   image_pull_policy = "IfNotPresent"
+        #   # Docker (ENTRYPOINT)
+        #   command = ["/bin/sh", "-c", "ulimit -n 65536"]
+        #   security_context {
+        #     # run_as_group = 0
+        #     # run_as_non_root = false
+        #     # run_as_user = 0
+        #     read_only_root_filesystem = true
+        #     privileged = true
+        #   }
+        # }
+        security_context {
+          # run_as_group = 1000
+          # run_as_user = 1000
+          # Allow non-root user to access PersistentVolume.
+          fs_group = 1000
         }
         container {
           name = var.service_name
@@ -329,8 +345,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
             capabilities {
               drop = ["ALL"]
             }
-            run_as_group = 1000
             run_as_non_root = true
+            run_as_group = 1000
             run_as_user = 1000
             read_only_root_filesystem = false
             privileged = false
@@ -386,37 +402,37 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
-          # When you want to form a cluster with nodes on other hosts, use the static
-          # discovery.seed_hosts setting. This setting provides a list of other nodes in the
-          # cluster that are master-eligible and likely to be live and contactable to seed the
-          # discovery process. Each address can be either an IP address or a hostname that resolves
-          # to one or more IP addresses via DNS.
-          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
-          env {
-            name = "discovery.seed_hosts"
-            value = <<-EOL
-              "${var.service_name}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-               ${var.service_name}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-               ${var.service_name}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
-            EOL
-          }
-          # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
-          # determines the set of master-eligible nodes whose votes are counted in the first election.
-          # In development mode, with no discovery settings configured, this step is performed
-          # automatically by the nodes themselves.
-          #
-          # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
-          # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
-          # the very first election.
-          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
-          env {
-            name = "cluster.initial_master_nodes"
-            value = <<-EOL
-              "${var.service_name}-0,
-               ${var.service_name}-1,
-               ${var.service_name}-2"
-            EOL
-          }
+          # # When you want to form a cluster with nodes on other hosts, use the static
+          # # discovery.seed_hosts setting. This setting provides a list of other nodes in the
+          # # cluster that are master-eligible and likely to be live and contactable to seed the
+          # # discovery process. Each address can be either an IP address or a hostname that resolves
+          # # to one or more IP addresses via DNS.
+          # # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
+          # env {
+          #   name = "discovery.seed_hosts"
+          #   value = <<EOL
+          #     "${var.service_name}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+          #      ${var.service_name}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
+          #      ${var.service_name}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
+          #   EOL
+          # }
+          # # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
+          # # determines the set of master-eligible nodes whose votes are counted in the first election.
+          # # In development mode, with no discovery settings configured, this step is performed
+          # # automatically by the nodes themselves.
+          # #
+          # # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
+          # # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
+          # # the very first election.
+          # # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
+          # env {
+          #   name = "cluster.initial_master_nodes"
+          #   value = <<EOL
+          #     "${var.service_name}-0,
+          #      ${var.service_name}-1,
+          #      ${var.service_name}-2"
+          #   EOL
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -443,10 +459,40 @@ resource "kubernetes_stateful_set" "stateful_set" {
           #   period_seconds = 60
           #   timeout_seconds = 10
           # }
-          # volume_mount {
-          #   name = "elasticsearch-storage"
-          #   mount_path = "/usr/share/elasticsearch/data"
-          # }
+          volume_mount {
+            name = "es-storage-master"
+            mount_path = "/es-data"
+          }
+        }
+      }
+    }
+    # This template will be used to create a PersistentVolumeClaim for each pod.
+    # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
+    # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
+    # pods in the same namespace.
+    #
+    # In order for RabbitMQ nodes to retain data between Pod restarts, node's data directory must
+    # use durable storage. A Persistent Volume must be attached to each RabbitMQ Pod.
+    #
+    # If a transient volume is used to back a RabbitMQ node, the node will lose its identity and
+    # all of its local data in case of a restart. This includes both schema and durable queue data.
+    # Syncing all of this data on every node restart would be highly inefficient. In case of a loss
+    # of quorum during a rolling restart, this will also lead to data loss.
+    volume_claim_template {
+      metadata {
+        name = "es-storage-master"
+        namespace = var.namespace
+        labels = {
+          app = var.app_name
+        }
+      }
+      spec {
+        access_modes = var.pvc_access_modes
+        storage_class_name = var.pvc_storage_class_name
+        resources {
+          requests = {
+            storage = var.pvc_storage_size
+          }
         }
       }
     }

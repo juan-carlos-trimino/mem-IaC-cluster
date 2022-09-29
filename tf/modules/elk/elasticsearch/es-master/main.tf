@@ -92,20 +92,11 @@ variable service_name_headless {
 variable service_session_affinity {
   default = "None"
 }
-# variable http_service_port {
-#   type = number
-# }
-# variable http_service_target_port {
-#   type = number
-# }
 variable transport_service_port {
   type = number
 }
 variable transport_service_target_port {
   type = number
-}
-variable dns_name {
-  default = ""
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
@@ -125,11 +116,9 @@ resource "null_resource" "scc-elasticsearch" {
   triggers = {
     always_run = timestamp()
   }
-  #
   provisioner "local-exec" {
     command = "oc apply -f ./modules/elk/elasticsearch/util/mem-elasticsearch-scc.yaml"
   }
-  #
   provisioner "local-exec" {
     when = destroy
     command = "oc delete scc mem-elasticsearch-scc"
@@ -200,7 +189,6 @@ resource "kubernetes_role_binding" "role_binding" {
   # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
   role_ref {
     api_group = "rbac.authorization.k8s.io"
-    # kind = "ClusterRole"
     kind = "Role"
     # This RoleBinding references the Role specified below...
     # name = kubernetes_cluster_role.cluster_role.metadata[0].name
@@ -304,7 +292,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = "increase-vm-max-map-count"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
-          # Docker (ENTRYPOINT)  #[  # ["sysctl", "-w", "vm.max_map_count=262144"]
+          # Docker (ENTRYPOINT)
           command = ["sysctl", "-w", "vm.max_map_count=262144"]
           security_context {
             run_as_non_root = false

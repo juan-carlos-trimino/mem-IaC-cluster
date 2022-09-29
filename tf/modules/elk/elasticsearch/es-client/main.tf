@@ -384,7 +384,7 @@ resource "kubernetes_deployment" "deployment" {
           }
           volume_mount {
             name = "storage"
-            mount_path = "/data"
+            mount_path = "/es-data"
           }
         }
         volume {

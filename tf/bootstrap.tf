@@ -46,9 +46,8 @@ locals {
   svc_video_streaming = "mem-video-streaming"
   svc_video_upload = "mem-video-upload"
   elasticsearch_cluster_name = "cluster-elk"
-  svc_elasticsearch_headless_master = "mem-elasticsearch-headless-master"
+  svc_elasticsearch_headless = "mem-elasticsearch-headless"
   svc_elasticsearch_master = "mem-elasticsearch-master"
-  svc_elasticsearch_headless_data = "mem-elasticsearch-headless-master"
   svc_elasticsearch_data = "mem-elasticsearch-data"
   svc_elasticsearch_client = "mem-elasticsearch-client"
   svc_kibana = "mem-kibana"
@@ -344,8 +343,8 @@ module "mem-elasticsearch-master" {
   qos_limits_cpu = "1500m"
   qos_requests_cpu = "250m"
   # By default, Elasticsearch allocates 2GB of system memory for the database.
-  qos_limits_memory = "2Gi"
-  qos_requests_memory = "1Gi"
+  qos_limits_memory = "4Gi"
+  qos_requests_memory = "3Gi"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "5Gi"
   pvc_storage_class_name = "ibmc-block-silver"
@@ -360,34 +359,18 @@ module "mem-elasticsearch-master" {
     # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
     # By default, the JVM heap size is 1GB,
     # By default, Elasticsearch is configured to use a heap with a minimum and maximum size of 1GB.
-    ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
-    # "path.repo": "data/repo"
     # It is vitally important to the health of your node that none of the JVM is ever swapped out
     # to disk.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/_memory_lock_check.html
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/setup-configuration-memory.html#bootstrap-memory_lock
     # "bootstrap.memory_lock": true  # Swapping is disabled.
-    # When you want to form a cluster with nodes on other hosts, use the static
-    # discovery.seed_hosts setting. This setting provides a list of other nodes in the
-    # cluster that are master-eligible and likely to be live and contactable to seed the
-    # discovery process. Each address can be either an IP address or a hostname that resolves
-    # to one or more IP addresses via DNS.
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
     "discovery.seed_hosts": <<EOL
-      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local,
-       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local,
-       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local"
+      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
-    # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
-    # determines the set of master-eligible nodes whose votes are counted in the first election.
-    # In development mode, with no discovery settings configured, this step is performed
-    # automatically by the nodes themselves.
-    #
-    # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
-    # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
-    # the very first election.
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
     "cluster.initial_master_nodes": <<EOL
       "${local.svc_elasticsearch_master}-0,
@@ -402,11 +385,9 @@ module "mem-elasticsearch-master" {
     # deprecated "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
   }
-  # http_service_port = 9200
-  # http_service_target_port = 9200
   transport_service_port = 9300
   transport_service_target_port = 9300
-  service_name_headless = "${local.svc_elasticsearch_headless_master}"
+  service_name_headless = "${local.svc_elasticsearch_headless}"
   service_name = local.svc_elasticsearch_master
 }
 
@@ -445,9 +426,9 @@ module "mem-elasticsearch-data" {
     # "path.repo": "data/repo"
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
     "discovery.seed_hosts": <<EOL
-      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local,
-       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local,
-       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless_master}.${local.namespace}.svc.cluster.local"
+      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
     "cluster.initial_master_nodes": <<EOL
@@ -455,14 +436,7 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-
-    # It is vitally important to the health of your node that none of the JVM is ever swapped out
-    # to disk.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/_memory_lock_check.html
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/setup-configuration-memory.html#bootstrap-memory_lock
-    # "bootstrap.memory_lock": true  # Swapping is disabled.
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/security-settings.html#general-security-settings
-    # "xpack.security.transport.ssl.enabled": true
     # In Elasticsearch 8.0 and later, security is enabled automatically when you start Elasticsearch for the first time.
     "xpack.security.enabled": false
     "xpack.license.self_generated.type": "trial"
@@ -472,7 +446,7 @@ module "mem-elasticsearch-data" {
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
-  service_name_headless = "${local.svc_elasticsearch_headless_data}"
+  service_name_headless = "${local.svc_elasticsearch_headless}"
   service_name = local.svc_elasticsearch_data
 }
 
@@ -543,7 +517,7 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_client}.memories.svc.cluster.local:9200"
+    ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
     CLUSTER_NAME: "cluster-elk"
     # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).
     "server.host": "0.0.0.0"

@@ -22,22 +22,10 @@ requiredDropCapabilities: [
 ]
 runAsUser:
   type: RunAsAny
-  # type: MustRunAs
-  # runAsUser: 1000
 fsGroup:
   type: RunAsAny
-  # type: MustRunAs
-  # ranges: [
-  #   min: 1000,  # Use the minimum value of the first range as the default.
-  #   max: 1100
-  # ]
 supplementalGroups:
   type: RunAsAny
-  # type: MustRunAs
-  # ranges: [
-  #   min: 1000,  # Use the minimum value of the first range as the default.
-  #   max: 1100
-  # ]
 seLinuxContext:
   type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated

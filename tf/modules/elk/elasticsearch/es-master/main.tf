@@ -13,7 +13,7 @@ variable namespace {
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
 # Always, but if the container refers to any other tag, the policy defaults to IfNotPresent.
 #
-# When using a tag other that latest, the imagePullPolicy property must be set if changes are made
+# When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
 variable imagePullPolicy {
@@ -49,8 +49,7 @@ variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-# To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
-# guarantee.
+# See https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#orderedready-pod-management
 variable pod_management_policy {
   default = "OrderedReady"
 }
@@ -58,7 +57,7 @@ variable pod_management_policy {
 # propagate SRV records for its Pods without respect to their readiness for purpose of peer
 # discovery.
 variable publish_not_ready_addresses {
-  default = "false"
+  default = false
   type = bool
 }
 variable pvc_access_modes {
@@ -108,8 +107,8 @@ variable service_type {
 Define local variables.
 ***/
 locals {
-  rs_label = "rs-${var.service_name}"
-  svc_label = "svc-${var.service_name}"
+  pod_selector_label = "ps-${var.service_name}"
+  svc_label = "svc-${var.service_name_headless}"
 }
 
 resource "null_resource" "scc-elasticsearch" {
@@ -191,7 +190,6 @@ resource "kubernetes_role_binding" "role_binding" {
     api_group = "rbac.authorization.k8s.io"
     kind = "Role"
     # This RoleBinding references the Role specified below...
-    # name = kubernetes_cluster_role.cluster_role.metadata[0].name
     name = kubernetes_role.role.metadata[0].name
   }
   # ... and binds it to the specified ServiceAccount in the specified namespace.
@@ -208,10 +206,23 @@ resource "kubernetes_role_binding" "role_binding" {
 # upgrades.
 #
 # $ kubectl get sts -n memories
+#
+#
+# It is interesting to follow the logs of any of the master-node pods to witness the master election among them
+# and then later on when new data and client nodes are added.
+# root$ kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | grep ClusterApplierService
+# https://jsonformatter.curiousconcept.com/#
+# It can be seen that es-master pod named es-master-594b58b86c-bj7g7 was elected as the master and other 2 pods added to it and each other.
+
+# Windows CMD
+# C:\> kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | findstr "ClusterApplierService"
+# Windows PowerShell
+# PS C:\> kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | Select-String "ClusterApplierService"
 resource "kubernetes_stateful_set" "stateful_set" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    # Labels attach to the StatefulSet.
     labels = {
       app = var.app_name
     }
@@ -219,18 +230,20 @@ resource "kubernetes_stateful_set" "stateful_set" {
   #
   spec {
     replicas = var.replicas
-    pod_management_policy = var.pod_management_policy
-    revision_history_limit = var.revision_history_limit
     # Headless service that gives network identity to the Elasticsearch nodes and enables them to
     # cluster. The name of the service that governs this StatefulSet. This service must exist
     # before the StatefulSet and is responsible for the network identity of the set. Pods get
     # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
     service_name = var.service_name_headless
-    # The label selector determines the pods the ReplicaSet manages.xxxxxxxxxxxxxxxxxx
+    pod_management_policy = var.pod_management_policy
+    revision_history_limit = var.revision_history_limit
+    # Pod Selector - You must set the .spec.selector field of a StatefulSet to match the labels of
+    # its .spec.template.metadata.labels. Failing to specify a matching Pod Selector will result in
+    # a validation error during StatefulSet creation.
     selector {
       match_labels = {
-        # It must match the labels in the Pod template.
-        rs_lbl = local.rs_label
+        # It must match the labels in the Pod template (.spec.template.metadata.labels).
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # updateStrategy:
@@ -241,10 +254,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
       metadata {
         # Labels attach to the Pod.
         labels = {
-          app = var.app_name
-          # It must match the label selector of the ReplicaSet.
-          rs_lbl = local.rs_label
-          # It must match the label selector of the Service.
+          # It must match the label for the pod selector (.spec.selector.matchLabels).
+          pod_selector_lbl = local.pod_selector_label
           svc_lbl = local.svc_label
         }
       }
@@ -289,10 +300,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
         # Increase the default vm.max_map_count to 262144
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
         init_container {
-          name = "increase-vm-max-map-count"
+          name = "init-sysctl"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
-          # Docker (ENTRYPOINT)
           command = ["sysctl", "-w", "vm.max_map_count=262144"]
           security_context {
             run_as_non_root = false
@@ -302,28 +312,23 @@ resource "kubernetes_stateful_set" "stateful_set" {
             privileged = true
           }
         }
-        # Increase the max number of open file descriptors.
-        # Increase the ulimit
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
-        # init_container {
-        #   name = "increase-fd-ulimit"
-        #   image = "busybox:1.34.1"
-        #   image_pull_policy = "IfNotPresent"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["/bin/sh", "-c", "ulimit -n 65536"]
-        #   security_context {
-        #     # run_as_group = 0
-        #     # run_as_non_root = false
-        #     # run_as_user = 0
-        #     read_only_root_filesystem = true
-        #     privileged = true
-        #   }
-        # }
-        security_context {
-          # run_as_group = 1000
-          # run_as_user = 1000
-          # Allow non-root user to access PersistentVolume.
-          fs_group = 1000
+        # Fix the permissions on the volume.
+        init_container {
+          name = "fix-permissions"
+          image = "busybox:1.34.1"
+          image_pull_policy = "IfNotPresent"
+          command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
+          security_context {
+            run_as_non_root = false
+            run_as_user = 0
+            run_as_group = 0
+            read_only_root_filesystem = true
+            privileged = true
+          }
+          volume_mount {
+            name = "es-storage"
+            mount_path = "/es-data"
+          }
         }
         container {
           name = var.service_name
@@ -339,19 +344,15 @@ resource "kubernetes_stateful_set" "stateful_set" {
             read_only_root_filesystem = false
             privileged = false
           }
+          ###################################################
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          # port {
-          #   name = "rest-api"
-          #   container_port = var.rest_api_service_target_port  # The port the app is listening.
-          #   protocol = "TCP"
-          # }
           port {
-            name = "inter-node"
+            name = "transport"
             container_port = var.transport_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
@@ -390,37 +391,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
-          # # When you want to form a cluster with nodes on other hosts, use the static
-          # # discovery.seed_hosts setting. This setting provides a list of other nodes in the
-          # # cluster that are master-eligible and likely to be live and contactable to seed the
-          # # discovery process. Each address can be either an IP address or a hostname that resolves
-          # # to one or more IP addresses via DNS.
-          # # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
-          # env {
-          #   name = "discovery.seed_hosts"
-          #   value = <<EOL
-          #     "${var.service_name}-0.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-          #      ${var.service_name}-1.${var.service_name_headless}.${var.namespace}.svc.cluster.local,
-          #      ${var.service_name}-2.${var.service_name_headless}.${var.namespace}.svc.cluster.local"
-          #   EOL
-          # }
-          # # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
-          # # determines the set of master-eligible nodes whose votes are counted in the first election.
-          # # In development mode, with no discovery settings configured, this step is performed
-          # # automatically by the nodes themselves.
-          # #
-          # # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
-          # # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
-          # # the very first election.
-          # # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
-          # env {
-          #   name = "cluster.initial_master_nodes"
-          #   value = <<EOL
-          #     "${var.service_name}-0,
-          #      ${var.service_name}-1,
-          #      ${var.service_name}-2"
-          #   EOL
-          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -448,7 +418,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           #   timeout_seconds = 10
           # }
           volume_mount {
-            name = "es-storage-master"
+            name = "es-storage"
             mount_path = "/es-data"
           }
         }
@@ -468,7 +438,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # of quorum during a rolling restart, this will also lead to data loss.
     volume_claim_template {
       metadata {
-        name = "es-storage-master"
+        name = "es-storage"
         namespace = var.namespace
         labels = {
           app = var.app_name
@@ -487,6 +457,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
   }
 }
 
+# Before deploying a StatefulSet, you will need to create a headless Service, which will be used
+# to provide the network identity for your stateful pods.
+#
 # Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
 # reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
 # the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
@@ -510,17 +483,12 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
   }
   spec {
     selector = {
+      # All pods with the svc_lbl=local.svc_label label belong to this service.
       svc_lbl = local.svc_label
     }
     session_affinity = var.service_session_affinity
-    # port {
-    #   name = "rest-api"  # Node discovery.
-    #   port = var.rest_api_service_port
-    #   target_port = var.rest_api_service_target_port
-    #   protocol = "TCP"
-    # }
     port {
-      name = "inter-node"  # Inter-node communication.
+      name = "transport"  # Inter-node communication.
       port = var.transport_service_port
       target_port = var.transport_service_target_port
       protocol = "TCP"

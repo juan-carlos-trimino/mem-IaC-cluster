@@ -95,12 +95,6 @@ variable service_name_headless {
 variable service_session_affinity {
   default = "None"
 }
-# variable http_service_port {
-#   type = number
-# }
-# variable http_service_target_port {
-#   type = number
-# }
 variable transport_service_port {
   type = number
 }
@@ -113,20 +107,13 @@ variable service_type {
   default = "ClusterIP"
 }
 
-# resource "null_resource" "scc-elasticsearch" {
-#   triggers = {
-#     always_run = timestamp()
-#   }
-#   #
-#   provisioner "local-exec" {
-#     command = "oc apply -f ./modules/elk/elasticsearch/util/mem-elasticsearch-scc.yaml"
-#   }
-#   #
-#   provisioner "local-exec" {
-#     when = destroy
-#     command = "oc delete scc mem-elasticsearch-scc"
-#   }
-# }
+/***
+Define local variables.
+***/
+locals {
+  pod_selector_label = "ps-${var.service_name}"
+  svc_label = "svc-${var.service_name_headless}"
+}
 
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
@@ -218,7 +205,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
     namespace = var.namespace
     labels = {
       app = var.app_name
-      pod = var.service_name
     }
   }
   #
@@ -231,9 +217,13 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # before the StatefulSet and is responsible for the network identity of the set. Pods get
     # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
     service_name = var.service_name_headless
+    # Pod Selector - You must set the .spec.selector field of a StatefulSet to match the labels of
+    # its .spec.template.metadata.labels. Failing to specify a matching Pod Selector will result in
+    # a validation error during StatefulSet creation.
     selector {
       match_labels = {
-        pod = var.service_name  # has to match .spec.template.metadata.labels
+        # It must match the labels in the Pod template (.spec.template.metadata.labels).
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # updateStrategy:
@@ -241,8 +231,13 @@ resource "kubernetes_stateful_set" "stateful_set" {
     #
     template {
       metadata {
+        # Labels attach to the Pod.
+        # The pod-template-hash label is added by the Deployment controller to every ReplicaSet
+        # that a Deployment creates or adopts.
         labels = {
-          pod = var.service_name
+          pod_selector_lbl = local.pod_selector_label
+          # It must match the label selector of the Service.
+          svc_lbl = local.svc_label
         }
       }
       #
@@ -536,6 +531,31 @@ resource "kubernetes_stateful_set" "stateful_set" {
 #     # }
 #     port {
 #       name = "inter-node"  # Inter-node communication.
+#       port = var.transport_service_port
+#       target_port = var.transport_service_target_port
+#       protocol = "TCP"
+#     }
+#     type = var.service_type
+#     cluster_ip = "None"  # Headless Service.
+#     publish_not_ready_addresses = var.publish_not_ready_addresses
+#   }
+# }
+# resource "kubernetes_service" "headless_service" {  # For inter-node communication.
+#   metadata {
+#     name = var.service_name_headless
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   spec {
+#     selector = {
+#       # svc_lbl = local.svc_label
+#       pod = var.service_name
+#     }
+#     session_affinity = var.service_session_affinity
+#     port {
+#       name = "transport"  # Inter-node communication.
 #       port = var.transport_service_port
 #       target_port = var.transport_service_target_port
 #       protocol = "TCP"

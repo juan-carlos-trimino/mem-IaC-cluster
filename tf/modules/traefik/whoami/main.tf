@@ -17,7 +17,7 @@ variable "replicas" {
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
 # Always, but if the container refers to any other tag, the policy defaults to IfNotPresent.
 #
-# When using a tag other that latest, the imagePullPolicy property must be set if changes are made
+# When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
 variable "imagePullPolicy" {

@@ -110,6 +110,7 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.imagePullPolicy
+          # command = ["/bin/sh", "-c", "/usr/share/kibana/bin/kibana-plugin remove x-pack && /usr/local/bin/kibana-docker"]
           # security_context {
           #   read_only_root_filesystem = false
           # }

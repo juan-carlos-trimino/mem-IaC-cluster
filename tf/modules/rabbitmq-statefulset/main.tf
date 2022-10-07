@@ -624,32 +624,32 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
 }
 
 # Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-resource "kubernetes_service" "service" {
-  metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  #
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = var.service_session_affinity
-    port {
-      name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
-      port = var.amqp_service_port  # Service port.
-      target_port = var.amqp_service_target_port  # Pod port.
-      protocol = "TCP"
-    }
-    port {
-      name = "mgmt"  # management UI and HTTP API).
-      port = var.mgmt_service_port  # Service port.
-      target_port = var.mgmt_service_target_port  # Pod port.
-      protocol = "TCP"
-    }
-    type = var.service_type
-  }
-}
+# resource "kubernetes_service" "service" {
+#   metadata {
+#     name = var.dns_name != "" ? var.dns_name : var.service_name
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   #
+#   spec {
+#     selector = {
+#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+#     }
+#     session_affinity = var.service_session_affinity
+#     port {
+#       name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
+#       port = var.amqp_service_port  # Service port.
+#       target_port = var.amqp_service_target_port  # Pod port.
+#       protocol = "TCP"
+#     }
+#     port {
+#       name = "mgmt"  # management UI and HTTP API).
+#       port = var.mgmt_service_port  # Service port.
+#       target_port = var.mgmt_service_target_port  # Pod port.
+#       protocol = "TCP"
+#     }
+#     type = var.service_type
+#   }
+# }

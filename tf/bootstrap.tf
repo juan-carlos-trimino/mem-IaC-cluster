@@ -76,7 +76,7 @@ locals {
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
-  svc_dns_elasticsearch = "${local.svc_elasticsearch_master}.${local.namespace}.svc.cluster.local:9200"
+  # svc_dns_elasticsearch = "${local.svc_elasticsearch_master}.${local.namespace}.svc.cluster.local:9200"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
@@ -337,14 +337,14 @@ module "mem-elasticsearch-master" {
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 3
-  # Limits and request for CPU resources are measured in millicores. If the container needs one full
-  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
-  # '250m.'
-  qos_limits_cpu = "1500m"
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
+  qos_limits_cpu = "1000m"
   qos_requests_cpu = "250m"
   # By default, Elasticsearch allocates 2GB of system memory for the database.
-  qos_limits_memory = "4Gi"
-  qos_requests_memory = "3Gi"
+  qos_limits_memory = "3Gi"
+  qos_requests_memory = "2Gi"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "5Gi"
   pvc_storage_class_name = "ibmc-block-silver"
@@ -357,9 +357,11 @@ module "mem-elasticsearch-master" {
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
     "node.roles": "[master]"
     # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
-    # By default, the JVM heap size is 1GB,
+    # By default, the JVM heap size is 1GB;
     # By default, Elasticsearch is configured to use a heap with a minimum and maximum size of 1GB.
-    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+    ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#data-path
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/important-settings.html#path-settings
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
     # It is vitally important to the health of your node that none of the JVM is ever swapped out
@@ -371,6 +373,14 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
+    # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
+    # determines the set of master-eligible nodes whose votes are counted in the first election.
+    # In development mode, with no discovery settings configured, this step is performed
+    # automatically by the nodes themselves.
+    #
+    # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
+    # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
+    # the very first election.
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
     "cluster.initial_master_nodes": <<EOL
       "${local.svc_elasticsearch_master}-0,
@@ -407,7 +417,7 @@ module "mem-elasticsearch-data" {
   # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
   # '250m.'
   qos_limits_cpu = "4000m"
-  qos_requests_cpu = "1000m"
+  qos_requests_cpu = "0.750m"
   # By default, Elasticsearch allocates 2GB of system memory for the database.
   qos_limits_memory = "10Gi"
   qos_requests_memory = "5Gi"
@@ -420,7 +430,7 @@ module "mem-elasticsearch-data" {
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
     "node.roles": "[data]"
     # By default, Elasticsearch is configured to use a heap with a minimum and maximum size of 1GB.
-    ES_JAVA_OPTS: "-Xms4g -Xmx4g"
+    ES_JAVA_OPTS: "-Xms3g -Xmx3g"
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
     # "path.repo": "data/repo"
@@ -470,12 +480,13 @@ module "mem-elasticsearch-client" {
   qos_requests_cpu = "100m"
   # By default, Elasticsearch allocates 2GB of system memory for the database.
   qos_limits_memory = "4Gi"
-  qos_requests_memory = "2Gi"
+  qos_requests_memory = "3Gi"
   env = {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     HTTP_ENABLE: true
     ES_PATH_CONF: "/usr/share/elasticsearch/config"
-    # a coordinating node
+    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+    # A coordinating node.
     "node.roles": "[]"
     "xpack.security.enabled": false
     "xpack.license.self_generated.type": "trial"
@@ -484,8 +495,6 @@ module "mem-elasticsearch-client" {
   }
   http_service_port = 9200
   http_service_target_port = 9200
-  # transport_service_port = 9300
-  # transport_service_target_port = 9300
   service_name_master = local.svc_elasticsearch_master
   service_name = local.svc_elasticsearch_client
 }
@@ -517,21 +526,27 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    ELASTICSEARCH_URL: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
-    CLUSTER_NAME: "cluster-elk"
+    "cluster.name": "${local.elasticsearch_cluster_name}"
+    SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
+    "elasticsearch.url": "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
     # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).
     "server.host": "0.0.0.0"
     # https://www.elastic.co/guide/en/kibana/current/settings.html
     "elasticsearch.hosts": "[mem-elasticsearch-client.memories]"
     "node.roles": "*"
-    # "elasticsearch.username": "kibana"
-    # "elasticsearch.password": "kibana"
-    # SVC_DNS_KIBANA: local.svc_dns_kibana
+
+    # "server.basePath": "/api/v1/proxy/namespaces/kibana/services/kibana-logging"
+    "elasticsearch.ssl.verificationMode": "none"
+    "status.allowAnonymous": true
+
+
+    "elasticsearch.username": "kibana"
+    "elasticsearch.password": "kibana"
     # XPACK_SECURITY_ENABLED: false
     # This deprecated setting has no effect.
-    "xpack.monitoring.enabled": false
+    # "xpack.monitoring.enabled": false
     # If set to false, the machine learning APIs are disabled on the node.
-    "xpack.ml.enabled": false
+    # "xpack.ml.enabled": false
     # "xpack.graph.enabled": false
   }
   service_port = 5601

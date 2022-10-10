@@ -80,7 +80,7 @@ variable service_name_headless {
 # ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
 #
-########################################## Session affinity and Web Browsers (for LoadBalancer Services)
+# Session affinity and Web Browsers (for LoadBalancer Services)
 # Since the service is now exposed externally, accessing it with a web browser will hit
 # the same pod every time. If the sessionAffinity is set to None, then why? The browser
 # is using keep-alive connections and sends all its requests through a single connection.
@@ -151,7 +151,6 @@ resource "kubernetes_service_account" "service_account" {
 # RoleBinding is a namespaced resource; ClusterRole/ClusterRoleBinding is a cluster-level resource.
 # A Role resource defines what actions can be taken on which resources; i.e., which types of HTTP
 # requests can be performed on which RESTful resources.
-# resource "kubernetes_cluster_role" "cluster_role" {
 resource "kubernetes_role" "role" {
   metadata {
     name = "${var.service_name}-role"
@@ -176,7 +175,6 @@ resource "kubernetes_role" "role" {
 }
 
 # Bind the role to the service account.
-# resource "kubernetes_cluster_role_binding" "cluster_role_binding" {
 resource "kubernetes_role_binding" "role_binding" {
   metadata {
     name = "${var.service_name}-role-binding"
@@ -256,6 +254,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
         labels = {
           # It must match the label for the pod selector (.spec.selector.matchLabels).
           pod_selector_lbl = local.pod_selector_label
+          # It must match the label selector of the Service.
           svc_lbl = local.svc_label
         }
       }
@@ -295,23 +294,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
-        # this number to a higher value, feel free to remove the init container.
-        # Increase the default vm.max_map_count to 262144
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
-        init_container {
-          name = "init-sysctl"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          command = ["sysctl", "-w", "vm.max_map_count=262144"]
-          security_context {
-            run_as_non_root = false
-            run_as_user = 0
-            run_as_group = 0
-            read_only_root_filesystem = true
-            privileged = true
-          }
-        }
         # Fix the permissions on the volume.
         init_container {
           name = "fix-permissions"
@@ -330,6 +312,23 @@ resource "kubernetes_stateful_set" "stateful_set" {
             mount_path = "/es-data"
           }
         }
+        # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
+        # this number to a higher value, feel free to remove the init container.
+        # Increase the default vm.max_map_count to 262144
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
+        init_container {
+          name = "init-sysctl"
+          image = "busybox:1.34.1"
+          image_pull_policy = "IfNotPresent"
+          command = ["sysctl", "-w", "vm.max_map_count=262144"]
+          security_context {
+            run_as_non_root = false
+            run_as_user = 0
+            run_as_group = 0
+            read_only_root_filesystem = true
+            privileged = true
+          }
+        }
         container {
           name = var.service_name
           image = var.image_tag
@@ -344,7 +343,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             read_only_root_filesystem = false
             privileged = false
           }
-          ###################################################
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -363,7 +361,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
               # Similarly, if a Container specifies its own CPU limit, but does not specify a CPU
               # request, Kubernetes automatically assigns a CPU request that matches the limit.
               cpu = var.qos_requests_cpu == "" ? var.qos_limits_cpu : var.qos_requests_cpu
-              memory = var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              memory = (
+                var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              )
             }
             limits = {
               cpu = var.qos_limits_cpu
@@ -428,14 +428,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # Since PersistentVolumes are cluster-level resources, they do not belong to any namespace, but
     # PersistentVolumeClaims can only be created in a specific namespace; they can only be used by
     # pods in the same namespace.
-    #
-    # In order for RabbitMQ nodes to retain data between Pod restarts, node's data directory must
-    # use durable storage. A Persistent Volume must be attached to each RabbitMQ Pod.
-    #
-    # If a transient volume is used to back a RabbitMQ node, the node will lose its identity and
-    # all of its local data in case of a restart. This includes both schema and durable queue data.
-    # Syncing all of this data on every node restart would be highly inefficient. In case of a loss
-    # of quorum during a rolling restart, this will also lead to data loss.
     volume_claim_template {
       metadata {
         name = "es-storage"

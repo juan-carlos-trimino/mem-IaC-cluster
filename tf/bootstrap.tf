@@ -342,46 +342,22 @@ module "mem-elasticsearch-master" {
   # value of '250m.'
   qos_limits_cpu = "1000m"
   qos_requests_cpu = "250m"
-  # By default, Elasticsearch allocates 2GB of system memory for the database.
-  qos_limits_memory = "3Gi"
-  qos_requests_memory = "2Gi"
+  qos_limits_memory = "1Gi"
+  qos_requests_memory = "550Mi"
   pvc_access_modes = ["ReadWriteOnce"]
-  pvc_storage_size = "5Gi"
+  pvc_storage_size = "1Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
-    # A node can only join a cluster when it shares its cluster.name with all the other nodes in
-    # the cluster. The default name is elasticsearch, but you should change it to an appropriate
-    # name which describes the purpose of the cluster.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#cluster-name
     "cluster.name": "${local.elasticsearch_cluster_name}"
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#node-roles
     "node.roles": "[master]"
-    # Elasticsearch recommends that the value for the maximum and minimum heap size be identical.
-    # By default, the JVM heap size is 1GB.
-    # By default, Elasticsearch is configured to use a heap with a minimum and maximum size of 1GB.
-    ES_JAVA_OPTS: "-Xms1g -Xmx1g"
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html#data-path
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/important-settings.html#path-settings
+    ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
-    # It is vitally important to the health of your node that none of the JVM is ever swapped out
-    # to disk.
-    # "bootstrap.memory_lock": true  # Swapping is disabled.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#unicast.hosts
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
-    # When you start an Elasticsearch cluster for the first time, a cluster bootstrapping step
-    # determines the set of master-eligible nodes whose votes are counted in the first election.
-    # In development mode, with no discovery settings configured, this step is performed
-    # automatically by the nodes themselves.
-    #
-    # Because auto-bootstrapping is inherently unsafe, when starting a new cluster in production
-    # mode, you must explicitly list the master-eligible nodes whose votes should be counted in
-    # the very first election.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#initial_master_nodes
     "cluster.initial_master_nodes": <<EOL
       "${local.svc_elasticsearch_master}-0,
        ${local.svc_elasticsearch_master}-1,
@@ -389,11 +365,16 @@ module "mem-elasticsearch-master" {
     EOL
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/security-settings.html#general-security-settings
     # In Elasticsearch 8.0 and later, security is enabled automatically when you start Elasticsearch for the first time.
+    # "xpack.security.enabled": false
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
-    # deprecated "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
+    "xpack.security.autoconfiguration.enabled": false
+    "xpack.license.self_generated.type": "trial"
+    # deprecated "xpack.monitoring.collection.enabled": true
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -436,11 +417,16 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
+    # "xpack.security.enabled": false
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
-    # "xpack.monitoring.collection.enabled": true
     "xpack.security.transport.ssl.enabled": false
+    "xpack.security.autoconfiguration.enabled": false
+    "xpack.license.self_generated.type": "trial"
+    # "xpack.monitoring.collection.enabled": true
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -474,10 +460,15 @@ module "mem-elasticsearch-client" {
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
+    # "xpack.security.enabled": false
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": false
+    "xpack.security.autoconfiguration.enabled": false
+    "xpack.license.self_generated.type": "trial"
   }
   http_service_port = 9200
   http_service_target_port = 9200
@@ -508,12 +499,18 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
+    # https://www.elastic.co/guide/en/kibana/current/settings.html
+    # https://github.com/elastic/kibana/blob/main/config/kibana.yml
     "cluster.name": "${local.elasticsearch_cluster_name}"
     "node.roles": "*"
     SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
     # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).wwwwwwwwwwwwwwwwwwwwwwwww
     "server.host": "0.0.0.0"
     "server.port": 5601
+
+    # "http.host": ["_local_", "_site_"]
+    "server.publicBaseUrl": "http://169.44.156.170:5601/"
+
     "elasticsearch.url": "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
     # https://www.elastic.co/guide/en/kibana/current/settings.html
     # The URLs of the Elasticsearch instances to use for all your queries.
@@ -524,17 +521,18 @@ module "mem-kibana" {
     "elasticsearch.username": "kibana"
     "elasticsearch.password": "kibana"
     # "server.basePath": "/api/v1/proxy/namespaces/kibana/services/kibana-logging"
-    "elasticsearch.ssl.verificationMode": "none"
-
+    # "elasticsearch.ssl.verificationMode": "none"
+    "elasticsearch.ssl.verify": false
 
     "status.allowAnonymous": true
 
-    # "xpack.security.enabled": false
-    # "xpack.license.self_generated.type": "trial"
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
-    
-    "server.ssl.enabled": true
+    "xpack.security.enabled": false
+    "xpack.security.enrollment.enabled": false
+    "xpack.security.http.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.autoconfiguration.enabled": false
+    "xpack.license.self_generated.type": "trial"
+    # "server.ssl.enabled": false
     # XPACK_SECURITY_ENABLED: false
     # This deprecated setting has no effect.
     # "xpack.monitoring.enabled": false

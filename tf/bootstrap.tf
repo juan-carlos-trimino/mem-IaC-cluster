@@ -296,36 +296,6 @@ module "whoiam" {
 # For the service:
 # $ kubectl port-forward svc/mem-elasticsearch-headless 9200:9200 -n memories
 # $ kubectl port-forward svc/mem-elasticsearch 9200:9200 -n memories
-#
-# From a terminal:
-# $ curl http://localhost:9200/_cat/health?v
-# Cluster Stats
-# $ curl http://localhost:9200/_cluster/stats?human&pretty
-# Cluster State
-# $ curl http://localhost:9200/_cluster/state?pretty
-# Cluster Health
-# $ curl http://localhost:9200/_cluster/health?pretty
-# Nodes Stats
-# $ curl http://localhost:9200/_nodes/stats?pretty
-# Specific Node Stats
-# $ curl http://localhost:9200/_nodes/mem-elasticsearch-1/stats?pretty
-# Index-Only Stats:
-# $ curl http://localhost:9200/_nodes/stats/indices?pretty
-#
-# From a web browser:
-# http://localhost:9200/_cat/health?v
-# Cluster Stats
-# http://localhost:9200/_cluster/stats?human&pretty
-# Cluster State
-# http://localhost:9200/_cluster/state?pretty
-# Cluster Health
-# http://localhost:9200/_cluster/health?pretty
-# Nodes Stats
-# http://localhost:9200/_nodes/stats?pretty
-# Specific Node Stats
-# http://localhost:9200/_nodes/mem-elasticsearch-1/stats?pretty
-# Index-Only Stats:
-# http://localhost:9200/_nodes/stats/indices?pretty
 
 # /*** elk
 module "mem-elasticsearch-master" {
@@ -363,18 +333,12 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.4/security-settings.html#general-security-settings
-    # In Elasticsearch 8.0 and later, security is enabled automatically when you start Elasticsearch for the first time.
-    # "xpack.security.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
     "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": false
     "xpack.security.autoconfiguration.enabled": false
     "xpack.license.self_generated.type": "trial"
-    # deprecated "xpack.monitoring.collection.enabled": true
   }
   transport_service_port = 9300
   transport_service_target_port = 9300

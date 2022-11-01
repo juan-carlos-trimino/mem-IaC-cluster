@@ -49,6 +49,9 @@ variable termination_grace_period_seconds {
   default = 30
   type = number
 }
+
+
+
 # See https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#orderedready-pod-management
 variable pod_management_policy {
   default = "OrderedReady"
@@ -68,7 +71,7 @@ variable pvc_storage_class_name {
   default = ""
 }
 variable pvc_storage_size {
-  default = "20Gi"
+  default = "5Gi"
 }
 variable service_name {
   default = ""
@@ -109,6 +112,7 @@ Define local variables.
 locals {
   pod_selector_label = "ps-${var.service_name}"
   svc_label = "svc-${var.service_name_headless}"
+  es_label = "es-cluster"
 }
 
 resource "null_resource" "scc-elasticsearch" {
@@ -199,23 +203,6 @@ resource "kubernetes_role_binding" "role_binding" {
   }
 }
 
-# There are important reasons for using a StatefulSet instead of a Deployment: sticky identity,
-# simple network identifiers, stable persistent storage and the ability to perform ordered rolling
-# upgrades.
-#
-# $ kubectl get sts -n memories
-#
-#
-# It is interesting to follow the logs of any of the master-node pods to witness the master election among them
-# and then later on when new data and client nodes are added.
-# root$ kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | grep ClusterApplierService
-# https://jsonformatter.curiousconcept.com/#
-# It can be seen that es-master pod named es-master-594b58b86c-bj7g7 was elected as the master and other 2 pods added to it and each other.
-
-# Windows CMD
-# C:\> kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | findstr "ClusterApplierService"
-# Windows PowerShell
-# PS C:\> kubectl -n memories logs -f pod/mem-elasticsearch-master-0 | Select-String "ClusterApplierService"
 resource "kubernetes_stateful_set" "stateful_set" {
   metadata {
     name = var.service_name
@@ -256,45 +243,30 @@ resource "kubernetes_stateful_set" "stateful_set" {
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
           svc_lbl = local.svc_label
+          es_lbl = local.es_label
+          es_role_lbl = "es-master"
         }
       }
       #
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         affinity {
-          # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
-          # that node is already running a pod with label having key 'replicaset' and value
-          # 'running_one'.
           pod_anti_affinity {
-            # Defines a preferred rule.
-            preferred_during_scheduling_ignored_during_execution {
-              # Specifies a weight for a preferred rule. The node with the highest weight is
-              # preferred.
-              weight = 100
-              pod_affinity_term {
-                label_selector {
-                  match_expressions {
-                    # Description of the pod label that determines when the anti-affinity rule
-                    # applies. Specifies a key and value for the label.
-                    key = "replicaset"
-                    # The operator represents the relationship between the label on the existing
-                    # pod and the set of values in the matchExpression parameters in the
-                    # specification for the new pod. Can be In, NotIn, Exists, or DoesNotExist.
-                    operator = "In"
-                    values = ["rs_elasticsearch"]
-                  }
+            required_during_scheduling_ignored_during_execution {
+              label_selector {
+                match_expressions {
+                  key = "es_lbl"
+                  operator = "In"
+                  values = ["${local.es_label}"]
                 }
-                # By default, the label selector only matches pods in the same namespace as the pod
-                # that is being scheduled. To select pods from other namespaces, add the
-                # appropriate namespace(s) in the namespaces field.
-                namespaces = ["${var.namespace}"]
-                topology_key = "kubernetes.io/hostname"
               }
+              topology_key = "kubernetes.io/hostname"
             }
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
         # Fix the permissions on the volume.
+        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
         init_container {
           name = "fix-permissions"
           image = "busybox:1.34.1"

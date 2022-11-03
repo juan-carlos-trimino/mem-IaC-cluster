@@ -44,14 +44,12 @@ variable revision_history_limit {
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
-# seconds to terminate gracefully before they're killed forcibly.
+# seconds to terminate gracefully before they're killed forcibly. The StatefulSet should not
+# specify a termination grace period of 0.
 variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-
-
-
 # See https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#orderedready-pod-management
 variable pod_management_policy {
   default = "OrderedReady"
@@ -141,13 +139,7 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    # annotations = {
-      # "kubernetes.io/enforce-mountable-secrets" = true
-  #   }
   }
-  # secret {
-  #   name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-  # }
 }
 
 # Roles define WHAT can be done; role bindings define WHO can do it.
@@ -215,10 +207,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
   #
   spec {
     replicas = var.replicas
-    # Headless service that gives network identity to the Elasticsearch nodes and enables them to
-    # cluster. The name of the service that governs this StatefulSet. This service must exist
-    # before the StatefulSet and is responsible for the network identity of the set. Pods get
-    # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
     service_name = var.service_name_headless
     pod_management_policy = var.pod_management_policy
     revision_history_limit = var.revision_history_limit
@@ -239,6 +227,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
       metadata {
         # Labels attach to the Pod.
         labels = {
+          app = var.app_name
           # It must match the label for the pod selector (.spec.selector.matchLabels).
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
@@ -250,6 +239,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
       #
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
+
+
         affinity {
           pod_anti_affinity {
             required_during_scheduling_ignored_during_execution {

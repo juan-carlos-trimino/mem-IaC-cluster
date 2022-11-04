@@ -302,7 +302,7 @@ module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
   imagePullPolicy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -353,7 +353,7 @@ module "mem-elasticsearch-data" {
   ]
   source = "./modules/elk/elasticsearch/es-data"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
   imagePullPolicy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -405,7 +405,7 @@ module "mem-elasticsearch-client" {
   ]
   source = "./modules/elk/elasticsearch/es-client"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.4.1"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 2
@@ -454,7 +454,7 @@ module "mem-kibana" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/kibana"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/kibana/kibana:8.4.1"
+  image_tag = "docker.elastic.co/kibana/kibana:8.5.0"
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1

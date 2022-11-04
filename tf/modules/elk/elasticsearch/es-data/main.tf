@@ -304,29 +304,21 @@ resource "kubernetes_stateful_set" "stateful_set" {
               value = env.value
             }
           }
-          # liveness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
-          #   }
-          #   initial_delay_seconds = 60
-          #   # See https://www.rabbitmq.com/monitoring.html for monitoring frequency recommendations.
-          #   period_seconds = 60
-          #   timeout_seconds = 15
-          #   failure_threshold = 3
-          #   success_threshold = 1
-          # }
-          # readiness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
-          #   }
-          #   initial_delay_seconds = 20
-          #   period_seconds = 60
-          #   timeout_seconds = 10
-          # }
-          # volume_mount {
-          #   name = "elasticsearch-storage"
-          #   mount_path = "/usr/share/elasticsearch/data"
-          # }
+          liveness_probe {
+            tcp_socket {
+              port = var.transport_service_target_port
+            }
+            initial_delay_seconds = 20
+            period_seconds = 10
+          }
+          readiness_probe {
+            http_get {
+              path = "/_cluster/health"
+              port = 9200
+            }
+            initial_delay_seconds = 20
+            timeout_seconds = 5
+          }
           volume_mount {
             name = "es-storage"
             mount_path = "/es-data"

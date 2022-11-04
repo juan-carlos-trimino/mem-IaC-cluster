@@ -239,8 +239,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
       #
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
-
-
         affinity {
           pod_anti_affinity {
             required_during_scheduling_ignored_during_execution {
@@ -256,13 +254,39 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
+
+
+        # https://www.elastic.co/guide/en/elasticsearch/reference/5.5/docker.html#_b_bind_mounted_configuration
+
         # Fix the permissions on the volume.
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
+        # init_container {
+        #   name = "fix-permissions"
+        #   image = "busybox:1.34.1"
+        #   image_pull_policy = "IfNotPresent"
+        #   command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
+        #   security_context {
+        #     run_as_non_root = false
+        #     run_as_user = 0
+        #     run_as_group = 0
+        #     read_only_root_filesystem = true
+        #     privileged = true
+        #   }
+        #   volume_mount {
+        #     name = "es-storage"
+        #     mount_path = "/es-data"
+        #   }
+        # }
+        # Set vm.max_map_count to 262144.
         init_container {
-          name = "fix-permissions"
+          name = "init-sysctl"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
-          command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
+          command = [
+            "/bin/sh",
+            "-c",
+            "chown -R 1000:1000 /es-data; sysctl -w vm.max_map_count=262144"
+          ]
           security_context {
             run_as_non_root = false
             run_as_user = 0
@@ -275,23 +299,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             mount_path = "/es-data"
           }
         }
-        # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
-        # this number to a higher value, feel free to remove the init container.
-        # Increase the default vm.max_map_count to 262144
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#docker-cli-run-prod-mode
-        init_container {
-          name = "init-sysctl"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          command = ["sysctl", "-w", "vm.max_map_count=262144"]
-          security_context {
-            run_as_non_root = false
-            run_as_user = 0
-            run_as_group = 0
-            read_only_root_filesystem = true
-            privileged = true
-          }
-        }
         container {
           name = var.service_name
           image = var.image_tag
@@ -301,8 +308,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
               drop = ["ALL"]
             }
             run_as_non_root = true
-            run_as_group = 1000
             run_as_user = 1000
+            run_as_group = 1000
             read_only_root_filesystem = false
             privileged = false
           }
@@ -333,6 +340,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
               memory = var.qos_limits_memory
             }
           }
+
           # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name
           # By default, Elasticsearch will take the 7 first character of the randomly generated
           # uuid used as the node id. Note that the node id is persisted and does not change when a
@@ -362,23 +370,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
             }
           }
           # liveness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
-          #   }
-          #   initial_delay_seconds = 60
-          #   # See https://www.rabbitmq.com/monitoring.html for monitoring frequency recommendations.
-          #   period_seconds = 60
-          #   timeout_seconds = 15
-          #   failure_threshold = 3
-          #   success_threshold = 1
-          # }
-          # readiness_probe {
-          #   exec {
-          #     command = ["rabbitmq-diagnostics", "status", "--erlang-cookie", "$(RABBITMQ_ERLANG_COOKIE)"]
+          #   tcp_socket {
+          #     port = "transport" # var.transport_service_target_port
           #   }
           #   initial_delay_seconds = 20
-          #   period_seconds = 60
-          #   timeout_seconds = 10
+          #   period_seconds = 10
           # }
           volume_mount {
             name = "es-storage"

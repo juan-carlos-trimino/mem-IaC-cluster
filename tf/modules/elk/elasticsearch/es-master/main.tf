@@ -254,32 +254,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-
-
-        # https://www.elastic.co/guide/en/elasticsearch/reference/5.5/docker.html#_b_bind_mounted_configuration
-
-        # Fix the permissions on the volume.
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html#_notes_for_production_use_and_defaults
-        # init_container {
-        #   name = "fix-permissions"
-        #   image = "busybox:1.34.1"
-        #   image_pull_policy = "IfNotPresent"
-        #   command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
-        #   security_context {
-        #     run_as_non_root = false
-        #     run_as_user = 0
-        #     run_as_group = 0
-        #     read_only_root_filesystem = true
-        #     privileged = true
-        #   }
-        #   volume_mount {
-        #     name = "es-storage"
-        #     mount_path = "/es-data"
-        #   }
-        # }
-        # Set vm.max_map_count to 262144.
         init_container {
-          name = "init-sysctl"
+          name = "init-commands"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
           command = [
@@ -340,11 +316,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
               memory = var.qos_limits_memory
             }
           }
-
-          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#node-name
-          # By default, Elasticsearch will take the 7 first character of the randomly generated
-          # uuid used as the node id. Note that the node id is persisted and does not change when a
-          # node restarts and therefore the default node name will also not change.
+          # A human-readable identifier for a particular instance of Elasticsearch.
           env {
             name = "node.name"
             value_from {
@@ -353,7 +325,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
-          # https://www.elastic.co/guide/en/elasticsearch/reference/current/important-settings.html#network.host
+          # By default, Elasticsearch only binds to loopback addresses such as 127.0.0.1 and [::1].
           env {
             name = "network.host"
             value_from {
@@ -410,20 +382,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
 
 # Before deploying a StatefulSet, you will need to create a headless Service, which will be used
 # to provide the network identity for your stateful pods.
-#
-# Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
-# reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
-# the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
-# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
-# governing Service belongs to the default namespace and is called service1, and the pod name is
-# pod-0, the pod can be reached by its fully qualified domain name of
-# pod-0.service1.default.svc.cluster.local.
-#
-# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
-# the cluster:
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
-#
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-elasticsearch-headless.memories.svc.cluster.local
 resource "kubernetes_service" "headless_service" {  # For inter-node communication.
   metadata {
     name = var.service_name_headless

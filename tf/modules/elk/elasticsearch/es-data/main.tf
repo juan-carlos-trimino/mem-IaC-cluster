@@ -92,13 +92,7 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    # annotations = {
-      # "kubernetes.io/enforce-mountable-secrets" = true
-  #   }
   }
-  # secret {
-  #   name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-  # }
 }
 
 resource "kubernetes_role" "role" {
@@ -160,7 +154,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
   #
   spec {
     replicas = var.replicas
-    # The name of the service that governs this StatefulSet.
     service_name = var.service_name_headless
     pod_management_policy = var.pod_management_policy
     revision_history_limit = var.revision_history_limit
@@ -178,6 +171,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
       metadata {
         # Labels attach to the Pod.
         labels = {
+          app = var.app_name
           # It must match the label for the pod selector (.spec.selector.matchLabels).
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
@@ -204,12 +198,18 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         termination_grace_period_seconds = var.termination_grace_period_seconds
-        # Fix the permissions on the volume.
         init_container {
-          name = "fix-permissions"
+          name = "init-commands"
           image = "busybox:1.34.1"
           image_pull_policy = "IfNotPresent"
-          command = ["/bin/sh", "-c", "chown -R 1000:1000 /es-data"]
+          command = [
+            "/bin/sh",
+            "-c",
+            # Fix the permissions on the volume.
+            # Increase the default vm.max_map_count to 262144.
+            # Increase the max number of open file descriptors.
+            "chown -R 1000:1000 /es-data; sysctl -w vm.max_map_count=262144; ulimit -n 65536"
+          ]
           security_context {
             run_as_non_root = false
             run_as_user = 0
@@ -220,34 +220,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
           volume_mount {
             name = "es-storage"
             mount_path = "/es-data"
-          }
-        }
-        # Increase the default vm.max_map_count to 262144
-        init_container {
-          name = "init-sysctl"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          command = ["sysctl", "-w", "vm.max_map_count=262144"]
-          security_context {
-            run_as_non_root = false
-            run_as_user = 0
-            run_as_group = 0
-            read_only_root_filesystem = true
-            privileged = true
-          }
-        }
-        # Increase the max number of open file descriptors.
-        init_container {
-          name = "increase-fd"
-          image = "busybox:1.34.1"
-          image_pull_policy = "IfNotPresent"
-          command = ["/bin/sh", "-c", "ulimit -n 65536"]
-          security_context {
-            run_as_non_root = false
-            run_as_user = 0
-            run_as_group = 0
-            read_only_root_filesystem = true
-            privileged = true
           }
         }
         container {

@@ -274,29 +274,6 @@ module "whoiam" {
 ###################################################################################################
 # elk                                                                                             #
 ###################################################################################################
-# To connect to a specific pod without going through a service, use the 'port-forward' command.
-#
-# $ kubectl port-forward <pod-name> <local-port>:<pod-port> -n <namespace>
-#
-# To connect via a service
-#
-# $ kubectl port-forward svc/<service-name> <local-port>:<pod-port> -n <namespace>
-#
-# Once the port forwarder is running, from a different terminal (or web browser) connect to the pod
-# through the local port.
-#
-# From a terminal:
-# $ curl http://localhost:<local-port>
-#
-# From a web browser:
-# http://localhost:<local-port>
-#
-#
-# To check the state of the deployment, use the 'port-forward' command.
-# For the service:
-# $ kubectl port-forward svc/mem-elasticsearch-headless 9200:9200 -n memories
-# $ kubectl port-forward svc/mem-elasticsearch 9200:9200 -n memories
-
 # /*** elk
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -359,7 +336,7 @@ module "mem-elasticsearch-data" {
   namespace = local.namespace
   replicas = 2
   qos_limits_cpu = "4000m"
-  qos_requests_cpu = "0.750m"
+  qos_requests_cpu = "750m"
   qos_limits_memory = "10Gi"
   qos_requests_memory = "5Gi"
   pvc_access_modes = ["ReadWriteOnce"]
@@ -381,16 +358,12 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    # "xpack.security.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
     "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": false
     "xpack.security.autoconfiguration.enabled": false
     "xpack.license.self_generated.type": "trial"
-    # "xpack.monitoring.collection.enabled": true
   }
   transport_service_port = 9300
   transport_service_target_port = 9300

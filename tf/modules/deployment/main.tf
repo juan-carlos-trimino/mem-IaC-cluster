@@ -217,6 +217,7 @@ resource "kubernetes_deployment" "deployment" {
   spec {
     # The desired number of pods that should be running.
     replicas = var.replicas
+    revision_history_limit = var.revision_history_limit
     # The label selector determines the pods the ReplicaSet manages.
     selector {
       match_labels = {
@@ -294,7 +295,9 @@ resource "kubernetes_deployment" "deployment" {
               # Similarly, if a Container specifies its own CPU limit, but does not specify a CPU
               # request, Kubernetes automatically assigns a CPU request that matches the limit.
               cpu = var.qos_requests_cpu == "" ? var.qos_limits_cpu : var.qos_requests_cpu
-              memory = var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              memory = (
+                var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              )
             }
             limits = {
               cpu = var.qos_limits_cpu

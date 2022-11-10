@@ -391,15 +391,11 @@ module "mem-elasticsearch-client" {
     "node.roles": "[]"  # A coordinating node.
     ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     HTTP_ENABLE: true
-    # ES_PATH_CONF: "/usr/share/elasticsearch/config"
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
-    # "xpack.security.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
     "xpack.security.enabled": false
     "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
@@ -411,7 +407,7 @@ module "mem-elasticsearch-client" {
   http_service_target_port = 9200
   service_name = local.svc_elasticsearch_client
 }
-
+############
 # To check the state of the deployment, use the 'port-forward' command.
 #
 # $ kubectl port-forward <pod-name-or-svc-headless> 5601:5601 -n memories

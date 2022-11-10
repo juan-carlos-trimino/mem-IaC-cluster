@@ -65,73 +65,11 @@ locals {
   es_label = "es-cluster"
 }
 
-# resource "kubernetes_service_account" "service_account" {
-#   metadata {
-#     name = "${var.service_name}-service-account"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#     # annotations = {
-#       # "kubernetes.io/enforce-mountable-secrets" = true
-#   #   }
-#   }
-#   # secret {
-#   #   name = kubernetes_secret.rabbitmq_secret.metadata[0].name
-#   # }
-# }
-
-# resource "kubernetes_role" "role" {
-#   metadata {
-#     name = "${var.service_name}-role"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   rule {
-#     # Resources in the core apiGroup, which has no name - hence the "".
-#     api_groups = [""]
-#     verbs = ["get", "watch", "list"]
-#     # The plural form must be used when specifying resources.
-#     resources = ["endpoints", "services", "namespaces"]
-#   }
-#   rule {
-#     api_groups = ["security.openshift.io"]
-#     verbs = ["use"]
-#     resources = ["securitycontextconstraints"]
-#     resource_names = ["mem-elasticsearch-scc"]
-#   }
-# }
-
-# resource "kubernetes_role_binding" "role_binding" {
-#   metadata {
-#     name = "${var.service_name}-role-binding"
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
-#   role_ref {
-#     api_group = "rbac.authorization.k8s.io"
-#     kind = "Role"
-#     # This RoleBinding references the Role specified below...
-#     name = kubernetes_role.role.metadata[0].name
-#   }
-#   # ... and binds it to the specified ServiceAccount in the specified namespace.
-#   subject {
-#     # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
-#     kind = "ServiceAccount"
-#     name = kubernetes_service_account.service_account.metadata[0].name
-#     namespace = kubernetes_service_account.service_account.metadata[0].namespace
-#   }
-# }
-
 resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    # Labels attach to the Deployment.
     labels = {
       app = var.app_name
     }
@@ -165,8 +103,6 @@ resource "kubernetes_deployment" "deployment" {
       }
       # The Pod template's specification.
       spec {
-        termination_grace_period_seconds = var.termination_grace_period_seconds
-        # service_account_name = kubernetes_service_account.service_account.metadata[0].name
         affinity {
           pod_anti_affinity {
             required_during_scheduling_ignored_during_execution {
@@ -181,37 +117,7 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
         }
-        # Elasticsearch requires vm.max_map_count to be at least 262144. If the OS already sets up
-        # this number to a higher value, feel free to remove the init container.
-        # init_container {
-        #   name = "increase-vm-max-map-count"
-        #   image = "busybox:1.34.1"
-        #   image_pull_policy = "IfNotPresent"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["sysctl", "-w", "vm.max_map_count=262144"]
-        #   security_context {
-        #     # run_as_group = 0
-        #     # run_as_non_root = false
-        #     # run_as_user = 0
-        #     read_only_root_filesystem = true
-        #     privileged = true
-        #   }
-        # }
-        # Increase the max number of open file descriptors.
-        # init_container {
-        #   name = "increase-fd-ulimit"
-        #   image = "busybox:1.34.1"
-        #   image_pull_policy = "IfNotPresent"
-        #   # Docker (ENTRYPOINT)
-        #   command = ["/bin/sh", "-c", "ulimit -n 65536"]
-        #   security_context {
-        #     # run_as_group = 0
-        #     # run_as_non_root = false
-        #     # run_as_user = 0
-        #     read_only_root_filesystem = true
-        #     privileged = true
-        #   }
-        # }
+        termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
           name = var.service_name
           image = var.image_tag
@@ -220,9 +126,9 @@ resource "kubernetes_deployment" "deployment" {
             capabilities {
               drop = ["ALL"]
             }
-            run_as_group = 1000
             run_as_non_root = true
             run_as_user = 1000
+            run_as_group = 1000
             read_only_root_filesystem = false
             privileged = false
           }

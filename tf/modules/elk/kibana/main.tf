@@ -139,14 +139,24 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          env {
-            name = "server.name"
-            value_from {
-              field_ref {
-                field_path = "metadata.name"
-              }
-            }
-          }
+          # # A human-readable display name that identifies this Kibana instance.
+          # env {
+          #   name = "server.name"
+          #   value_from {
+          #     field_ref {
+          #       field_path = "metadata.name"
+          #     }
+          #   }
+          # }
+          # # By default, Elasticsearch only binds to loopback addresses such as 127.0.0.1 and [::1].
+          # env {
+          #   name = "network.host"
+          #   value_from {
+          #     field_ref {
+          #       field_path = "status.podIP"
+          #     }
+          #   }
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -182,6 +192,6 @@ resource "kubernetes_service" "service" {
       target_port = var.service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = "LoadBalancer"  #var.service_type
+    type = var.service_type
   }
 }

@@ -288,16 +288,14 @@ module "mem-elasticsearch-master" {
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
   qos_limits_cpu = "1000m"
-  qos_requests_cpu = "250m"
-  qos_limits_memory = "1Gi"
-  qos_requests_memory = "550Mi"
+  qos_limits_memory = "2Gi"
   pvc_access_modes = ["ReadWriteOnce"]
-  pvc_storage_size = "1Gi"
+  pvc_storage_size = "2Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     "node.roles": "[master]"
-    ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ES_JAVA_OPTS: "-Xms1g -Xmx1g"
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
     "discovery.seed_hosts": <<EOL
@@ -335,17 +333,15 @@ module "mem-elasticsearch-data" {
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 2
-  qos_limits_cpu = "4000m"
-  qos_requests_cpu = "750m"
-  qos_limits_memory = "10Gi"
-  qos_requests_memory = "5Gi"
+  qos_limits_cpu = "3000m"
+  qos_limits_memory = "8Gi"
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "50Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     "node.roles": "[data]"
-    ES_JAVA_OPTS: "-Xms3g -Xmx3g"
+    ES_JAVA_OPTS: "-Xms4g -Xmx4g"
     "path.data": "/es-data/data/"
     "path.logs": "/es-data/log/"
     "discovery.seed_hosts": <<EOL
@@ -383,9 +379,7 @@ module "mem-elasticsearch-client" {
   namespace = local.namespace
   replicas = 2
   qos_limits_cpu = "1000m"
-  qos_requests_cpu = "200m"
   qos_limits_memory = "4Gi"
-  qos_requests_memory = "3Gi"
   env = {
     "cluster.name": "${local.elasticsearch_cluster_name}"
     "node.roles": "[]"  # A coordinating node.
@@ -397,7 +391,8 @@ module "mem-elasticsearch-client" {
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
     "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": false
+    "xpack.security.enrollment.enabled": true
+    # "xpack.security.enrollment.enabled": false
     "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": false
     "xpack.security.autoconfiguration.enabled": false
@@ -421,6 +416,9 @@ module "mem-elasticsearch-client" {
 # http://localhost:5601
 module "mem-kibana" {
   count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-elasticsearch-client
+  ]
   source = "./modules/elk/kibana"
   app_name = var.app_name
   image_tag = "docker.elastic.co/kibana/kibana:8.5.0"
@@ -432,47 +430,55 @@ module "mem-kibana" {
   qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
   env = {
-    # https://www.elastic.co/guide/en/kibana/current/settings.html
     # https://github.com/elastic/kibana/blob/main/config/kibana.yml
-    "cluster.name": "${local.elasticsearch_cluster_name}"
-    "node.roles": "*"
-    SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
-    # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).wwwwwwwwwwwwwwwwwwwwwwwww
-    "server.host": "0.0.0.0"
+    # https://www.elastic.co/guide/en/kibana/current/settings.html
+    # A human-readable display name that identifies this Kibana instance.
+    "server.name": "${local.svc_kibana}"
+    # This setting specifies the host of the back end server. To allow remote users to connect, set
+    # the value to the IP address or DNS name of the Kibana server.
+    "server.host": "${local.svc_dns_kibana}"
+    # Kibana is served by a back end server. This setting specifies the port to use.
     "server.port": 5601
+    # The URLs of the Elasticsearch instances to use for all your queries.
+    # To enable SSL/TLS for outbound connections to Elasticsearch, use the https protocol in this
+    # setting.
+    # "elasticsearch.hosts": <<EOL
+    #   "[http://${local.svc_elasticsearch_data}-0.${local.namespace}:9300,
+    #     http://${local.svc_elasticsearch_data}-1.${local.namespace}:9300]"
+    # EOL
+    "elasticsearch.hosts": <<EOL
+      "[http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200]
+    EOL
+
+
+    # "server.publicBaseUrl": "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
+    # "cluster.name": "${local.elasticsearch_cluster_name}"
+    # "node.roles": "*"
+    # SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
+    # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).wwwwwwwwwwwwwwwwwwwwwwwww
+    # "server.host": "0.0.0.0"
 
     # "http.host": ["_local_", "_site_"]
-    "server.publicBaseUrl": "http://169.44.156.170:5601/"
 
-    "elasticsearch.url": "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
-    # https://www.elastic.co/guide/en/kibana/current/settings.html
-    # The URLs of the Elasticsearch instances to use for all your queries.
-    "elasticsearch.hosts": <<EOL
-      "[http://${local.svc_elasticsearch_data}-0.${local.namespace}:9200,
-        http://${local.svc_elasticsearch_data}-1.${local.namespace}:9200]"
-    EOL
-    "elasticsearch.username": "kibana"
-    "elasticsearch.password": "kibana"
+    # "elasticsearch.username": "kibana"
+    # "elasticsearch.password": "kibana"
     # "server.basePath": "/api/v1/proxy/namespaces/kibana/services/kibana-logging"
     # "elasticsearch.ssl.verificationMode": "none"
-    "elasticsearch.ssl.verify": false
+    # "elasticsearch.ssl.verify": false
 
-    "status.allowAnonymous": true
-
+    # "status.allowAnonymous": true
+    # "xpack.monitoring.ui.container.elasticsearch.enabled": true
     "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": false
-    "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.autoconfiguration.enabled": false
-    "xpack.license.self_generated.type": "trial"
-    # "server.ssl.enabled": false
-    # XPACK_SECURITY_ENABLED: false
-    # This deprecated setting has no effect.
-    # "xpack.monitoring.enabled": false
+    "xpack.security.enrollment.enabled": true
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.transport.ssl.enabled": false
+    # "xpack.security.autoconfiguration.enabled": false
+    # "xpack.license.self_generated.type": "trial"
     # If set to false, the machine learning APIs are disabled on the node.
     # "xpack.ml.enabled": false
     # "xpack.graph.enabled": false
   }
+  service_type = "LoadBalancer"
   service_port = 5601
   service_target_port = 5601
   service_name = local.svc_kibana

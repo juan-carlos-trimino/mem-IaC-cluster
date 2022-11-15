@@ -15,9 +15,11 @@ variable service_name {
 }
 variable kibana_username {
   type = string
+  sensitive = true
 }
 variable kibana_password {
   type = string
+  sensitive = true
 }
 
 resource "kubernetes_secret" "secret" {

@@ -15,9 +15,11 @@ variable "service_name1" {
 }
 variable "traefik_rabbitmq_username" {
   type = string
+  sensitive = true
 }
 variable "traefik_rabbitmq_password" {
   type = string
+  sensitive = true
 }
 variable "service_name2" {
   type = string

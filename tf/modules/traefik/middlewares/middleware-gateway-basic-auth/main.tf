@@ -15,9 +15,11 @@ variable service_name {
 }
 variable traefik_gateway_username {
   type = string
+  sensitive = true
 }
 variable traefik_gateway_password {
   type = string
+  sensitive = true
 }
 
 resource "kubernetes_secret" "secret" {

@@ -25,6 +25,7 @@ variable dns_names {
 }
 variable traefik_dns_api_token {
   type = string
+  sensitive = true
 }
 
 resource "kubernetes_secret" "secret" {

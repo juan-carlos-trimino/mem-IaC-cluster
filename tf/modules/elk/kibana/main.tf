@@ -23,6 +23,14 @@ variable "env" {
   default = {}
   type = map
 }
+variable es_username {
+  type = string
+  sensitive = true
+}
+variable es_password {
+  type = string
+  sensitive = true
+}
 variable "qos_requests_cpu" {
   default = ""
 }
@@ -77,6 +85,22 @@ variable "service_target_port" {
 # NodePort, LoadBalancer, and ExternalName.
 variable "service_type" {
   default = "ClusterIP"
+}
+
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "${var.service_name}-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    es_username = var.es_username
+    es_password = var.es_password
+  }
+  type = "Opaque"
 }
 
 resource "kubernetes_deployment" "deployment" {
@@ -157,6 +181,24 @@ resource "kubernetes_deployment" "deployment" {
           #     }
           #   }
           # }
+          env {
+            name = "ELASTICSEARCH_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret.metadata[0].name
+                key = "es_username"
+              }
+            }
+          }
+          env {
+            name = "ELASTICSEARCH_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret.metadata[0].name
+                key = "es_password"
+              }
+            }
+          }
           dynamic "env" {
             for_each = var.env
             content {

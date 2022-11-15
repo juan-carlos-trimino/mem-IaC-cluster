@@ -284,6 +284,8 @@ module "mem-elasticsearch-master" {
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 3
+  es_username = var.es_username
+  es_password = var.es_password
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
@@ -308,12 +310,34 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": false
-    "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.autoconfiguration.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    # "ELASTICSEARCH_USERNAME": "elastic"
+    # "ELASTICSEARCH_PASSWORD": "elastic"
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
+    #### https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
+    "xpack.security.enabled": true
+    "xpack.security.audit.enabled": true
+    # "xpack.security.http.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": true
+    # Disable unused xpack features.
+    ### xpack.monitoring.enabled: false
+    "xpack.graph.enabled": false
+    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
+    # PagerDuty.
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
+    "xpack.watcher.enabled": false
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
+    "xpack.ml.enabled": false
+
+    # "xpack.license.self_generated.type": "basic"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.client_authentication": "required"
+    # "xpack.security.transport.ssl.keystore.path": "/usr/share/elasticsearch/config/http.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/usr/share/elasticsearch/config/http.p12"
+
+    # "xpack.security.enrollment.enabled": false
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.autoconfiguration.enabled": false
+    # "xpack.license.self_generated.type": "trial"
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -354,12 +378,34 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": false
-    "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.autoconfiguration.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    # "ELASTICSEARCH_USERNAME": "elastic"
+    # "ELASTICSEARCH_PASSWORD": "elastic"
+    "xpack.security.enabled": true
+    "xpack.security.audit.enabled": true
+    # "xpack.security.http.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": true
+    # Disable unused xpack features.
+    ### xpack.monitoring.enabled: false
+    "xpack.graph.enabled": false
+    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
+    # PagerDuty.
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
+    "xpack.watcher.enabled": false
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
+    "xpack.ml.enabled": false
+    # # "xpack.security.enrollment.enabled": true
+    # "xpack.license.self_generated.type": "basic"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.client_authentication": "required"
+    # "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
+
+    # "xpack.security.enabled": false
+    # "xpack.security.enrollment.enabled": false
+    # "xpack.security.http.ssl.enabled": false
+    # "xpack.security.transport.ssl.enabled": false
+    # "xpack.security.autoconfiguration.enabled": false
+    # "xpack.license.self_generated.type": "trial"
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -390,13 +436,31 @@ module "mem-elasticsearch-client" {
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
-    "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": true
+    # "ELASTICSEARCH_USERNAME": "elastic"
+    # "ELASTICSEARCH_PASSWORD": "elastic"
+    "xpack.security.enabled": true
+    "xpack.security.audit.enabled": true
+    # "xpack.security.http.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": true
+    # Disable unused xpack features.
+    ### xpack.monitoring.enabled: false
+    "xpack.graph.enabled": false
+    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
+    # PagerDuty.
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
+    "xpack.watcher.enabled": false
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
+    "xpack.ml.enabled": false
+    # "xpack.license.self_generated.type": "basic"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.client_authentication": "required"
+    # "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
+
+    # "xpack.security.transport.ssl.enabled": false
     # "xpack.security.enrollment.enabled": false
-    "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.autoconfiguration.enabled": false
-    "xpack.license.self_generated.type": "trial"
+    # "xpack.security.autoconfiguration.enabled": false
+    # "xpack.license.self_generated.type": "trial"
   }
   http_service_port = 9200
   http_service_target_port = 9200
@@ -425,6 +489,8 @@ module "mem-kibana" {
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
+  es_username = var.es_username
+  es_password = var.es_password
   qos_limits_cpu = "750m"
   qos_requests_cpu = "200m"
   qos_limits_memory = "1Gi"
@@ -460,18 +526,22 @@ module "mem-kibana" {
 
     # "http.host": ["_local_", "_site_"]
 
-    # "elasticsearch.username": "kibana"
-    # "elasticsearch.password": "kibana"
     # "server.basePath": "/api/v1/proxy/namespaces/kibana/services/kibana-logging"
     # "elasticsearch.ssl.verificationMode": "none"
     # "elasticsearch.ssl.verify": false
 
     # "status.allowAnonymous": true
     # "xpack.monitoring.ui.container.elasticsearch.enabled": true
-    "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": true
+    # "elasticsearch.username": "elastic"
+    # "elasticsearch.password": "elastic"
+    "xpack.security.enabled": true
+    "xpack.security.audit.enabled": true
+    # Disable unused xpack features.
+    "xpack.reporting.enabled": false
+    "xpack.ml.enabled": false
+    "xpack.graph.enabled": false
     # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.enabled": true
     # "xpack.security.autoconfiguration.enabled": false
     # "xpack.license.self_generated.type": "trial"
     # If set to false, the machine learning APIs are disabled on the node.

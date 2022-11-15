@@ -23,6 +23,14 @@ variable env {
   default = {}
   type = map
 }
+variable es_username {
+  type = string
+  sensitive = true
+}
+variable es_password {
+  type = string
+  sensitive = true
+}
 variable qos_requests_cpu {
   default = ""
 }
@@ -126,6 +134,22 @@ resource "null_resource" "scc-elasticsearch" {
   }
 }
 
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "${var.service_name}-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    es_username = var.es_username
+    es_password = var.es_password
+  }
+  type = "Opaque"
+}
+
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
 # associated with exactly one ServiceAccount, but multiple pods can use the same ServiceAccount. A
@@ -139,6 +163,12 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
+    annotations = {
+      "kubernetes.io/enforce-mountable-secrets" = true
+    }
+  }
+  secret {
+    name = kubernetes_secret.secret.metadata[0].name
   }
 }
 
@@ -331,6 +361,24 @@ resource "kubernetes_stateful_set" "stateful_set" {
             value_from {
               field_ref {
                 field_path = "status.podIP"
+              }
+            }
+          }
+          env {
+            name = "ELASTICSEARCH_USERNAME"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret.metadata[0].name
+                key = "es_username"
+              }
+            }
+          }
+          env {
+            name = "ELASTICSEARCH_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret.metadata[0].name
+                key = "es_password"
               }
             }
           }

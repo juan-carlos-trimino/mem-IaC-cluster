@@ -178,6 +178,16 @@ variable traefik_le_email {
 #################
 # The ELK Stack #
 #################
+variable es_username {
+  default = "<required>"
+  sensitive = true
+}
+
+variable es_password {
+  default = "<required>"
+  sensitive = true
+}
+
 variable kibana_username {
   default = "<required>"
   sensitive = true

@@ -10,7 +10,7 @@ locals {
   ###########
   # Traefik #
   ###########
-  secret_cert_name = "le-secret-cert"
+  traefik_secret_cert_name = "le-secret-cert"
   # dashboard_secret_cert_name = "le-dashboard-secret-cert"
   issuer_name = "le-acme-issuer"
   tls_store = "default"
@@ -46,6 +46,8 @@ locals {
   svc_video_streaming = "mem-video-streaming"
   svc_video_upload = "mem-video-upload"
   elasticsearch_cluster_name = "cluster-elk"
+  elasticsearch_issuer = "elk-selfsigned-issuer"
+  elasticsearch_secret_cert_name = "elk-secret-cert"
   svc_elasticsearch_headless = "mem-elasticsearch-headless"
   svc_elasticsearch_master = "mem-elasticsearch-master"
   svc_elasticsearch_data = "mem-elasticsearch-data"
@@ -178,7 +180,7 @@ module "tlsstore" {
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = "default"
-  secret_name = local.secret_cert_name
+  secret_name = local.traefik_secret_cert_name
   service_name = local.tls_store
 }
 
@@ -205,7 +207,7 @@ module "ingress-route" {
   middleware_kibana_basic_auth = local.middleware_kibana_basic_auth
   svc_gateway = local.svc_gateway
   svc_kibana = local.svc_kibana
-  secret_name = local.secret_cert_name
+  secret_name = local.traefik_secret_cert_name
   issuer_name = local.issuer_name
   # host_name = "169.46.98.220.nip.io"
   # host_name = "memories.mooo.com"
@@ -217,14 +219,14 @@ module "ingress-route" {
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-/*** cert manager
+# /*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
   chart_version = "1.9.1"
   service_name = "mem-cert-manager"
 }
-
+/*** cert manager
 module "acme-issuer" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/cert-manager/acme-issuer"
@@ -253,7 +255,7 @@ module "certificate" {
   # records on that name.
   # common_name = "trimino.xyz"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
-  secret_name = local.secret_cert_name
+  secret_name = local.traefik_secret_cert_name
 }
 ***/ # cert manager
 
@@ -275,6 +277,35 @@ module "whoiam" {
 # elk                                                                                             #
 ###################################################################################################
 # /*** elk
+module "elk-issuer" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/cert-manager/issuer"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.elasticsearch_issuer
+}
+
+module "elk-certificate" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/cert-manager/certificates"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.elasticsearch_issuer
+  certificate_name = "elk-cert"
+  # The A record maps a name to one or more IP addresses when the IP are known and stable.
+  # The CNAME record maps a name to another name. It should only be used when there are no other
+  # records on that name.
+  # common_name = "trimino.xyz"
+  dns_names = [
+    local.svc_elasticsearch_client,
+    "${local.svc_elasticsearch_client}.${local.namespace}",
+    "${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
+  ]
+  secret_name = local.elasticsearch_secret_cert_name
+}
+
+/*** elk
+
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -286,6 +317,7 @@ module "mem-elasticsearch-master" {
   replicas = 3
   es_username = var.es_username
   es_password = var.es_password
+  pod_management_policy = "Parallel"
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
@@ -357,6 +389,7 @@ module "mem-elasticsearch-data" {
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 2
+  pod_management_policy = "Parallel"
   qos_limits_cpu = "3000m"
   qos_limits_memory = "8Gi"
   pvc_access_modes = ["ReadWriteOnce"]
@@ -384,6 +417,10 @@ module "mem-elasticsearch-data" {
     "xpack.security.audit.enabled": true
     # "xpack.security.http.ssl.enabled": false
     "xpack.security.transport.ssl.enabled": true
+    "xpack.security.transport.ssl.verification_mode": "certificate"
+    "xpack.security.transport.ssl.client_authentication": "required"
+    "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
+    "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
     # Disable unused xpack features.
     ### xpack.monitoring.enabled: false
     "xpack.graph.enabled": false
@@ -394,11 +431,9 @@ module "mem-elasticsearch-data" {
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
     "xpack.ml.enabled": false
     # # "xpack.security.enrollment.enabled": true
+    "xpack.security.transport.ssl.key": "/usr/share/elasticsearch/data/ca.key"
+    "xpack.security.transport.ssl.certificate": "/usr/share/elasticsearch/data/ca.crt"
     # "xpack.license.self_generated.type": "basic"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.client_authentication": "required"
-    # "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
 
     # "xpack.security.enabled": false
     # "xpack.security.enrollment.enabled": false

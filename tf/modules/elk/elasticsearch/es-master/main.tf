@@ -319,6 +319,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
             read_only_root_filesystem = false
             privileged = false
           }
+          # command = [
+          #   "/bin/sh",
+          #   "-c",
+          #   "./bin/elasticsearch-certutil ca --pem unzip elastic-stack-ca.zip –d; cp ca.crt data/ca.crt; cp ca.key data/ca.key"
+          # ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other

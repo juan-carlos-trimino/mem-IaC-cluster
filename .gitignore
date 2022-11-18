@@ -31,6 +31,14 @@ tf/modules/deployment/*
 #
 !tf/modules/elk/
 tf/modules/elk/*
+!tf/modules/elk/cert-manager/
+tf/modules/elk/cert-manager/*
+!tf/modules/elk/cert-manager/certificates/
+tf/modules/elk/cert-manager/certificates/*
+!tf/modules/elk/cert-manager/certificates/main.tf
+!tf/modules/elk/cert-manager/issuer/
+tf/modules/elk/cert-manager/issuer/*
+!tf/modules/elk/cert-manager/issuer/main.tf
 !tf/modules/elk/elasticsearch/
 tf/modules/elk/elasticsearch/*
 !tf/modules/elk/elasticsearch/es-data/

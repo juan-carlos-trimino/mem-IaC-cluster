@@ -303,9 +303,7 @@ module "elk-certificate" {
   ]
   secret_name = local.elasticsearch_secret_cert_name
 }
-
-/*** elk
-
+/***
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -588,7 +586,7 @@ module "mem-kibana" {
   service_target_port = 5601
   service_name = local.svc_kibana
 }
-
+***/
 /**
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1

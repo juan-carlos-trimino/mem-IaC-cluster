@@ -182,7 +182,7 @@ resource "kubernetes_deployment" "deployment" {
           #   }
           # }
           env {
-            name = "ELASTICSEARCH_USERNAME"
+            name = "elasticsearch.username"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.secret.metadata[0].name
@@ -191,7 +191,7 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
           env {
-            name = "ELASTICSEARCH_PASSWORD"
+            name = "elasticsearch.password"
             value_from {
               secret_key_ref {
                 name = kubernetes_secret.secret.metadata[0].name

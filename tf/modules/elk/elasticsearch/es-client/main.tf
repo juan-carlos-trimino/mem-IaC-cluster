@@ -19,6 +19,14 @@ variable env {
 variable qos_requests_cpu {
   default = ""
 }
+variable es_username {
+  type = string
+  sensitive = true
+}
+variable es_password {
+  type = string
+  sensitive = true
+}
 variable qos_requests_memory {
   default = ""
 }
@@ -52,6 +60,12 @@ variable http_service_port {
 variable http_service_target_port {
   type = number
 }
+variable transport_service_port {
+  type = number
+}
+variable transport_service_target_port {
+  type = number
+}
 variable service_type {
   default = "ClusterIP"
 }
@@ -63,6 +77,22 @@ locals {
   rs_label = "rs-${var.service_name}"
   svc_label = "svc-${var.service_name}"
   es_label = "es-cluster"
+}
+
+resource "kubernetes_secret" "secret" {
+  metadata {
+    name = "${var.service_name}-secret"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  # Plain-text data.
+  data = {
+    es_username = var.es_username
+    es_password = var.es_password
+  }
+  type = "Opaque"
 }
 
 resource "kubernetes_deployment" "deployment" {
@@ -137,6 +167,11 @@ resource "kubernetes_deployment" "deployment" {
             container_port = var.http_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
+          port {
+            name = "transport"
+            container_port = var.transport_service_target_port  # The port the app is listening.
+            protocol = "TCP"
+          }
           resources {
             requests = {
               cpu = var.qos_requests_cpu == "" ? var.qos_limits_cpu : var.qos_requests_cpu
@@ -208,6 +243,12 @@ resource "kubernetes_service" "service" {
       name = "http"
       port = var.http_service_port  # Service port.
       target_port = var.http_service_target_port  # Pod port.
+      protocol = "TCP"
+    }
+    port {
+      name = "transport"
+      port = var.transport_service_port  # Service port.
+      target_port = var.transport_service_target_port  # Pod port.
       protocol = "TCP"
     }
     type = var.service_type

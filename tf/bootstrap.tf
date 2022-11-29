@@ -303,7 +303,7 @@ module "elk-certificate" {
   ]
   secret_name = local.elasticsearch_secret_cert_name
 }
-/***
+
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -315,6 +315,8 @@ module "mem-elasticsearch-master" {
   replicas = 3
   es_username = var.es_username
   es_password = var.es_password
+  # The default is to deploy all pods serially. By setting this to parallel, all pods are started
+  # at the same time when bootstrapping the cluster.
   pod_management_policy = "Parallel"
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
@@ -340,16 +342,32 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    # "ELASTICSEARCH_USERNAME": "elastic"
-    # "ELASTICSEARCH_PASSWORD": "elastic"
+     # Set a custom port for HTTP.
+    "http.port": 9200
+   # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
+    ELASTIC_PASSWORD: var.es_password
+
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
-    #### https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
     "xpack.security.enabled": true
-    "xpack.security.audit.enabled": true
-    # "xpack.security.http.ssl.enabled": false
+    "xpack.security.enrollment.enabled": true
     "xpack.security.transport.ssl.enabled": true
+    # "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.transport.ssl.verification_mode": "certificate"
+    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
+    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    # xpack.security.transport.ssl.key: certs/elasticsearch.key
+    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
+    "xpack.security.http.ssl.enabled": false
+    # xpack.security.http.ssl.key: certs/elasticsearch.key
+    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
+    # xpack.security.http.ssl.client_authentication: optional
     # Disable unused xpack features.
-    ### xpack.monitoring.enabled: false
+    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
     "xpack.graph.enabled": false
     # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
     # PagerDuty.
@@ -357,17 +375,6 @@ module "mem-elasticsearch-master" {
     "xpack.watcher.enabled": false
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
     "xpack.ml.enabled": false
-
-    # "xpack.license.self_generated.type": "basic"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.client_authentication": "required"
-    # "xpack.security.transport.ssl.keystore.path": "/usr/share/elasticsearch/config/http.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/usr/share/elasticsearch/config/http.p12"
-
-    # "xpack.security.enrollment.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.autoconfiguration.enabled": false
-    # "xpack.license.self_generated.type": "trial"
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -409,36 +416,35 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
+    # Set a custom port for HTTP.
+    "http.port": 9200
     # "ELASTICSEARCH_USERNAME": "elastic"
     # "ELASTICSEARCH_PASSWORD": "elastic"
-    "xpack.security.enabled": true
-    "xpack.security.audit.enabled": true
-    # "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": true
-    "xpack.security.transport.ssl.verification_mode": "certificate"
-    "xpack.security.transport.ssl.client_authentication": "required"
-    "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
-    "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
-    # Disable unused xpack features.
-    ### xpack.monitoring.enabled: false
-    "xpack.graph.enabled": false
-    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
-    # PagerDuty.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
-    "xpack.watcher.enabled": false
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
-    "xpack.ml.enabled": false
-    # # "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.key": "/usr/share/elasticsearch/data/ca.key"
-    "xpack.security.transport.ssl.certificate": "/usr/share/elasticsearch/data/ca.crt"
-    # "xpack.license.self_generated.type": "basic"
+    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
+    ELASTIC_PASSWORD: var.es_password
 
-    # "xpack.security.enabled": false
-    # "xpack.security.enrollment.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.enabled": false
-    # "xpack.security.autoconfiguration.enabled": false
-    # "xpack.license.self_generated.type": "trial"
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
+    "xpack.security.enabled": true
+    "xpack.security.enrollment.enabled": true
+    "xpack.security.transport.ssl.enabled": true
+    # "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.transport.ssl.verification_mode": "certificate"
+    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
+    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    # xpack.security.transport.ssl.key: certs/elasticsearch.key
+    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
+    "xpack.security.http.ssl.enabled": false
+    # xpack.security.http.ssl.key: certs/elasticsearch.key
+    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
+    # xpack.security.http.ssl.client_authentication: optional
+    # Disable unused xpack features.
+    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
+    "xpack.graph.enabled": false
+    "xpack.watcher.enabled": false
+    "xpack.ml.enabled": false
   }
   transport_service_port = 9300
   transport_service_target_port = 9300
@@ -457,10 +463,12 @@ module "mem-elasticsearch-client" {
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 2
+  es_username = var.es_username
+  es_password = var.es_password
   qos_limits_cpu = "1000m"
   qos_limits_memory = "4Gi"
   env = {
-    "cluster.name": "${local.elasticsearch_cluster_name}"
+    "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[]"  # A coordinating node.
     ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     HTTP_ENABLE: true
@@ -469,37 +477,46 @@ module "mem-elasticsearch-client" {
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
+    # Set a custom port for HTTP.
+    "http.port": 9200
     # "ELASTICSEARCH_USERNAME": "elastic"
     # "ELASTICSEARCH_PASSWORD": "elastic"
-    "xpack.security.enabled": true
-    "xpack.security.audit.enabled": true
-    # "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": true
-    # Disable unused xpack features.
-    ### xpack.monitoring.enabled: false
-    "xpack.graph.enabled": false
-    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
-    # PagerDuty.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
-    "xpack.watcher.enabled": false
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
-    "xpack.ml.enabled": false
-    # "xpack.license.self_generated.type": "basic"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.client_authentication": "required"
-    # "xpack.security.transport.ssl.keystore.path": "/etc/elasticsearch/certs/http.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/etc/elasticsearch/certs/http.p12"
+    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
+    ELASTIC_PASSWORD: var.es_password
 
-    # "xpack.security.transport.ssl.enabled": false
-    # "xpack.security.enrollment.enabled": false
-    # "xpack.security.autoconfiguration.enabled": false
-    # "xpack.license.self_generated.type": "trial"
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
+    "xpack.security.enabled": true
+    "xpack.security.enrollment.enabled": true
+    "xpack.security.transport.ssl.enabled": true
+    # "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.transport.ssl.verification_mode": "certificate"
+    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
+    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    # xpack.security.transport.ssl.key: certs/elasticsearch.key
+    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
+    "xpack.security.http.ssl.enabled": false
+    # xpack.security.http.ssl.key: certs/elasticsearch.key
+    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
+    # xpack.security.http.ssl.client_authentication: optional
+    # Disable unused xpack features.
+    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
+    "xpack.graph.enabled": false
+    "xpack.watcher.enabled": false
+    "xpack.ml.enabled": false
   }
+  # The client exposes two ports:
+  # (1) 9300 to communicate with the other nodes of the cluster;
+  # (2) 9200 for the HTTP API.
   http_service_port = 9200
   http_service_target_port = 9200
+  transport_service_port = 9300
+  transport_service_target_port = 9300
   service_name = local.svc_elasticsearch_client
 }
-############
+
 # To check the state of the deployment, use the 'port-forward' command.
 #
 # $ kubectl port-forward <pod-name-or-svc-headless> 5601:5601 -n memories
@@ -532,10 +549,10 @@ module "mem-kibana" {
     # https://github.com/elastic/kibana/blob/main/config/kibana.yml
     # https://www.elastic.co/guide/en/kibana/current/settings.html
     # A human-readable display name that identifies this Kibana instance.
-    "server.name": "${local.svc_kibana}"
+    "server.name": local.svc_kibana
     # This setting specifies the host of the back end server. To allow remote users to connect, set
     # the value to the IP address or DNS name of the Kibana server.
-    "server.host": "${local.svc_dns_kibana}"
+    "server.host": local.svc_dns_kibana
     # Kibana is served by a back end server. This setting specifies the port to use.
     "server.port": 5601
     # The URLs of the Elasticsearch instances to use for all your queries.
@@ -548,8 +565,18 @@ module "mem-kibana" {
     "elasticsearch.hosts": <<EOL
       "[http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200]
     EOL
+    # Set a custom port for HTTP.
+    "http.port": 9200
 
-
+    ## X-Pack security credentials.
+    # Password for the 'elastic' user (at least 6 characters)
+    # "elasticsearch.username": "elastic"
+    # ELASTIC_PASSWORD: "1234567"
+    # "elasticsearch.password": "1234567"
+    # Password for the 'kibana_system' user (at least 6 characters)
+    KIBANA_PASSWORD: "1234567"
+    # elasticsearch_username: elastic
+    # elasticsearch_password: ELASTIC_PASSWORD # it needs to be changed
     # "server.publicBaseUrl": "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
     # "cluster.name": "${local.elasticsearch_cluster_name}"
     # "node.roles": "*"
@@ -567,14 +594,24 @@ module "mem-kibana" {
     # "xpack.monitoring.ui.container.elasticsearch.enabled": true
     # "elasticsearch.username": "elastic"
     # "elasticsearch.password": "elastic"
+
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
     "xpack.security.enabled": true
-    "xpack.security.audit.enabled": true
+    "xpack.security.enrollment.enabled": true
+    "xpack.security.http.ssl.enabled": true
+    # "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.transport.ssl.verification_mode": "certificate"
+    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
+    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    # xpack.security.transport.ssl.key: certs/elasticsearch.key
+    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
+    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
     # Disable unused xpack features.
-    "xpack.reporting.enabled": false
-    "xpack.ml.enabled": false
-    "xpack.graph.enabled": false
-    # "xpack.security.http.ssl.enabled": false
-    "xpack.security.transport.ssl.enabled": true
+    # "xpack.reporting.enabled": false
+    # "xpack.ml.enabled": false
+    # "xpack.graph.enabled": false
+    # "xpack.security.transport.ssl.enabled": true
     # "xpack.security.autoconfiguration.enabled": false
     # "xpack.license.self_generated.type": "trial"
     # If set to false, the machine learning APIs are disabled on the node.
@@ -586,7 +623,7 @@ module "mem-kibana" {
   service_target_port = 5601
   service_name = local.svc_kibana
 }
-***/
+
 /**
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1

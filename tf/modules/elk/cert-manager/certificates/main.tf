@@ -40,7 +40,10 @@ resource "kubernetes_manifest" "certificate" {
       isCA = null
       dnsNames = var.dns_names  # Add subdomains.
       duration = "2160h0m0s"  # 90 days.
-      renewBefore = "720h0m0s" # 30 days
+      renewBefore = "720h0m0s"  # 30 days.
+      # The name of the secret resource that will be automatically created and managed by this
+      # Certificate resource. It will be populated with a private key and certificate, signed by
+      # the denoted issuer.
       secretName = var.secret_name
       # The Certificate will be issued using the issuer named 'var.issuer_name' in the
       # 'var.namespace' namespace (the same namespace as the Certificate resource).

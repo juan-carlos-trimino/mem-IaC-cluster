@@ -162,6 +162,12 @@ resource "kubernetes_deployment" "deployment" {
             read_only_root_filesystem = false
             privileged = false
           }
+          # command = [
+          #   "/bin/sh",
+          #   "-c",
+          #   # "./bin/elasticsearch-certutil ca; ./bin/elasticsearch cert --ca es-ca.p12; cp es-ca.p12 /es-data/certs/es-ca.p12"
+          #   "./bin/elasticsearch-certutil --silent cert --ca --out /es-data/certs/es-ca.p12 --ca-pass \"\""
+          # ]
           port {
             name = "http"
             container_port = var.http_service_target_port  # The port the app is listening.

@@ -219,14 +219,14 @@ module "ingress-route" {
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-# /*** cert manager
+/*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
   chart_version = "1.9.1"
   service_name = "mem-cert-manager"
 }
-/*** cert manager
+
 module "acme-issuer" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/cert-manager/acme-issuer"
@@ -276,7 +276,7 @@ module "whoiam" {
 ###################################################################################################
 # elk                                                                                             #
 ###################################################################################################
-# /*** elk
+/*** elk
 module "elk-issuer" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/cert-manager/issuer"
@@ -303,7 +303,7 @@ module "elk-certificate" {
   ]
   secret_name = local.elasticsearch_secret_cert_name
 }
-
+***/
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -312,6 +312,7 @@ module "mem-elasticsearch-master" {
   imagePullPolicy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
+  path_to_config = "./modules/elk/elasticsearch/util"
   replicas = 3
   es_username = var.es_username
   es_password = var.es_password
@@ -326,12 +327,16 @@ module "mem-elasticsearch-master" {
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "2Gi"
   pvc_storage_class_name = "ibmc-block-silver"
+
+  es_cluster_name = local.elasticsearch_cluster_name
+
   env = {
-    "cluster.name": "${local.elasticsearch_cluster_name}"
+    # ES_PATH_CONF: "/es-data/config"
+    # "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[master]"
     ES_JAVA_OPTS: "-Xms1g -Xmx1g"
-    "path.data": "/es-data/data/"
-    "path.logs": "/es-data/log/"
+    # "path.data": "/es-data/data/"
+    # "path.logs": "/es-data/log/"
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
@@ -344,20 +349,20 @@ module "mem-elasticsearch-master" {
     EOL
      # Set a custom port for HTTP.
     "http.port": 9200
-   # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
-    ELASTIC_PASSWORD: var.es_password
+    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
+    # ELASTIC_PASSWORD: var.es_password
 
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
-    "xpack.security.enabled": true
-    "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": true
-    # "xpack.security.transport.ssl.verification_mode": "none"
-    "xpack.security.transport.ssl.verification_mode": "certificate"
-    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
-    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    "xpack.security.enabled": false
+    # "xpack.security.enrollment.enabled": true
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
     # xpack.security.transport.ssl.key: certs/elasticsearch.key
     # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
     # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
@@ -401,7 +406,7 @@ module "mem-elasticsearch-data" {
   pvc_storage_size = "50Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
-    "cluster.name": "${local.elasticsearch_cluster_name}"
+    "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[data]"
     ES_JAVA_OPTS: "-Xms4g -Xmx4g"
     "path.data": "/es-data/data/"
@@ -425,13 +430,13 @@ module "mem-elasticsearch-data" {
 
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
-    "xpack.security.enabled": true
-    "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": true
-    # "xpack.security.transport.ssl.verification_mode": "none"
-    "xpack.security.transport.ssl.verification_mode": "certificate"
-    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
-    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    "xpack.security.enabled": false
+    # "xpack.security.enrollment.enabled": true
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
     # xpack.security.transport.ssl.key: certs/elasticsearch.key
     # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
     # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
@@ -486,13 +491,13 @@ module "mem-elasticsearch-client" {
 
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
-    "xpack.security.enabled": true
+    "xpack.security.enabled": false
     "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": true
-    # "xpack.security.transport.ssl.verification_mode": "none"
-    "xpack.security.transport.ssl.verification_mode": "certificate"
-    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
-    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
+    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
     # xpack.security.transport.ssl.key: certs/elasticsearch.key
     # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
     # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
@@ -563,10 +568,11 @@ module "mem-kibana" {
     #     http://${local.svc_elasticsearch_data}-1.${local.namespace}:9300]"
     # EOL
     "elasticsearch.hosts": <<EOL
-      "[http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200]
+      "[http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200]"
     EOL
+    ELASTICSEARCH_HOSTS: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
     # Set a custom port for HTTP.
-    "http.port": 9200
+    # "http.port": 9200
 
     ## X-Pack security credentials.
     # Password for the 'elastic' user (at least 6 characters)
@@ -574,11 +580,11 @@ module "mem-kibana" {
     # ELASTIC_PASSWORD: "1234567"
     # "elasticsearch.password": "1234567"
     # Password for the 'kibana_system' user (at least 6 characters)
-    KIBANA_PASSWORD: "1234567"
+    # KIBANA_PASSWORD: "1234567"
     # elasticsearch_username: elastic
     # elasticsearch_password: ELASTIC_PASSWORD # it needs to be changed
     # "server.publicBaseUrl": "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
-    # "cluster.name": "${local.elasticsearch_cluster_name}"
+    "cluster.name": local.elasticsearch_cluster_name
     # "node.roles": "*"
     # SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
     # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).wwwwwwwwwwwwwwwwwwwwwwwww
@@ -597,13 +603,13 @@ module "mem-kibana" {
 
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
-    "xpack.security.enabled": true
-    "xpack.security.enrollment.enabled": true
-    "xpack.security.http.ssl.enabled": true
+    "xpack.security.enabled": false
+    # "xpack.security.enrollment.enabled": true
+    "xpack.security.http.ssl.enabled": false
     # "xpack.security.transport.ssl.verification_mode": "none"
-    "xpack.security.transport.ssl.verification_mode": "certificate"
-    "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
-    "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
+    # "xpack.security.transport.ssl.verification_mode": "certificate"
+    # "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
+    # "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
     # xpack.security.transport.ssl.key: certs/elasticsearch.key
     # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
     # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt

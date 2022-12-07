@@ -23,6 +23,12 @@ variable env {
   default = {}
   type = map
 }
+variable path_to_config {
+  type = string
+}
+variable es_cluster_name {
+  type = string
+}
 variable es_username {
   type = string
   sensitive = true
@@ -33,15 +39,19 @@ variable es_password {
 }
 variable qos_requests_cpu {
   default = ""
+  type = string
 }
 variable qos_requests_memory {
   default = ""
+  type = string
 }
 variable qos_limits_cpu {
   default = "0"
+  type = string
 }
 variable qos_limits_memory {
   default = "0"
+  type = string
 }
 variable replicas {
   default = 1
@@ -149,6 +159,62 @@ resource "kubernetes_secret" "secret" {
   }
   type = "Opaque"
 }
+
+
+
+
+resource "kubernetes_config_map" "es_config" {
+  metadata {
+    name = "${var.service_name}-config"
+    namespace = var.namespace
+    labels = {
+      app = var.app_name
+    }
+  }
+  data = {
+    # ======================== Elasticsearch Configuration ========================
+    # ---------------------------------- Cluster ----------------------------------
+    # Cluster name identifies the cluster for auto-discovery. If you're running multiple clusters on
+    # the same network, make sure you use unique names.
+    "cluster.name": "cluster-elk"
+    # ------------------------------------ Node -----------------------------------
+    # ----------------------------------- Paths -----------------------------------
+    # Path to directory where to store the data (separate multiple locations by comma).
+    "path.data": var.es_cluster_name
+    # Path to log files.
+    "path.logs": "/es-data/log/"
+    # Path to directory containing the configuration file (this file and logging.yml).
+    # path.conf: /es-data/configs/
+    
+  }
+}
+/*
+    ---
+    # xpack.security.enabled: "false"
+    # cluster.name: "sandbox-es"
+    # node.master: "true"
+    # node.data: "false"
+    # node.ml: "false"
+    # node.ingest: "false"
+    # node.name: ${HOSTNAME}
+    # node.max_local_storage_nodes: 3
+    # #processors: ${PROCESSORS}
+    # network.host: "_site_"
+    # path.data: "/data/data/"
+    # path.logs: "/data/log"
+    # path.repo: "data/repo"
+    # http.cors.enabled: "true"
+    # discovery.seed_hosts: ed
+    # cluster.initial_master_nodes: es-master-0,es-master-1,es-master-2
+    # cluster.routing.allocation.awareness.attributes: zone
+    # xpack.license.self_generated.type: "trial"
+    # xpack.security.http.ssl.enabled: "false"
+    # xpack.monitoring.collection.enabled: "true"
+    # xpack.security.transport.ssl.enabled: false
+
+*/
+
+
 
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
@@ -322,7 +388,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # command = [
           #   "/bin/sh",
           #   "-c",
-          #   "./bin/elasticsearch-certutil ca --pem unzip elastic-stack-ca.zip –d; cp ca.crt data/ca.crt; cp ca.key data/ca.key"
+          #   # "./bin/elasticsearch-certutil ca; ./bin/elasticsearch cert --ca es-ca.p12; cp es-ca.p12 /es-data/certs/es-ca.p12"
+          #   "./bin/elasticsearch-certutil --silent cert --ca --out /es-data/certs/es-ca.p12 --ca-pass \"\""
           # ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -387,6 +454,17 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
+
+
+          env_from {
+            config_map_ref {
+              # All key-value pairs of the ConfigMap are referenced.
+              name = kubernetes_config_map.es_config.metadata[0].name
+              # key = "es.conf"
+            }
+          }
+
+
           dynamic "env" {
             for_each = var.env
             content {
@@ -405,7 +483,37 @@ resource "kubernetes_stateful_set" "stateful_set" {
             name = "es-storage"
             mount_path = "/es-data"
           }
+
+
+          # volume_mount {
+          #   name = "config"
+          #   # mount_path = "/es-data/config/elasticsearch.yaml"
+          #   mount_path = "/etc/elasticsearch/elasticsearch.yml"
+          #   sub_path = "elasticsearch.yml"
+          #   read_only = true
+          # }
+
+
         }
+
+
+
+        # volume {
+        #   name = "config"
+        #   config_map {
+        #     name = kubernetes_config_map.es_config.metadata[0].name
+        #     # Although ConfigMap should be used for non-sensitive configuration data, make the
+        #     # file readable and writable only by the user and group that owns it.
+        #     default_mode = "0440"  # Octal
+        #     # items {
+        #     #   key = "es.env"
+        #     #   path = "es.env"  # File name.
+        #     # }
+        #   }
+        # }
+          
+
+
       }
     }
     # This template will be used to create a PersistentVolumeClaim for each pod.

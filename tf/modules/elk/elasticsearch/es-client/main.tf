@@ -4,37 +4,42 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable app_name {}
-variable image_tag {}
+variable app_name {
+  type = string
+}
+variable image_tag {
+  type = string
+}
 variable namespace {
   default = "default"
+  type = string
 }
-variable imagePullPolicy {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
 variable env {
   default = {}
   type = map
 }
+variable es_configmap {
+  type = string
+}
 variable qos_requests_cpu {
   default = ""
-}
-variable es_username {
   type = string
-  sensitive = true
-}
-variable es_password {
-  type = string
-  sensitive = true
 }
 variable qos_requests_memory {
   default = ""
+  type = string
 }
 variable qos_limits_cpu {
   default = "0"
+  type = string
 }
 variable qos_limits_memory {
   default = "0"
+  type = string
 }
 variable replicas {
   default = 1
@@ -49,10 +54,11 @@ variable termination_grace_period_seconds {
   type = number
 }
 variable service_name {
-  default = ""
+  type = string
 }
 variable service_session_affinity {
   default = "None"
+  type = string
 }
 variable http_service_port {
   type = number
@@ -68,6 +74,7 @@ variable transport_service_target_port {
 }
 variable service_type {
   default = "ClusterIP"
+  type = string
 }
 
 /***
@@ -77,22 +84,6 @@ locals {
   rs_label = "rs-${var.service_name}"
   svc_label = "svc-${var.service_name}"
   es_label = "es-cluster"
-}
-
-resource "kubernetes_secret" "secret" {
-  metadata {
-    name = "${var.service_name}-secret"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  # Plain-text data.
-  data = {
-    es_username = var.es_username
-    es_password = var.es_password
-  }
-  type = "Opaque"
 }
 
 resource "kubernetes_deployment" "deployment" {
@@ -151,7 +142,7 @@ resource "kubernetes_deployment" "deployment" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           security_context {
             capabilities {
               drop = ["ALL"]
@@ -162,12 +153,6 @@ resource "kubernetes_deployment" "deployment" {
             read_only_root_filesystem = false
             privileged = false
           }
-          # command = [
-          #   "/bin/sh",
-          #   "-c",
-          #   # "./bin/elasticsearch-certutil ca; ./bin/elasticsearch cert --ca es-ca.p12; cp es-ca.p12 /es-data/certs/es-ca.p12"
-          #   "./bin/elasticsearch-certutil --silent cert --ca --out /es-data/certs/es-ca.p12 --ca-pass \"\""
-          # ]
           port {
             name = "http"
             container_port = var.http_service_target_port  # The port the app is listening.
@@ -204,6 +189,12 @@ resource "kubernetes_deployment" "deployment" {
               field_ref {
                 field_path = "status.podIP"
               }
+            }
+          }
+          env_from {
+            config_map_ref {
+              # All key-value pairs of the ConfigMap are referenced.
+              name = var.es_configmap
             }
           }
           dynamic "env" {

@@ -4,10 +4,15 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "image_tag" {}
-variable "namespace" {
+variable app_name {
+  type = string
+}
+variable image_tag {
+  type = string
+}
+variable namespace {
   default = "default"
+  type = string
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
@@ -16,115 +21,104 @@ variable "namespace" {
 # When using a tag other that latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
-variable "env" {
+variable env {
   default = {}
   type = map
 }
-variable es_username {
-  type = string
-  sensitive = true
-}
-variable es_password {
-  type = string
-  sensitive = true
-}
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
+  type = string
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
+  type = string
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
+  type = string
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
+  type = string
 }
-variable "replicas" {
+variable replicas {
   default = 1
   type = number
 }
-variable "revision_history_limit" {
+variable revision_history_limit {
   default = 2
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
 # seconds to terminate gracefully before they're killed forcibly.
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-variable "service_name" {
-  default = ""
+variable service_name {
+  type = string
 }
-# The service normally forwards each connection to a randomly selected backing pod. To
-# ensure that connections from a particular client are passed to the same Pod each time,
-# set the service's sessionAffinity property to ClientIP instead of None (default).
-#
-# xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxSession affinity and Web Browsers (for LoadBalancer Services)
-# Since the service is now exposed externally, accessing it with a web browser will hit
-# the same pod every time. If the sessionAffinity is set to None, then why? The browser
-# is using keep-alive connections and sends all its requests through a single connection.
-# Services work at the connection level, and when a connection to a service is initially
-# open, a random pod is selected and then all network packets belonging to that connection
-# are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-# always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
+  type = string
 }
-variable "service_port" {
+variable service_port {
   type = number
 }
-variable "service_target_port" {
+variable service_target_port {
   type = number
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
+  type = string
 }
 
-resource "kubernetes_secret" "secret" {
-  metadata {
-    name = "${var.service_name}-secret"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  # Plain-text data.
-  data = {
-    es_username = var.es_username
-    es_password = var.es_password
-  }
-  type = "Opaque"
+/***
+Define local variables.
+***/
+locals {
+  rs_label = "rs-${var.service_name}"
+  svc_label = "svc-${var.service_name}"
 }
 
 resource "kubernetes_deployment" "deployment" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    # Labels attach to the Deployment.
     labels = {
       app = var.app_name
-      pod = var.service_name
     }
   }
   #
   spec {
     replicas = var.replicas
     revision_history_limit = var.revision_history_limit
+    # The label selector determines the pods the ReplicaSet manages.
     selector {
       match_labels = {
-        pod = var.service_name
+        # It must match the labels in the Pod template.
+        rs_lbl = local.rs_label
       }
     }
+    # The Pod template.
     template {
       metadata {
+        # Labels attach to the Pod.
+        # The pod-template-hash label is added by the Deployment controller to every ReplicaSet
+        # that a Deployment creates or adopts.
         labels = {
-          pod = var.service_name
+          app = var.app_name
+          # It must match the label selector of the ReplicaSet.
+          rs_lbl = local.rs_label
+          # It must match the label selector of the Service.
+          svc_lbl = local.svc_label
         }
       }
       #
@@ -133,11 +127,7 @@ resource "kubernetes_deployment" "deployment" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
-          # command = ["/bin/sh", "-c", "/usr/share/kibana/bin/kibana-plugin remove x-pack && /usr/local/bin/kibana-docker"]
-          # security_context {
-          #   read_only_root_filesystem = false
-          # }
+          image_pull_policy = var.image_pull_policy
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -181,24 +171,6 @@ resource "kubernetes_deployment" "deployment" {
           #     }
           #   }
           # }
-          env {
-            name = "elasticsearch.username"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret.metadata[0].name
-                key = "es_username"
-              }
-            }
-          }
-          env {
-            name = "elasticsearch.password"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret.metadata[0].name
-                key = "es_password"
-              }
-            }
-          }
           dynamic "env" {
             for_each = var.env
             content {
@@ -224,8 +196,9 @@ resource "kubernetes_service" "service" {
   }
   #
   spec {
+    # The label selector determines which pods belong to the service.
     selector = {
-      pod = kubernetes_deployment.deployment.metadata[0].labels.pod
+      svc_lbl = local.svc_label
     }
     session_affinity = var.service_session_affinity
     port {

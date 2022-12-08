@@ -8,6 +8,7 @@ variable app_name {}
 variable image_tag {}
 variable namespace {
   default = "default"
+  type = string
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
@@ -16,26 +17,16 @@ variable namespace {
 # When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable imagePullPolicy {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
 variable env {
   default = {}
   type = map
 }
-variable path_to_config {
+variable es_configmap {
   type = string
-}
-variable es_cluster_name {
-  type = string
-}
-variable es_username {
-  type = string
-  sensitive = true
-}
-variable es_password {
-  type = string
-  sensitive = true
 }
 variable qos_requests_cpu {
   default = ""
@@ -71,6 +62,7 @@ variable termination_grace_period_seconds {
 # See https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#orderedready-pod-management
 variable pod_management_policy {
   default = "OrderedReady"
+  type = string
 }
 # The primary use case for setting this field is to use a StatefulSet's Headless Service to
 # propagate SRV records for its Pods without respect to their readiness for purpose of peer
@@ -85,15 +77,17 @@ variable pvc_access_modes {
 }
 variable pvc_storage_class_name {
   default = ""
+  type = string
 }
 variable pvc_storage_size {
   default = "5Gi"
+  type = string
 }
 variable service_name {
-  default = ""
+  type = string
 }
 variable service_name_headless {
-  default = ""
+  type = string
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
@@ -109,6 +103,7 @@ variable service_name_headless {
 # always get hit (until the connection is closed).
 variable service_session_affinity {
   default = "None"
+  type = string
 }
 variable transport_service_port {
   type = number
@@ -120,6 +115,7 @@ variable transport_service_target_port {
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
   default = "ClusterIP"
+  type = string
 }
 
 /***
@@ -144,77 +140,56 @@ resource "null_resource" "scc-elasticsearch" {
   }
 }
 
-resource "kubernetes_secret" "secret" {
-  metadata {
-    name = "${var.service_name}-secret"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  # Plain-text data.
-  data = {
-    es_username = var.es_username
-    es_password = var.es_password
-  }
-  type = "Opaque"
-}
-
-
-
-
 resource "kubernetes_config_map" "es_config" {
   metadata {
-    name = "${var.service_name}-config"
+    name = var.es_configmap
     namespace = var.namespace
     labels = {
       app = var.app_name
     }
   }
   data = {
-    # ======================== Elasticsearch Configuration ========================
-    # ---------------------------------- Cluster ----------------------------------
-    # Cluster name identifies the cluster for auto-discovery. If you're running multiple clusters on
-    # the same network, make sure you use unique names.
+    # ================================ Elasticsearch Configuration ================================
+    # ------------------------------------------ Cluster ------------------------------------------
+    # Cluster name identifies the cluster for auto-discovery. If you're running multiple clusters
+    # on the same network, make sure you use unique names.
     "cluster.name": "cluster-elk"
-    # ------------------------------------ Node -----------------------------------
-    # ----------------------------------- Paths -----------------------------------
+    # -------------------------------------------- Node -------------------------------------------
+    # ------------------------------------------- Paths -------------------------------------------
     # Path to directory where to store the data (separate multiple locations by comma).
-    "path.data": var.es_cluster_name
+    "path.data": "cluster-elk"
     # Path to log files.
     "path.logs": "/es-data/log/"
     # Path to directory containing the configuration file (this file and logging.yml).
     # path.conf: /es-data/configs/
-    
+    # ------------------------------------------ Network ------------------------------------------
+    # By default Elasticsearch listens for HTTP traffic on the first free port it finds starting at
+    # 9200.
+    "http.port": 9200
+    # ----------------------------------------- Discovery -----------------------------------------
+    # ------------------------------------------ Security -----------------------------------------
+    #
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/configuring-stack-security.html
+    # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
+    #
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
+    "xpack.security.enabled": false
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.http.ssl.enabled": false
+    # Disable unused xpack features.
+    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
+    "xpack.graph.enabled": false
+    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
+    # PagerDuty.
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
+    "xpack.watcher.enabled": false
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
+    "xpack.ml.enabled": false
   }
 }
-/*
-    ---
-    # xpack.security.enabled: "false"
-    # cluster.name: "sandbox-es"
-    # node.master: "true"
-    # node.data: "false"
-    # node.ml: "false"
-    # node.ingest: "false"
-    # node.name: ${HOSTNAME}
-    # node.max_local_storage_nodes: 3
-    # #processors: ${PROCESSORS}
-    # network.host: "_site_"
-    # path.data: "/data/data/"
-    # path.logs: "/data/log"
-    # path.repo: "data/repo"
-    # http.cors.enabled: "true"
-    # discovery.seed_hosts: ed
-    # cluster.initial_master_nodes: es-master-0,es-master-1,es-master-2
-    # cluster.routing.allocation.awareness.attributes: zone
-    # xpack.license.self_generated.type: "trial"
-    # xpack.security.http.ssl.enabled: "false"
-    # xpack.monitoring.collection.enabled: "true"
-    # xpack.security.transport.ssl.enabled: false
-
-*/
-
-
 
 # A ServiceAccount is used by an application running inside a pod to authenticate itself with the
 # API server. A default ServiceAccount is automatically created for each namespace; each pod is
@@ -229,12 +204,9 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    annotations = {
-      "kubernetes.io/enforce-mountable-secrets" = true
-    }
-  }
-  secret {
-    name = kubernetes_secret.secret.metadata[0].name
+    # annotations = {
+    #   "kubernetes.io/enforce-mountable-secrets" = true
+    # }
   }
 }
 
@@ -374,7 +346,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           security_context {
             capabilities {
               drop = ["ALL"]
@@ -385,12 +357,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             read_only_root_filesystem = false
             privileged = false
           }
-          # command = [
-          #   "/bin/sh",
-          #   "-c",
-          #   # "./bin/elasticsearch-certutil ca; ./bin/elasticsearch cert --ca es-ca.p12; cp es-ca.p12 /es-data/certs/es-ca.p12"
-          #   "./bin/elasticsearch-certutil --silent cert --ca --out /es-data/certs/es-ca.p12 --ca-pass \"\""
-          # ]
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -436,35 +402,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
-          env {
-            name = "ELASTICSEARCH_USERNAME"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret.metadata[0].name
-                key = "es_username"
-              }
-            }
-          }
-          env {
-            name = "ELASTICSEARCH_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret.metadata[0].name
-                key = "es_password"
-              }
-            }
-          }
-
-
           env_from {
             config_map_ref {
               # All key-value pairs of the ConfigMap are referenced.
               name = kubernetes_config_map.es_config.metadata[0].name
-              # key = "es.conf"
             }
           }
-
-
           dynamic "env" {
             for_each = var.env
             content {
@@ -483,37 +426,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
             name = "es-storage"
             mount_path = "/es-data"
           }
-
-
-          # volume_mount {
-          #   name = "config"
-          #   # mount_path = "/es-data/config/elasticsearch.yaml"
-          #   mount_path = "/etc/elasticsearch/elasticsearch.yml"
-          #   sub_path = "elasticsearch.yml"
-          #   read_only = true
-          # }
-
-
         }
-
-
-
-        # volume {
-        #   name = "config"
-        #   config_map {
-        #     name = kubernetes_config_map.es_config.metadata[0].name
-        #     # Although ConfigMap should be used for non-sensitive configuration data, make the
-        #     # file readable and writable only by the user and group that owns it.
-        #     default_mode = "0440"  # Octal
-        #     # items {
-        #     #   key = "es.env"
-        #     #   path = "es.env"  # File name.
-        #     # }
-        #   }
-        # }
-          
-
-
       }
     }
     # This template will be used to create a PersistentVolumeClaim for each pod.

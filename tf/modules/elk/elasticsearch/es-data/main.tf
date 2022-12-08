@@ -4,29 +4,42 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable app_name {}
-variable image_tag {}
+variable app_name {
+  type = string
+}
+variable image_tag {
+  type = string
+}
 variable namespace {
   default = "default"
+  type = string
 }
-variable imagePullPolicy {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
 variable env {
   default = {}
   type = map
 }
+variable es_configmap {
+  type = string
+}
 variable qos_requests_cpu {
   default = ""
+  type = string
 }
 variable qos_requests_memory {
   default = ""
+  type = string
 }
 variable qos_limits_cpu {
   default = "0"
+  type = string
 }
 variable qos_limits_memory {
   default = "0"
+  type = string
 }
 variable replicas {
   default = 1
@@ -42,6 +55,7 @@ variable termination_grace_period_seconds {
 }
 variable pod_management_policy {
   default = "OrderedReady"
+  type = string
 }
 variable publish_not_ready_addresses {
   default = false
@@ -53,18 +67,21 @@ variable pvc_access_modes {
 }
 variable pvc_storage_class_name {
   default = ""
+  type = string
 }
 variable pvc_storage_size {
   default = "20Gi"
+  type = string
 }
 variable service_name {
-  default = ""
+  type = string
 }
 variable service_name_headless {
-  default = ""
+  type = string
 }
 variable service_session_affinity {
   default = "None"
+  type = string
 }
 variable transport_service_port {
   type = number
@@ -74,6 +91,7 @@ variable transport_service_target_port {
 }
 variable service_type {
   default = "ClusterIP"
+  type = string
 }
 
 /***
@@ -225,7 +243,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           security_context {
             capabilities {
               drop = ["ALL"]
@@ -267,6 +285,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
               field_ref {
                 field_path = "status.podIP"
               }
+            }
+          }
+          env_from {
+            config_map_ref {
+              # All key-value pairs of the ConfigMap are referenced.
+              name = var.es_configmap
             }
           }
           dynamic "env" {

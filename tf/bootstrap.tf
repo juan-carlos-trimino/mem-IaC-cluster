@@ -33,6 +33,13 @@ locals {
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
+  #################
+  # Elasticsearch #
+  #################
+  elasticsearch_cluster_name = "cluster-elk"
+  elasticsearch_issuer = "elk-selfsigned-issuer"
+  elasticsearch_secret_cert_name = "elk-secret-cert"
+  elasticsearch_configmap = "elasticsearch-config"
   ####################
   # Name of Services #
   ####################
@@ -45,9 +52,6 @@ locals {
   svc_video_storage = "mem-video-storage"
   svc_video_streaming = "mem-video-streaming"
   svc_video_upload = "mem-video-upload"
-  elasticsearch_cluster_name = "cluster-elk"
-  elasticsearch_issuer = "elk-selfsigned-issuer"
-  elasticsearch_secret_cert_name = "elk-secret-cert"
   svc_elasticsearch_headless = "mem-elasticsearch-headless"
   svc_elasticsearch_master = "mem-elasticsearch-master"
   svc_elasticsearch_data = "mem-elasticsearch-data"
@@ -309,13 +313,10 @@ module "mem-elasticsearch-master" {
   source = "./modules/elk/elasticsearch/es-master"
   app_name = var.app_name
   image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
-  path_to_config = "./modules/elk/elasticsearch/util"
   replicas = 3
-  es_username = var.es_username
-  es_password = var.es_password
   # The default is to deploy all pods serially. By setting this to parallel, all pods are started
   # at the same time when bootstrapping the cluster.
   pod_management_policy = "Parallel"
@@ -327,16 +328,9 @@ module "mem-elasticsearch-master" {
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "2Gi"
   pvc_storage_class_name = "ibmc-block-silver"
-
-  es_cluster_name = local.elasticsearch_cluster_name
-
   env = {
-    # ES_PATH_CONF: "/es-data/config"
-    # "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[master]"
     ES_JAVA_OPTS: "-Xms1g -Xmx1g"
-    # "path.data": "/es-data/data/"
-    # "path.logs": "/es-data/log/"
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
@@ -347,43 +341,11 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-     # Set a custom port for HTTP.
-    "http.port": 9200
-    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
-    # ELASTIC_PASSWORD: var.es_password
-
-    # X-Pack settings.
-    "xpack.license.self_generated.type": "basic"
-    # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
-    "xpack.security.enabled": false
-    # "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.transport.ssl.verification_mode": "none"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
-    # xpack.security.transport.ssl.key: certs/elasticsearch.key
-    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
-    "xpack.security.http.ssl.enabled": false
-    # xpack.security.http.ssl.key: certs/elasticsearch.key
-    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
-    # xpack.security.http.ssl.client_authentication: optional
-    # Disable unused xpack features.
-    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
-    "xpack.graph.enabled": false
-    # You configure Watcher settings to set up Watcher and send notifications via email, Slack, and
-    # PagerDuty.
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/notification-settings.html
-    "xpack.watcher.enabled": false
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-settings.html
-    "xpack.ml.enabled": false
   }
+  es_configmap = local.elasticsearch_configmap
   transport_service_port = 9300
   transport_service_target_port = 9300
-  service_name_headless = "${local.svc_elasticsearch_headless}"
+  service_name_headless = local.svc_elasticsearch_headless
   service_name = local.svc_elasticsearch_master
 }
 
@@ -395,7 +357,7 @@ module "mem-elasticsearch-data" {
   source = "./modules/elk/elasticsearch/es-data"
   app_name = var.app_name
   image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 2
@@ -406,11 +368,8 @@ module "mem-elasticsearch-data" {
   pvc_storage_size = "50Gi"
   pvc_storage_class_name = "ibmc-block-silver"
   env = {
-    "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[data]"
     ES_JAVA_OPTS: "-Xms4g -Xmx4g"
-    "path.data": "/es-data/data/"
-    "path.logs": "/es-data/log/"
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
@@ -421,39 +380,11 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-1,
        ${local.svc_elasticsearch_master}-2"
     EOL
-    # Set a custom port for HTTP.
-    "http.port": 9200
-    # "ELASTICSEARCH_USERNAME": "elastic"
-    # "ELASTICSEARCH_PASSWORD": "elastic"
-    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
-    ELASTIC_PASSWORD: var.es_password
-
-    # X-Pack settings.
-    "xpack.license.self_generated.type": "basic"
-    "xpack.security.enabled": false
-    # "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.transport.ssl.verification_mode": "none"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
-    # xpack.security.transport.ssl.key: certs/elasticsearch.key
-    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
-    "xpack.security.http.ssl.enabled": false
-    # xpack.security.http.ssl.key: certs/elasticsearch.key
-    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
-    # xpack.security.http.ssl.client_authentication: optional
-    # Disable unused xpack features.
-    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
-    "xpack.graph.enabled": false
-    "xpack.watcher.enabled": false
-    "xpack.ml.enabled": false
   }
+  es_configmap = local.elasticsearch_configmap
   transport_service_port = 9300
   transport_service_target_port = 9300
-  service_name_headless = "${local.svc_elasticsearch_headless}"
+  service_name_headless = local.svc_elasticsearch_headless
   service_name = local.svc_elasticsearch_data
 }
 
@@ -465,53 +396,21 @@ module "mem-elasticsearch-client" {
   source = "./modules/elk/elasticsearch/es-client"
   app_name = var.app_name
   image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 2
-  es_username = var.es_username
-  es_password = var.es_password
   qos_limits_cpu = "1000m"
   qos_limits_memory = "4Gi"
   env = {
-    "cluster.name": local.elasticsearch_cluster_name
     "node.roles": "[]"  # A coordinating node.
     ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-    HTTP_ENABLE: true
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
-    # Set a custom port for HTTP.
-    "http.port": 9200
-    # "ELASTICSEARCH_USERNAME": "elastic"
-    # "ELASTICSEARCH_PASSWORD": "elastic"
-    # Note that we specified a password for the default user elastic. If it is not specified here, a random password will be generated when you start the container.
-    ELASTIC_PASSWORD: var.es_password
-
-    # X-Pack settings.
-    "xpack.license.self_generated.type": "basic"
-    "xpack.security.enabled": false
-    "xpack.security.enrollment.enabled": true
-    "xpack.security.transport.ssl.enabled": false
-    "xpack.security.transport.ssl.verification_mode": "none"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.keystore.path": "/es-data/certs/es-ca.p12"
-    # "xpack.security.transport.ssl.truststore.path": "/es-data/certs/es-ca.p12"
-    # xpack.security.transport.ssl.key: certs/elasticsearch.key
-    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
-    "xpack.security.http.ssl.enabled": false
-    # xpack.security.http.ssl.key: certs/elasticsearch.key
-    # xpack.security.http.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.http.ssl.certificate_authorities: certs/ca.crt
-    # xpack.security.http.ssl.client_authentication: optional
-    # Disable unused xpack features.
-    # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
-    "xpack.graph.enabled": false
-    "xpack.watcher.enabled": false
-    "xpack.ml.enabled": false
   }
+  es_configmap = local.elasticsearch_configmap
   # The client exposes two ports:
   # (1) 9300 to communicate with the other nodes of the cluster;
   # (2) 9200 for the HTTP API.
@@ -522,17 +421,6 @@ module "mem-elasticsearch-client" {
   service_name = local.svc_elasticsearch_client
 }
 
-# To check the state of the deployment, use the 'port-forward' command.
-#
-# $ kubectl port-forward <pod-name-or-svc-headless> 5601:5601 -n memories
-# For the service:
-# $ kubectl port-forward svc/mem-kibana 5601:5601 -n memories
-#
-# From a terminal:
-# $ curl http://localhost:5601
-#
-# From a web browser:
-# http://localhost:5601
 module "mem-kibana" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
@@ -541,15 +429,13 @@ module "mem-kibana" {
   source = "./modules/elk/kibana"
   app_name = var.app_name
   image_tag = "docker.elastic.co/kibana/kibana:8.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
-  es_username = var.es_username
-  es_password = var.es_password
-  qos_limits_cpu = "750m"
   qos_requests_cpu = "200m"
-  qos_limits_memory = "1Gi"
   qos_requests_memory = "500Mi"
+  qos_limits_cpu = "750m"
+  qos_limits_memory = "1Gi"
   env = {
     # https://github.com/elastic/kibana/blob/main/config/kibana.yml
     # https://www.elastic.co/guide/en/kibana/current/settings.html
@@ -562,57 +448,24 @@ module "mem-kibana" {
     "server.port": 5601
     # The URLs of the Elasticsearch instances to use for all your queries.
     # To enable SSL/TLS for outbound connections to Elasticsearch, use the https protocol in this
-    # setting.
+    # setting.http://169.60.120.162:5601/
     # "elasticsearch.hosts": <<EOL
     #   "[http://${local.svc_elasticsearch_data}-0.${local.namespace}:9300,
     #     http://${local.svc_elasticsearch_data}-1.${local.namespace}:9300]"
     # EOL
-    "elasticsearch.hosts": <<EOL
-      "[http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200]"
-    EOL
-    ELASTICSEARCH_HOSTS: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+    # "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
+    # EOL
+    ELASTICSEARCH_HOSTS: "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
+    # EOL
     # Set a custom port for HTTP.
     # "http.port": 9200
 
     ## X-Pack security credentials.
-    # Password for the 'elastic' user (at least 6 characters)
-    # "elasticsearch.username": "elastic"
-    # ELASTIC_PASSWORD: "1234567"
-    # "elasticsearch.password": "1234567"
-    # Password for the 'kibana_system' user (at least 6 characters)
-    # KIBANA_PASSWORD: "1234567"
-    # elasticsearch_username: elastic
-    # elasticsearch_password: ELASTIC_PASSWORD # it needs to be changed
-    # "server.publicBaseUrl": "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
     "cluster.name": local.elasticsearch_cluster_name
-    # "node.roles": "*"
-    # SVC_DNS_KIBANA: "${local.svc_dns_kibana}"
-    # Use 0.0.0.0 to make Kibana listen on all IPs (public and private).wwwwwwwwwwwwwwwwwwwwwwwww
-    # "server.host": "0.0.0.0"
-
-    # "http.host": ["_local_", "_site_"]
-
-    # "server.basePath": "/api/v1/proxy/namespaces/kibana/services/kibana-logging"
-    # "elasticsearch.ssl.verificationMode": "none"
-    # "elasticsearch.ssl.verify": false
-
-    # "status.allowAnonymous": true
-    # "xpack.monitoring.ui.container.elasticsearch.enabled": true
-    # "elasticsearch.username": "elastic"
-    # "elasticsearch.password": "elastic"
-
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
     "xpack.security.enabled": false
-    # "xpack.security.enrollment.enabled": true
     "xpack.security.http.ssl.enabled": false
-    # "xpack.security.transport.ssl.verification_mode": "none"
-    # "xpack.security.transport.ssl.verification_mode": "certificate"
-    # "xpack.security.transport.ssl.keystore.path": "elastic-certificates.p12"
-    # "xpack.security.transport.ssl.truststore.path": "elastic-certificates.p12"
-    # xpack.security.transport.ssl.key: certs/elasticsearch.key
-    # xpack.security.transport.ssl.certificate: certs/elasticsearch.crt
-    # xpack.security.transport.ssl.certificate_authorities: certs/ca.crt
     # Disable unused xpack features.
     # "xpack.reporting.enabled": false
     # "xpack.ml.enabled": false

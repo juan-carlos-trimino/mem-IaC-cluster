@@ -81,8 +81,8 @@ variable service_type {
 Define local variables.
 ***/
 locals {
-  rs_label = "rs-${var.service_name}"
-  svc_label = "svc-${var.service_name}"
+  pod_selector_label = "rs-${var.service_name}"
+  svc_selector_label = "svc-${var.service_name}"
   es_label = "es-cluster"
 }
 
@@ -103,7 +103,7 @@ resource "kubernetes_deployment" "deployment" {
     selector {
       match_labels = {
         # It must match the labels in the Pod template.
-        rs_lbl = local.rs_label
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # The Pod template.
@@ -115,9 +115,9 @@ resource "kubernetes_deployment" "deployment" {
         labels = {
           app = var.app_name
           # It must match the label selector of the ReplicaSet.
-          rs_lbl = local.rs_label
+          pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
           es_lbl = local.es_label
           es_role_lbl = "es-client"
         }
@@ -233,7 +233,7 @@ resource "kubernetes_service" "service" {
   spec {
     # The label selector determines which pods belong to the service.
     selector = {
-      svc_lbl = local.svc_label
+      svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
     port {

@@ -274,7 +274,6 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-
         {
           kind = "Rule"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/kibana`)"
@@ -310,7 +309,6 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-        
         # Define a low-priority catchall rule that kicks in only if other rules for defined
         # services can't handle the request.
         # {

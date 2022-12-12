@@ -83,8 +83,8 @@ variable service_type {
 Define local variables.
 ***/
 locals {
-  rs_label = "rs-${var.service_name}"
-  svc_label = "svc-${var.service_name}"
+  pod_selector_label = "rs-${var.service_name}"
+  svc_selector_label = "svc-${var.service_name}"
 }
 
 resource "kubernetes_deployment" "deployment" {
@@ -104,7 +104,7 @@ resource "kubernetes_deployment" "deployment" {
     selector {
       match_labels = {
         # It must match the labels in the Pod template.
-        rs_lbl = local.rs_label
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # The Pod template.
@@ -116,9 +116,9 @@ resource "kubernetes_deployment" "deployment" {
         labels = {
           app = var.app_name
           # It must match the label selector of the ReplicaSet.
-          rs_lbl = local.rs_label
+          pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
         }
       }
       #
@@ -128,6 +128,14 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.image_pull_policy
+          security_context {
+            capabilities {
+              drop = ["ALL"]
+            }
+            run_as_non_root = true
+            run_as_user = 1000
+            run_as_group = 1000
+          }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -153,24 +161,15 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          # # A human-readable display name that identifies this Kibana instance.
-          # env {
-          #   name = "server.name"
-          #   value_from {
-          #     field_ref {
-          #       field_path = "metadata.name"
-          #     }
-          #   }
-          # }
-          # # By default, Elasticsearch only binds to loopback addresses such as 127.0.0.1 and [::1].
-          # env {
-          #   name = "network.host"
-          #   value_from {
-          #     field_ref {
-          #       field_path = "status.podIP"
-          #     }
-          #   }
-          # }
+          # A human-readable display name that identifies this Kibana instance.
+          env {
+            name = "server.name"
+            value_from {
+              field_ref {
+                field_path = "metadata.name"
+              }
+            }
+          }
           dynamic "env" {
             for_each = var.env
             content {
@@ -198,7 +197,7 @@ resource "kubernetes_service" "service" {
   spec {
     # The label selector determines which pods belong to the service.
     selector = {
-      svc_lbl = local.svc_label
+      svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
     port {

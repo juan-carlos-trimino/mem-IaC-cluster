@@ -4,8 +4,12 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable app_name {}
-variable image_tag {}
+variable app_name {
+  type = string
+}
+variable image_tag {
+  type = string
+}
 variable namespace {
   default = "default"
   type = string
@@ -26,6 +30,9 @@ variable env {
   type = map
 }
 variable es_configmap {
+  type = string
+}
+variable es_service_account {
   type = string
 }
 variable qos_requests_cpu {
@@ -123,7 +130,7 @@ Define local variables.
 ***/
 locals {
   pod_selector_label = "ps-${var.service_name}"
-  svc_label = "svc-${var.service_name_headless}"
+  svc_selector_label = "svc-${var.service_name_headless}"
   es_label = "es-cluster"
 }
 
@@ -199,7 +206,7 @@ resource "kubernetes_config_map" "es_config" {
 # For cluster security, let's constrain the cluster metadata this pod may read.
 resource "kubernetes_service_account" "service_account" {
   metadata {
-    name = "${var.service_name}-service-account"
+    name = var.es_service_account
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -217,7 +224,7 @@ resource "kubernetes_service_account" "service_account" {
 # requests can be performed on which RESTful resources.
 resource "kubernetes_role" "role" {
   metadata {
-    name = "${var.service_name}-role"
+    name = "es-role"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -241,7 +248,7 @@ resource "kubernetes_role" "role" {
 # Bind the role to the service account.
 resource "kubernetes_role_binding" "role_binding" {
   metadata {
-    name = "${var.service_name}-role-binding"
+    name = "es-role-binding"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -299,7 +306,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # It must match the label for the pod selector (.spec.selector.matchLabels).
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
           es_lbl = local.es_label
           es_role_lbl = "es-master"
         }
@@ -466,8 +473,8 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
   }
   spec {
     selector = {
-      # All pods with the svc_lbl=local.svc_label label belong to this service.
-      svc_lbl = local.svc_label
+      # All pods with the svc_selector_lbl=local.svc_selector_label label belong to this service.
+      svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
     port {

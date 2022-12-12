@@ -11,7 +11,6 @@ locals {
   # Traefik #
   ###########
   traefik_secret_cert_name = "le-secret-cert"
-  # dashboard_secret_cert_name = "le-dashboard-secret-cert"
   issuer_name = "le-acme-issuer"
   tls_store = "default"
   tls_options = "tlsoptions"
@@ -19,7 +18,6 @@ locals {
   # Ingress Routes #
   ##################
   ingress_route = "mem-ingress-route"
-  ingress_route_dashboard = "mem-ingress-route-dashboard"
   ###############
   # Middlewares #
   ###############
@@ -36,10 +34,10 @@ locals {
   #################
   # Elasticsearch #
   #################
-  elasticsearch_cluster_name = "cluster-elk"
-  elasticsearch_issuer = "elk-selfsigned-issuer"
-  elasticsearch_secret_cert_name = "elk-secret-cert"
-  elasticsearch_configmap = "elasticsearch-config"
+  es_issuer = "es-selfsigned-issuer"
+  es_secret_cert_name = "es-secret-cert"
+  es_configmap = "es-config"
+  es_service_account = "es-service-account"
   ####################
   # Name of Services #
   ####################
@@ -82,14 +80,13 @@ locals {
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
-  # svc_dns_elasticsearch = "${local.svc_elasticsearch_master}.${local.namespace}.svc.cluster.local:9200"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
 ###################################################################################################
 # traefik                                                                                         #
 ###################################################################################################
-/*** traefik
+# /*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -218,12 +215,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-***/ # traefik
+# ***/ # traefik
 
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-/*** cert manager
+# /*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
@@ -261,7 +258,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.traefik_secret_cert_name
 }
-***/ # cert manager
+# ***/ # cert manager
 
 ###################################################################################################
 # whoami                                                                                          #
@@ -286,7 +283,7 @@ module "elk-issuer" {
   source = "./modules/elk/cert-manager/issuer"
   app_name = var.app_name
   namespace = local.namespace
-  issuer_name = local.elasticsearch_issuer
+  issuer_name = local.es_issuer
 }
 
 module "elk-certificate" {
@@ -294,7 +291,7 @@ module "elk-certificate" {
   source = "./modules/elk/cert-manager/certificates"
   app_name = var.app_name
   namespace = local.namespace
-  issuer_name = local.elasticsearch_issuer
+  issuer_name = local.es_issuer
   certificate_name = "elk-cert"
   # The A record maps a name to one or more IP addresses when the IP are known and stable.
   # The CNAME record maps a name to another name. It should only be used when there are no other
@@ -305,7 +302,7 @@ module "elk-certificate" {
     "${local.svc_elasticsearch_client}.${local.namespace}",
     "${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
   ]
-  secret_name = local.elasticsearch_secret_cert_name
+  secret_name = local.es_secret_cert_name
 }
 ***/
 module "mem-elasticsearch-master" {
@@ -342,7 +339,8 @@ module "mem-elasticsearch-master" {
        ${local.svc_elasticsearch_master}-2"
     EOL
   }
-  es_configmap = local.elasticsearch_configmap
+  es_configmap = local.es_configmap
+  es_service_account = local.es_service_account
   transport_service_port = 9300
   transport_service_target_port = 9300
   service_name_headless = local.svc_elasticsearch_headless
@@ -381,7 +379,8 @@ module "mem-elasticsearch-data" {
        ${local.svc_elasticsearch_master}-2"
     EOL
   }
-  es_configmap = local.elasticsearch_configmap
+  es_configmap = local.es_configmap
+  es_service_account = local.es_service_account
   transport_service_port = 9300
   transport_service_target_port = 9300
   service_name_headless = local.svc_elasticsearch_headless
@@ -410,7 +409,7 @@ module "mem-elasticsearch-client" {
        ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
     EOL
   }
-  es_configmap = local.elasticsearch_configmap
+  es_configmap = local.es_configmap
   # The client exposes two ports:
   # (1) 9300 to communicate with the other nodes of the cluster;
   # (2) 9200 for the HTTP API.
@@ -437,58 +436,42 @@ module "mem-kibana" {
   qos_limits_cpu = "750m"
   qos_limits_memory = "1Gi"
   env = {
+    # "cluster.name": "cluster-elk"
     # https://github.com/elastic/kibana/blob/main/config/kibana.yml
     # https://www.elastic.co/guide/en/kibana/current/settings.html
-    # A human-readable display name that identifies this Kibana instance.
-    "server.name": local.svc_kibana
     # This setting specifies the host of the back end server. To allow remote users to connect, set
     # the value to the IP address or DNS name of the Kibana server.
     "server.host": local.svc_dns_kibana
     # Kibana is served by a back end server. This setting specifies the port to use.
     "server.port": 5601
     # The URLs of the Elasticsearch instances to use for all your queries.
-    # To enable SSL/TLS for outbound connections to Elasticsearch, use the https protocol in this
-    # setting.http://169.60.120.162:5601/
-    # "elasticsearch.hosts": <<EOL
-    #   "[http://${local.svc_elasticsearch_data}-0.${local.namespace}:9300,
-    #     http://${local.svc_elasticsearch_data}-1.${local.namespace}:9300]"
-    # EOL
-    # "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
-    # EOL
+    "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
     ELASTICSEARCH_HOSTS: "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
-    # EOL
-    # Set a custom port for HTTP.
-    # "http.port": 9200
-
-    ## X-Pack security credentials.
-    "cluster.name": local.elasticsearch_cluster_name
+    SERVER_BASEPATH: "/kibana"
+    SERVER_REWRITEBASEPATH: true
     # X-Pack settings.
     "xpack.license.self_generated.type": "basic"
     "xpack.security.enabled": false
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
     "xpack.security.http.ssl.enabled": false
     # Disable unused xpack features.
-    # "xpack.reporting.enabled": false
-    # "xpack.ml.enabled": false
-    # "xpack.graph.enabled": false
-    # "xpack.security.transport.ssl.enabled": true
-    # "xpack.security.autoconfiguration.enabled": false
-    # "xpack.license.self_generated.type": "trial"
-    # If set to false, the machine learning APIs are disabled on the node.
-    # "xpack.ml.enabled": false
-    # "xpack.graph.enabled": false
+    "xpack.reporting.enabled": false
+    "xpack.ml.enabled": false
+    "xpack.graph.enabled": false
   }
-  service_type = "LoadBalancer"
+  # service_type = "LoadBalancer"
   service_port = 5601
   service_target_port = 5601
   service_name = local.svc_kibana
 }
 
-/**
+/***
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/logstash"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/logstash/logstash:7.5.0"
+  image_tag = "docker.elastic.co/logstash/logstash:8.5.0"
   imagePullPolicy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
@@ -496,7 +479,9 @@ module "mem-logstash" {
   service_target_port = 5044
   service_name = "mem-logstash"
 }
-**/
+***/
+
+
 # ***/  # elk
 /***
 # Filebeat is the agent that ships logs to Logstash.

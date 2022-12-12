@@ -25,6 +25,9 @@ variable env {
 variable es_configmap {
   type = string
 }
+variable es_service_account {
+  type = string
+}
 variable qos_requests_cpu {
   default = ""
   type = string
@@ -99,10 +102,10 @@ Define local variables.
 ***/
 locals {
   pod_selector_label = "ps-${var.service_name}"
-  svc_label = "svc-${var.service_name_headless}"
+  svc_selector_label = "svc-${var.service_name_headless}"
   es_label = "es-cluster"
 }
-
+/***
 resource "kubernetes_service_account" "service_account" {
   metadata {
     name = "${var.service_name}-service-account"
@@ -159,7 +162,7 @@ resource "kubernetes_role_binding" "role_binding" {
     namespace = kubernetes_service_account.service_account.metadata[0].namespace
   }
 }
-
+***/
 resource "kubernetes_stateful_set" "stateful_set" {
   metadata {
     name = var.service_name
@@ -193,14 +196,15 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # It must match the label for the pod selector (.spec.selector.matchLabels).
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
           es_lbl = local.es_label
           es_role_lbl = "es-data"
         }
       }
       #
       spec {
-        service_account_name = kubernetes_service_account.service_account.metadata[0].name
+        # service_account_name = kubernetes_service_account.service_account.metadata[0].name
+        service_account_name = var.es_service_account
         affinity {
           pod_anti_affinity {
             required_during_scheduling_ignored_during_execution {

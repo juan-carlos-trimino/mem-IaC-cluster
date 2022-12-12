@@ -70,7 +70,7 @@ variable "readiness_probe" {
 # When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable "image_pull_policy" {
   default = "Always"
   type = string
 }
@@ -269,7 +269,7 @@ resource "kubernetes_deployment" "deployment" {
         container {
           name = var.service_name
           image = local.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other

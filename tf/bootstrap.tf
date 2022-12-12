@@ -472,7 +472,7 @@ module "mem-logstash" {
   source = "./modules/elk/logstash"
   app_name = var.app_name
   image_tag = "docker.elastic.co/logstash/logstash:8.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
   service_port = 5044
@@ -491,7 +491,7 @@ module "mem-filebeat" {
   path_to_files = "./utility-files/ELK/filebeat"
   app_name = var.app_name
   image_tag = "docker.elastic.co/beats/filebeat:7.5.0"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   host_network = true
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
@@ -594,7 +594,7 @@ module "mem-rabbitmq" {
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.15-management-alpine"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   # image_tag = "rabbitmq:3.9.7-alpine"
   path_rabbitmq_files = "./utility-files/rabbitmq"
   namespace = local.namespace
@@ -625,7 +625,7 @@ module "mem-rabbitmq" {
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie

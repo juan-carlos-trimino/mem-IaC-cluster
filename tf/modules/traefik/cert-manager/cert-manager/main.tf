@@ -11,18 +11,18 @@ variable service_name {
   type = string
 }
 variable chart_version {
-  type = string
   description = "Cert Manager Helm version."
+  type = string
 }
 variable chart_name {
-  type = string
   description = "Cert Manager Helm name."
   default = "cert-manager"
+  type = string
 }
 variable chart_repo {
-  type = string
   description = "Cert Manager Helm repository name."
   default = "https://charts.jetstack.io"
+  type = string
 }
 
 resource "helm_release" "cert_manager" {

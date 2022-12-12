@@ -4,20 +4,34 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "app_version" {}
+variable "app_name" {
+  type = string
+}
+variable "app_version" {
+  type = string
+}
 variable "image_tag" {
-  default = ""
+  type = string
 }
 variable "namespace" {
   default = "default"
+  type = string
 }
-variable "dir_name" {}
-variable "cr_login_server" {}
-variable "cr_username" {}
-variable "cr_password" {}
+variable "dir_name" {
+  type = string
+}
+variable "cr_login_server" {
+  type = string
+}
+variable "cr_username" {
+  type = string
+}
+variable "cr_password" {
+  type = string
+}
 variable "dns_name" {
   default = ""
+  type = string
 }
 variable "readiness_probe" {
   default = []
@@ -58,6 +72,7 @@ variable "readiness_probe" {
 # tag.
 variable "imagePullPolicy" {
   default = "Always"
+  type = string
 }
 variable "env" {
   default = {}
@@ -65,15 +80,19 @@ variable "env" {
 }
 variable "qos_requests_cpu" {
   default = ""
+  type = string
 }
 variable "qos_requests_memory" {
   default = ""
+  type = string
 }
 variable "qos_limits_cpu" {
   default = "0"
+  type = string
 }
 variable "qos_limits_memory" {
   default = "0"
+  type = string
 }
 variable "replicas" {
   default = 1
@@ -84,12 +103,13 @@ variable "termination_grace_period_seconds" {
   type = number
 }
 variable "service_name" {
-  default = ""
+  type = string
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable "service_type" {
   default = "ClusterIP"
+  type = string
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
@@ -104,22 +124,23 @@ variable "service_type" {
 # always get hit (until the connection is closed).
 variable "service_session_affinity" {
   default = "None"
+  type = string
 }
 variable "service_port" {
-  type = number
   default = 80
+  type = number
 }
 variable "service_target_port" {
-  type = number
   default = 8080
+  type = number
 }
 
 /***
 Define local variables.
 ***/
 locals {
-  rs_label = "rs-${var.service_name}"
-  svc_label = "svc-${var.service_name}"
+  pod_selector_label = "rs-${var.service_name}"
+  svc_selector_label = "svc-${var.service_name}"
   image_tag = (
                 var.image_tag == "" ?
                 "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
@@ -222,7 +243,7 @@ resource "kubernetes_deployment" "deployment" {
     selector {
       match_labels = {
         # It must match the labels in the Pod template.
-        rs_lbl = local.rs_label
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # The Pod template.
@@ -234,9 +255,9 @@ resource "kubernetes_deployment" "deployment" {
         labels = {
           app = var.app_name
           # It must match the label selector of the ReplicaSet.
-          rs_lbl = local.rs_label
+          pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
         }
       }
       # The Pod template's specification.
@@ -335,7 +356,7 @@ resource "kubernetes_service" "service" {
   spec {
     # The label selector determines which pods belong to the service.
     selector = {
-      svc_lbl = local.svc_label
+      svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
     port {

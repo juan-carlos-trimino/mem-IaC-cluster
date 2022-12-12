@@ -17,8 +17,8 @@ variable certificate_name {
   type = string
 }
 variable dns_names {
-  type = list
   default = []
+  type = list
 }
 variable secret_name {
   type = string

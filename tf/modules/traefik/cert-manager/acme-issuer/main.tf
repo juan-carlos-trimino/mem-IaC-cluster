@@ -20,12 +20,12 @@ variable acme_server {
   type = string
 }
 variable dns_names {
-  type = list
   default = []
+  type = list
 }
 variable traefik_dns_api_token {
-  type = string
   sensitive = true
+  type = string
 }
 
 resource "kubernetes_secret" "secret" {

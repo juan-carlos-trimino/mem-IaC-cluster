@@ -55,6 +55,8 @@ locals {
   svc_elasticsearch_data = "mem-elasticsearch-data"
   svc_elasticsearch_client = "mem-elasticsearch-client"
   svc_kibana = "mem-kibana"
+  svc_logstash = "mem-logstash"
+  svc_filebeat = "mem-filebeat"
   ############
   # Services #
   ############
@@ -237,8 +239,8 @@ module "acme-issuer" {
   acme_email = var.traefik_le_email
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
@@ -466,7 +468,7 @@ module "mem-kibana" {
   service_name = local.svc_kibana
 }
 
-/***
+
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/logstash"
@@ -475,25 +477,31 @@ module "mem-logstash" {
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
-  service_port = 5044
-  service_target_port = 5044
-  service_name = "mem-logstash"
+  qos_limits_cpu = "2500m"
+  qos_limits_memory = "4Gi"
+  qos_requests_cpu = "800m"
+  qos_requests_memory = "4Gi"
+  es_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  beats_service_port = 5044
+  beats_service_target_port = 5044
+  logstash_service_port = 9600
+  logstash_service_target_port = 9600
+  service_name = local.svc_logstash
 }
-***/
 
 
-# ***/  # elk
-/***
+
+
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/ELK/filebeat"
-  path_to_files = "./utility-files/ELK/filebeat"
+  source = "./modules/elk/filebeat"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/beats/filebeat:7.5.0"
+  image_tag = "docker.elastic.co/beats/filebeat:8.5.0"
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   host_network = true
+  util_path = "./modules/elk/filebeat/util"
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
@@ -501,9 +509,12 @@ module "mem-filebeat" {
   qos_requests_cpu = "500m"
   qos_limits_memory = "200Mi"
   qos_requests_memory = "100Mi"
-  service_name = "mem-filebeat"
+  logstash_hosts = "http://${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
+  service_name = local.svc_filebeat
 }
-***/
+
+# ***/  # elk
+
 
 ###################################################################################################
 # mongodb                                                                                         #

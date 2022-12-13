@@ -10,11 +10,14 @@ variable app_name {
 variable image_tag {
   type = string
 }
-variable path_to_files {
-  type = string
-}
 variable namespace {
   default = "default"
+  type = string
+}
+variable logstash_hosts {
+  type = string
+}
+variable util_path {
   type = string
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
@@ -100,7 +103,7 @@ variable service_type {
 
 resource "null_resource" "scc-filebeat" {
   provisioner "local-exec" {
-    command = "oc apply -f ./utility-files/filebeat/mem-filebeat-scc.yaml"
+    command = "oc apply --file ${file("${var.util_path}/mem-filebeat-scc.yaml")}"
   }
   #
   provisioner "local-exec" {
@@ -202,7 +205,25 @@ resource "kubernetes_config_map" "config_files" {
           - add_kubernetes_metadata:
             in_cluster: true
       EOF
-    "filebeat.yml" = "${file("${var.path_to_files}/filebeat.yml")}"
+    # To configure Filebeat, edit the configuration file. The default configuration file is called
+    # filebeat.yml.
+    # "filebeat.yml" = <<EOF
+    #   filebeat.inputs:
+    #     - type: container
+    #       paths:
+    #         - /var/log/containers/*.log
+    #       processors:
+    #         - add_kubernetes_metadata:
+    #           host: $(NODE_NAME)
+    #           matchers:
+    #             - logs_path:
+    #               logs_path: /var/log/containers/
+    #   processors:
+    #     - add_host_metadata: ~
+    #   output.logstash:
+    #     hosts: ["${var.logstash_hosts}"]
+    #   EOF
+    "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
   }
 }
 
@@ -215,6 +236,7 @@ resource "kubernetes_daemonset" "daemonset" {
   metadata {
     name = var.service_name
     namespace = var.namespace
+    # namespace = "kube-system"
     labels = {
       app = var.app_name
     }
@@ -223,7 +245,7 @@ resource "kubernetes_daemonset" "daemonset" {
   spec {
     selector {
       match_labels = {
-        pod = var.service_name
+        pod_selector_lbl = var.service_name
       }
     }
     revision_history_limit = var.revision_history_limit
@@ -231,7 +253,7 @@ resource "kubernetes_daemonset" "daemonset" {
     template {
       metadata {
         labels = {
-          pod = var.service_name
+          pod_selector_lbl = var.service_name
         }
       }
       #
@@ -244,13 +266,13 @@ resource "kubernetes_daemonset" "daemonset" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           security_context {
+            run_as_non_root = false
             run_as_user = 0
             # By setting this property to true, the app will not be allowed to write to /tmp, and
             # the error below will be generated. To avoid the error, mount a volume to the /tmp
             # directory.
-            # log: exiting because of error: log: cannot create log: open /tmp/filebeat.kube-c8l9uj1d06jc36g628o0-itzroks6630-default-00000291.root.log.WARNING.20220314-023504.1: read-only file system
             read_only_root_filesystem = true
             # Filebeat needs extra configuration to run in the Openshift environment; enable the
             # container to be privileged as an administrator for Openshift.

@@ -135,7 +135,9 @@ resource "kubernetes_config_map" "config" {
       input {
         beats {
           type => "beats"
-          port => 5044  # All input will come from Filebeat, no local logs.
+          port => 5044
+          ecs_compatibility => v8
+          # ecs_compatibility => disabled
           ssl => false
         }
       }
@@ -143,43 +145,22 @@ resource "kubernetes_config_map" "config" {
         json {
           source => "message"
         }
-        # grok {
-        #  match => {"message" => "%%{COMBINEDAPACHELOG}"}
-        # }
-        # date {
-        #  match => ["timestamp", "dd/MMM/yyyy:HH:mm:ss Z"]
-        # }
-        # Container logs are received with a variable named index_prefix.
-        # Since it is in JSON format, decode it via the JSON filter plugin.
-        # if [index_prefix] == "k8s-logs" {
-        #   if [message] =~ /^\{.*\}$/ {
-        #     json {
-        #       source => "message"
-        #       skip_on_invalid_json => true
-        #     }
-        #   }
-        # }
-        #
-        # Do not expose the index_prefix field to Kibana.
-        # mutate {
-        #   # @metadata is not exposed outside of Logstash by default.
-        #   add_field => { "[@metadata][index_prefix]" => "%%{index_prefix}-%%{+YYYY.MM.dd}" }
-        #   # Since index_prefix was added to metadata, the ["index_prefix"] field is no longer needed.
-        #   remove_field => ["index_prefix"]
-        # }
-        #
-        # if [ClientHost] {
-        #   geoip {
-        #     source => "ClientHost"
-        #   }
-        # }
-        # geoip {
-        #   source => "clientip"
-        # }
       }
       output {
         elasticsearch {
           hosts => ["${var.es_hosts}"]
+          # data_stream => true
+          #  data_stream_timestamp => "@timestamp"
+          # data_stream_type => "logs"
+          # data_stream_dataset => "memories"
+          # data_stream_namespace => "memories"
+          # Ending with the date of the log.
+          # index => "memories-logs"
+          # action => "create"
+          ilm_enabled => false
+          # ilm_rollover_alias => "custom"
+          # ilm_pattern => "000001"
+          # ilm_policy => "custom_policy"
         }
         # Send events to the standard output interface; the events are visible in the terminal
         # running Logstash.

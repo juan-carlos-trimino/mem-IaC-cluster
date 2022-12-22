@@ -164,9 +164,9 @@ resource "kubernetes_config_map" "es_config" {
     # -------------------------------------------- Node -------------------------------------------
     # ------------------------------------------- Paths -------------------------------------------
     # Path to directory where to store the data (separate multiple locations by comma).
-    "path.data": "cluster-elk"
+    "path.data": "/es-data/data/"
     # Path to log files.
-    "path.logs": "/es-data/log/"
+    "path.logs": "/es-data/logs/"
     # Path to directory containing the configuration file (this file and logging.yml).
     # path.conf: /es-data/configs/
     # ------------------------------------------ Network ------------------------------------------
@@ -186,6 +186,7 @@ resource "kubernetes_config_map" "es_config" {
     "xpack.security.transport.ssl.enabled": false
     "xpack.security.transport.ssl.verification_mode": "none"
     "xpack.security.http.ssl.enabled": false
+    "xpack.monitoring.collection.enabled": true
     # Disable unused xpack features.
     # xpack.monitoring.enabled: false  # Deprecated in 7.8.0.
     "xpack.graph.enabled": false
@@ -297,7 +298,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
     # updateStrategy:
     #   type: RollingUpdate
     #
-    # The Pod template.
+    # Pod template.
     template {
       metadata {
         # Labels attach to the Pod.

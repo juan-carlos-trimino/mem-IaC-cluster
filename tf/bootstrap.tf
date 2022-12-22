@@ -78,7 +78,7 @@ locals {
   #
   # It is possible to allow the guest user to connect from a remote host by setting the
   # loopback_users configuration to none. (See rabbitmq.conf)
-  svc_dns_rabbitmq = "amqp://${var.rabbitmq_default_user}:${var.rabbitmq_default_pass}@${local.svc_rabbitmq}.${local.namespace}.svc.cluster.local:5672"
+  svc_dns_rabbitmq = "amqp://${var.rabbitmq_default_user}:${var.rabbitmq_default_pass}@${local.svc_rabbitmq}-headless.${local.namespace}.svc.cluster.local:5672"
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
@@ -403,7 +403,7 @@ module "mem-elasticsearch-client" {
   qos_limits_cpu = "1000m"
   qos_limits_memory = "4Gi"
   env = {
-    "node.roles": "[]"  # A coordinating node.
+    "node.roles": "[remote_cluster_client]"  # A coordinating node.
     ES_JAVA_OPTS: "-Xms2g -Xmx2g"
     "discovery.seed_hosts": <<EOL
       "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
@@ -444,6 +444,7 @@ module "mem-kibana" {
     # This setting specifies the host of the back end server. To allow remote users to connect, set
     # the value to the IP address or DNS name of the Kibana server.
     "server.host": local.svc_dns_kibana
+    # "server.host": "0.0.0.0"
     # Kibana is served by a back end server. This setting specifies the port to use.
     "server.port": 5601
     # The URLs of the Elasticsearch instances to use for all your queries.
@@ -471,6 +472,9 @@ module "mem-kibana" {
 
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-kibana
+  ]
   source = "./modules/elk/logstash"
   app_name = var.app_name
   image_tag = "docker.elastic.co/logstash/logstash:8.5.0"
@@ -481,7 +485,7 @@ module "mem-logstash" {
   qos_limits_memory = "4Gi"
   qos_requests_cpu = "800m"
   qos_requests_memory = "4Gi"
-  es_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  es_hosts = "${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
   beats_service_port = 5044
   beats_service_target_port = 5044
   logstash_service_port = 9600
@@ -495,6 +499,10 @@ module "mem-logstash" {
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-logstash,
+    module.mem-kibana
+  ]
   source = "./modules/elk/filebeat"
   app_name = var.app_name
   image_tag = "docker.elastic.co/beats/filebeat:8.5.0"
@@ -505,10 +513,14 @@ module "mem-filebeat" {
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
-  qos_limits_cpu = "600m"
   qos_requests_cpu = "500m"
-  qos_limits_memory = "200Mi"
   qos_requests_memory = "100Mi"
+  qos_limits_cpu = "600m"
+  qos_limits_memory = "200Mi"
+  env = {
+    ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
+    ELASTICSEARCH_PORT: 9200
+  }
   logstash_hosts = "http://${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
   service_name = local.svc_filebeat
 }
@@ -519,7 +531,7 @@ module "mem-filebeat" {
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-/*** mongodb - deployment
+# /*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -543,9 +555,9 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-***/  # mongodb - deployment
+# ***/  # mongodb - deployment
 
-/*** mongodb - statefulset
+/*** mongodb - statefulset active
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -607,7 +619,8 @@ module "mem-rabbitmq" {
   image_tag = "rabbitmq:3.9.15-management-alpine"
   image_pull_policy = "IfNotPresent"
   # image_tag = "rabbitmq:3.9.7-alpine"
-  path_rabbitmq_files = "./utility-files/rabbitmq"
+  # path_rabbitmq_files = "./utility-files/rabbitmq"
+  path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   namespace = local.namespace
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
@@ -627,7 +640,7 @@ module "mem-rabbitmq" {
 }
 ***/  # rabbitmq - deployment
 
-/*** rabbitmq - statefulset
+# /*** rabbitmq - statefulset goodxxcxx
 # StatefulSet.
 module "mem-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -673,12 +686,12 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-***/  # rabbitmq - statefulset
+# ***/  # rabbitmq - statefulset
 
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-/*** app
+# /*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -755,6 +768,9 @@ module "mem-history" {
 
 module "mem-metadata" {
   count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-mongodb
+  ]
   source = "./modules/deployment"
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
@@ -886,4 +902,4 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-***/  # app
+# ***/  # app

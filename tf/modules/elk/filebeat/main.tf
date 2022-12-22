@@ -40,11 +40,17 @@ variable image_pull_policy {
 # get its own IP address, and if it runs a process that binds to a port, the process will be bound
 # to the node's port. (It allows a pod to listen to all network traffic for all pods on the node
 # and communicate with other pods on the network namespace.)
-# $ kubectl exec <pod-name> ifconfig
+# $ kubectl exec <pod-name> -n <namespace> -- ifconfig
 variable host_network {
   default = false
   type = bool
 }
+
+variable env {
+  default = {}
+  type = map
+}
+
 variable qos_requests_cpu {
   default = ""
   type = string
@@ -101,9 +107,18 @@ variable service_type {
   type = string
 }
 
+/***
+Define local variables.
+***/
+locals {
+  pod_selector_label = "ps-${var.service_name}"
+  fb_label = "filebeat"
+}
+
 resource "null_resource" "scc-filebeat" {
   provisioner "local-exec" {
-    command = "oc apply --file ${file("${var.util_path}/mem-filebeat-scc.yaml")}"
+    # command = "oc apply -f ${file("${var.util_path}/mem-filebeat-scc.yaml")}"
+    command = "oc apply -f ./modules/elk/filebeat/util/mem-filebeat-scc.yaml"
   }
   #
   provisioner "local-exec" {
@@ -151,7 +166,7 @@ resource "kubernetes_cluster_role" "cluster_role" {
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
-    resources = ["pods", "namespaces"]
+    resources = ["pods", "namespaces", "nodes"]
   }
   rule {
     api_groups = ["security.openshift.io"]
@@ -205,24 +220,6 @@ resource "kubernetes_config_map" "config_files" {
           - add_kubernetes_metadata:
             in_cluster: true
       EOF
-    # To configure Filebeat, edit the configuration file. The default configuration file is called
-    # filebeat.yml.
-    # "filebeat.yml" = <<EOF
-    #   filebeat.inputs:
-    #     - type: container
-    #       paths:
-    #         - /var/log/containers/*.log
-    #       processors:
-    #         - add_kubernetes_metadata:
-    #           host: $(NODE_NAME)
-    #           matchers:
-    #             - logs_path:
-    #               logs_path: /var/log/containers/
-    #   processors:
-    #     - add_host_metadata: ~
-    #   output.logstash:
-    #     hosts: ["${var.logstash_hosts}"]
-    #   EOF
     "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
   }
 }
@@ -236,24 +233,34 @@ resource "kubernetes_daemonset" "daemonset" {
   metadata {
     name = var.service_name
     namespace = var.namespace
-    # namespace = "kube-system"
     labels = {
       app = var.app_name
+    }
+    # For OpenShift only!!!
+    # Override the default node selector for the kube-system namespace (or your custom namespace)
+    # to allow for scheduling on any node. This command sets the node selector for the project to
+    # an empty string. If you don't run this command, the default node selector will skip master
+    # nodes.
+    annotations = {
+      "openshift.io/node-selector" = ""
     }
   }
   #
   spec {
     selector {
       match_labels = {
-        pod_selector_lbl = var.service_name
+        # It must match the labels in the Pod template (.spec.template.metadata.labels).
+        pod_selector_lbl = local.pod_selector_label
       }
     }
-    revision_history_limit = var.revision_history_limit
-    #
+    # Pod template.
     template {
       metadata {
         labels = {
-          pod_selector_lbl = var.service_name
+          app = var.app_name
+          # It must match the labels in the Pod template (.spec.template.metadata.labels).
+          pod_selector_lbl = local.pod_selector_label
+          fb_lbl = local.fb_label
         }
       }
       #
@@ -261,7 +268,9 @@ resource "kubernetes_daemonset" "daemonset" {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         host_network = var.host_network
-        ################# jct
+        # For Pods running with hostNetwork, you should explicitly set its DNS policy to
+        # "ClusterFirstWithHostNet". Otherwise, Pods running with hostNetwork and "ClusterFirst"
+        # will fallback to the behavior of the "Default" policy.
         dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
@@ -281,7 +290,8 @@ resource "kubernetes_daemonset" "daemonset" {
             #  /usr/share/filebeat/data/meta.json.new: permission denied
             privileged = true
           }
-          # Docker (CMD)
+          # Docker (CMD).
+          # -e => Write logs to the stdout.
           args = ["-c", "/etc/filebeat.yml", "-e"]
           resources {
             requests = {
@@ -305,6 +315,15 @@ resource "kubernetes_daemonset" "daemonset" {
               }
             }
           }
+
+          dynamic "env" {
+            for_each = var.env
+            content {
+              name = env.key
+              value = env.value
+            }
+          }
+
           volume_mount {
             name = "config"
             mount_path = "/etc/filebeat.yml"
@@ -351,9 +370,13 @@ resource "kubernetes_daemonset" "daemonset" {
             }
           }
         }
+        # The data folder stores a registry of read status for all files so that Filebeat doesn't
+        # send everything again on a pod restart.
         volume {
           name = "data"
           host_path {
+            # When Filebeat runs as non-root user, this directory needs to be writable by group
+            # (g+w).
             path = "/var/lib/filebeat-data"
             type = "DirectoryOrCreate"
           }

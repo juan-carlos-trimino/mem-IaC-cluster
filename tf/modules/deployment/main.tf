@@ -4,36 +4,37 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "app_version" {
+variable app_version {
   type = string
 }
-variable "image_tag" {
-  type = string
-}
-variable "namespace" {
-  default = "default"
-  type = string
-}
-variable "dir_name" {
-  type = string
-}
-variable "cr_login_server" {
-  type = string
-}
-variable "cr_username" {
-  type = string
-}
-variable "cr_password" {
-  type = string
-}
-variable "dns_name" {
+variable image_tag {
   default = ""
   type = string
 }
-variable "readiness_probe" {
+variable namespace {
+  default = "default"
+  type = string
+}
+variable dir_name {
+  type = string
+}
+variable cr_login_server {
+  type = string
+}
+variable cr_username {
+  type = string
+}
+variable cr_password {
+  type = string
+}
+variable dns_name {
+  default = ""
+  type = string
+}
+variable readiness_probe {
   default = []
   type = list(object({
     http_get = list(object({
@@ -70,44 +71,44 @@ variable "readiness_probe" {
 # When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "image_pull_policy" {
+variable image_pull_policy {
   default = "Always"
   type = string
 }
-variable "env" {
+variable env {
   default = {}
   type = map
 }
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
   type = string
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
   type = string
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
   type = string
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
   type = string
 }
-variable "replicas" {
+variable replicas {
   default = 1
   type = number
 }
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-variable "service_name" {
+variable service_name {
   type = string
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
   type = string
 }
@@ -122,15 +123,15 @@ variable "service_type" {
 # open, a random pod is selected and then all network packets belonging to that connection
 # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
 # always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
   type = string
 }
-variable "service_port" {
+variable service_port {
   default = 80
   type = number
 }
-variable "service_target_port" {
+variable service_target_port {
   default = 8080
   type = number
 }
@@ -238,7 +239,7 @@ resource "kubernetes_deployment" "deployment" {
   spec {
     # The desired number of pods that should be running.
     replicas = var.replicas
-    revision_history_limit = var.revision_history_limit
+    # revision_history_limit = var.revision_history_limit
     # The label selector determines the pods the ReplicaSet manages.
     selector {
       match_labels = {

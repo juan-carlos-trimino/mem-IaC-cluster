@@ -20,7 +20,7 @@ variable "dns_name" {
 # When using a tag other that latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable image_pull_policy {
   default = "Always"
 }
 variable "env" {
@@ -227,7 +227,7 @@ resource "kubernetes_deployment" "deployment" {
         termination_grace_period_seconds = var.termination_grace_period_seconds
         container {
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           name = var.service_name
           security_context {
             run_as_non_root = true

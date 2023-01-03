@@ -136,19 +136,21 @@ resource "kubernetes_config_map" "config" {
         beats {
           type => "beats"
           port => 5044
-          ecs_compatibility => v8
-          # ecs_compatibility => disabled
+          # ecs_compatibility => v8
+          # # ecs_compatibility => disabled
           ssl => false
         }
       }
-      filter {
-        json {
-          source => "message"
-        }
-      }
+      # filter {
+      #   json {
+      #     source => "message"
+      #   }
+      # }
       output {
         elasticsearch {
           hosts => ["${var.es_hosts}"]
+          index => "memories-%%{[@metadata][beat]}-%%{[@metadata][version]}-%%{+YYYY.MM.dd}"
+          document_type => "%%{[@metadata][type]}"
           # data_stream => true
           #  data_stream_timestamp => "@timestamp"
           # data_stream_type => "logs"

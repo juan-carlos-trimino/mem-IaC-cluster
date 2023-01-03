@@ -52,38 +52,52 @@
 # To configure inputs:
 #   https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
 # Inputs specify how Filebeat locates and processes input data.
+# https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
 filebeat.inputs:
   # Read containers log files.
-  - type: container
+  - type: "container"
     # Change to true to enable this input configuration.
     enabled: true
     # Read from the specified streams only: all (default), stdout or stderr.
-    stream: all
+    stream: "all"
     # Use the given format when reading the log file: auto, docker or cri. The default is auto; it
     # will automatically detect the format.
-    format: auto
-    encoding: utf-8
+    format: "auto"
+    encoding: "utf-8"
     # To collect container logs, each Filebeat instance needs access to the local log's path, which
     # is actually a log directory mounted from the host. With this configuration, Filebeat can
     # collect logs from all the files that exist under the /var/log/containers/ directory.
     paths:
-      - '/var/log/containers/*.log'
+      - "/var/log/containers/*.log"
+    json:
+      keys_under_root: false
+      overwrite_keys: false
+      add_error_key: true
+    # json.expand_keys: false
+    # json.ignore_decoding_error: true
     # Filebeat exports only the lines that match a regular expression in the list. By default, all
     # lines are exported. Empty lines are ignored.
     # include_lines: ['^ERR', '^WARN', '^INFO']
     # exclude_lines: ['^DBG']
-    fields_under_root: true
-    fields:
+    include_lines: ["^{"]
+    # exclude_lines: ["^\\s+[\\-`('.|_]"]
+    # fields_under_root: true
+    # fields:
       # To be used by Logstash for distinguishing index names while writing to Elasticsearch.
-      index_prefix: k8s-logs-memories
+      # index_prefix: k8s-logs-memories
     # Enrich events with k8s, cloud metadata.
-    processors:
-      - add_kubernetes_metadata:
-          in_cluster: true
-          host: $(NODE_NAME)
-          matchers:
-            - logs_path:
-                logs_path: '/var/log/containers/'
+    # processors:
+      # - decode_json_fields:
+      #     # fields: ['log']
+      #     process_array: false
+      #     max_depth: 2
+      #     target: "publish"
+      # - add_kubernetes_metadata:
+      #     in_cluster: true
+      #     host: ${NODE_NAME}
+      #     matchers:
+      #       - logs_path:
+      #           logs_path: '/var/log/containers/'
     # logging:
     #   # Available log levels are: critical, error, warning, info (default), debug.
     #   # Set logging.level to debug to see the generated events by the running filebeat instance.
@@ -101,53 +115,73 @@ filebeat.inputs:
     #     permissions: 0660
 # ========================================== Processors ===========================================
 processors:
-  - add_cloud_metadata: ~
-  - add_host_metadata: ~
+  # - add_cloud_metadata: ~
+  # - add_host_metadata: ~
+  # - add_docker_metadata: ~
+  # - add_kubernetes_metadata:
+  #     in_cluster: true
+  #     host: ${NODE_NAME}
+  #     matchers:
+  #       - logs_path:
+  #           logs_path: "/var/log/containers/"
+  # - drop_event:
+  #     when:
+  #       regexp.message: "kube-probe"
+  # - drop_event:
+  #     when:
+  #       equals:
+  #         kubernetes.container.name: "filebeat"
+  # Add to each event the machihe's local time zone offset from UTC.
+  - add_locale:
+      format: offset
 # ============================================ Outputs ============================================
 # Configure what output to use when sending the data collected by the beat. Only a single output
 # may be defined.
 # See https://www.elastic.co/guide/en/beats/filebeat/current/configuring-output.html
-output.logstash:
-  enabled: false
-  protocol: 'http'
-  # The Logstash hosts.
-  hosts: ['mem-logstash.memories.svc.cluster.local:5044']
-  # Configure escaping HTML symbols in strings.
-  escape_html: true
-  # Number of workers per Logstash host.
-  worker: 1
-  loadbalance: false
-  ttl: 0
-  pipelining: 2
+# output.logstash:
+#   enabled: true
+#   protocol: "http"
+#   # The Logstash hosts.
+#   hosts: ["mem-logstash.memories.svc.cluster.local:5044"]
+#   ssl.enabled: false
+#   # Configure escaping HTML symbols in strings.
+#   escape_html: true
+#   # Number of workers per Logstash host.
+#   worker: 4
+#   loadbalance: false
+#   ttl: 0
+#   pipelining: 2
 output.elasticsearch:
   enabled: true
-  protocol: 'http'
+  protocol: "http"
   # The Logstash hosts.
   hosts: ['mem-elasticsearch-client.memories.svc.cluster.local:9200']
   ssl.enabled: false
+  index: "memories-test"
+  # index: "memories-test-%%{+YYYY.MM.dd}"
 # Filebeat comes packaged with example Kibana dashboards, visualizations, and searches for
 # visualizing Filebeat data in Kibana. If Kibana is not available at startup, Filebeat will stop
 # with an error.
 # See https://www.elastic.co/guide/en/beats/filebeat/current/configuration-dashboards.html
-setup.dashboards:
-  enabled: true
-  beat: "filebeat"
-  # The name of the Kibana index to use for setting the configuration.
-  kibana_index: ".kibana-memories"
-  index: "memories-*"
-  always_kibana: true
-  retry.enabled: true
-  retry.interval: 3  # In seconds.
-  retry.maximum: 3
+# setup.dashboards:
+#   enabled: true
+#   beat: "filebeat"
+#   # The name of the Kibana index to use for setting the configuration.
+#   kibana_index: ".kibana-memories"
+#   index: "filebeat-memories-*"
+#   always_kibana: true
+#   retry.enabled: true
+#   retry.interval: 3  # In seconds.
+#   retry.maximum: 3
 # See https://www.elastic.co/guide/en/beats/filebeat/current/setup-kibana-endpoint.html
-setup.kibana:
-  enabled: true
-  protocol: 'http'
-  host: 'mem-kibana.memories.svc.cluster.local:5601'
-  path: '/kibana'
-  ssl.enabled: false
-  ssl.verification_mode: 'none'
-setup.template:
-  enabled: true
-  settings:
-    index.number_of_shards: 2
+# setup.kibana:
+#   enabled: true
+#   protocol: 'http'
+#   host: 'mem-kibana.memories.svc.cluster.local:5601'
+#   path: '/kibana'
+#   ssl.enabled: false
+#   ssl.verification_mode: 'none'
+# setup.template:
+#   enabled: true
+#   settings:
+#     index.number_of_shards: 2

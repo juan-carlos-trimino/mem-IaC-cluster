@@ -282,7 +282,7 @@ resource "kubernetes_daemonset" "daemonset" {
             # By setting this property to true, the app will not be allowed to write to /tmp, and
             # the error below will be generated. To avoid the error, mount a volume to the /tmp
             # directory.
-            read_only_root_filesystem = true
+            read_only_root_filesystem = false   # jct
             # Filebeat needs extra configuration to run in the Openshift environment; enable the
             # container to be privileged as an administrator for Openshift.
             # (filebeat pods enter in CrashLoopBackOff status, and the following error appears:
@@ -291,7 +291,10 @@ resource "kubernetes_daemonset" "daemonset" {
             privileged = true
           }
           # Docker (CMD).
-          # -e => Write logs to the stdout.
+          # -c -> Specify the configuration file to use for Filebeat.
+          # -e => Log to stderr and disables syslog/file output.
+          # Location of our filebeat.yml file; MUST MATCH the mount_path in the volume_mount of
+          # "config."
           args = ["-c", "/etc/filebeat.yml", "-e"]
           resources {
             requests = {
@@ -344,7 +347,7 @@ resource "kubernetes_daemonset" "daemonset" {
           # command, but a copy is kept at this path).
           volume_mount {
             name = "varlibdockercontainers"
-            mount_path = "/var/lib/docker/containers"
+            mount_path = "/var/log/containers/"
             read_only = true
           }
           volume_mount {
@@ -388,7 +391,7 @@ resource "kubernetes_daemonset" "daemonset" {
           # files.
           host_path {
             # Access the node's /var/lib/docker/containers.
-            path = "/var/lib/docker/containers"  # Directory location on host.
+            path = "/var/log/containers/"  # Directory location on host.
           }
         }
         volume {

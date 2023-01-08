@@ -708,11 +708,13 @@ module "mem-gateway" {
   cr_password = var.cr_password
   # Configure environment variables specific to the mem-gateway.
   env = {
+    SVC_NAME: local.svc_gateway
     SVC_DNS_METADATA: local.svc_dns_metadata
     SVC_DNS_HISTORY: local.svc_dns_history
     SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
     SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
     SVC_DNS_KIBANA: local.svc_dns_kibana
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -746,9 +748,11 @@ module "mem-history" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_history
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
     DB_NAME: local.db_history
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -783,9 +787,11 @@ module "mem-metadata" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_metadata
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
     DB_NAME: local.db_metadata
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -817,6 +823,7 @@ module "mem-video-storage" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_storage
     BUCKET_NAME: var.bucket_name
     # Without HMAC.
     AUTHENTICATION_TYPE: "iam"
@@ -830,6 +837,7 @@ module "mem-video-storage" {
     # SECRET_ACCESS_KEY: var.secret_access_key
     # ENDPOINT: var.public_endpoint
     #
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   service_name = local.svc_video_storage
@@ -849,8 +857,10 @@ module "mem-video-streaming" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_streaming
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -883,8 +893,10 @@ module "mem-video-upload" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_upload
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{

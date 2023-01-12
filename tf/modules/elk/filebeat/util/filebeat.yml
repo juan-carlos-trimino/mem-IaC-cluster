@@ -64,34 +64,38 @@ filebeat.inputs:
     # will automatically detect the format.
     format: "auto"
     encoding: "utf-8"
+    ignore_older: "10m"
     # To collect container logs, each Filebeat instance needs access to the local log's path, which
     # is actually a log directory mounted from the host. With this configuration, Filebeat can
     # collect logs from all the files that exist under the /var/log/containers/ directory.
     paths:
       - "/var/log/containers/*.log"
-    json:
-      keys_under_root: false
-      overwrite_keys: false
-      add_error_key: true
+    # json:
+    #   keys_under_root: false
+    #   overwrite_keys: false
+    #   add_error_key: true
     # json.expand_keys: false
     # json.ignore_decoding_error: true
     # Filebeat exports only the lines that match a regular expression in the list. By default, all
     # lines are exported. Empty lines are ignored.
     # include_lines: ['^ERR', '^WARN', '^INFO']
     # exclude_lines: ['^DBG']
-    include_lines: ["^{"]
+    # include_lines: ["^{"]
     # exclude_lines: ["^\\s+[\\-`('.|_]"]
     # fields_under_root: true
     # fields:
       # To be used by Logstash for distinguishing index names while writing to Elasticsearch.
       # index_prefix: k8s-logs-memories
-    # Enrich events with k8s, cloud metadata.
-    # processors:
-      # - decode_json_fields:
-      #     # fields: ['log']
-      #     process_array: false
-      #     max_depth: 2
-      #     target: "publish"
+    multiline:
+      pattern: "^{"
+      negate: true
+      match: "after"
+    processors:
+      - decode_json_fields:
+          fields: ["message"]
+          process_array: false
+          max_depth: 2
+          target: "json"
       # - add_kubernetes_metadata:
       #     in_cluster: true
       #     host: ${NODE_NAME}
@@ -151,14 +155,19 @@ processors:
 #   loadbalance: false
 #   ttl: 0
 #   pipelining: 2
+# To configure the ElasticSearch output, see
+# https://www.elastic.co/guide/en/beats/filebeat/8.5/elasticsearch-output.html
 output.elasticsearch:
   enabled: true
+  allow_older_versions: false
   protocol: "http"
   # The Logstash hosts.
-  hosts: ['mem-elasticsearch-client.memories.svc.cluster.local:9200']
+  hosts: ["mem-elasticsearch-client.memories.svc.cluster.local:9200"]
   ssl.enabled: false
-  index: "memories-test"
-  # index: "memories-test-%%{+YYYY.MM.dd}"
+  # index: "memories-filebeat-%%{[beat.version]}-%%{+YYYY.MM.dd}"
+  index: "memories-filebeat-%%{[agent.version]}-%%{+YYYY.MM.dd}"
+  compression_level: 0
+  worker: 1
 # Filebeat comes packaged with example Kibana dashboards, visualizations, and searches for
 # visualizing Filebeat data in Kibana. If Kibana is not available at startup, Filebeat will stop
 # with an error.
@@ -181,7 +190,18 @@ output.elasticsearch:
 #   path: '/kibana'
 #   ssl.enabled: false
 #   ssl.verification_mode: 'none'
-# setup.template:
-#   enabled: true
-#   settings:
-#     index.number_of_shards: 2
+setup.ilm:  # Index Lifecycle Management
+  enabled: true
+  policy_name: "memories"
+  rollover_alias: "memories"
+  pattern: "{now/d}-000001"
+# To configure ElasticSearch index template loading, see
+# https://www.elastic.co/guide/en/beats/filebeat/8.5/configuration-template.html
+setup.template:
+  enabled: true
+  overwrite: false
+  settings:
+    index.number_of_shards: 2
+    number_of_replicas: 2
+  name: "memories-filebeat-%%{[agent.version]}"
+  pattern: "memories-memories-filebeat-%%{[agent.version]}"

@@ -212,15 +212,132 @@ resource "kubernetes_config_map" "config_files" {
     }
   }
   data = {
-    "kubernetes.yml" = <<EOF
-      - type: docker
-        containers.ids:
-        - "*"
-        processors:
-          - add_kubernetes_metadata:
-            in_cluster: true
+    # "kubernetes.yml" = <<EOF
+    #   - type: docker
+    #     containers.ids:
+    #     - "*"
+    #     processors:
+    #       - add_kubernetes_metadata:
+    #         in_cluster: true
+    #   EOF
+    # "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
+    # To see a full example of the configuration file, go to https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+    # The Filebeat configuration file consists, mainly, of the following sections. For some more information on how to configure Filebeat(https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.html).
+    "filebeat.yml" = <<EOF
+      # (1) The Modules configuration section can help with the collection, parsing, and visualization of common log formats (optional).
+      # (2) The Inputs section determines the input sources (mandatory if not using Module configuration). If you are not using modules, you need to configure the Filebeat manually.
+      # To configure inputs:
+      #   https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
+      # Inputs specify how Filebeat locates and processes input data.
+      # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+      filebeat.inputs:
+        # Read containers log files.
+        # - type: "container"
+        - type: "filestream"
+          id: "memories-filestream-id"
+          # Change to true to enable this input configuration.
+          enabled: true
+          # Read from the specified streams only: all (default), stdout or stderr.
+          stream: "all"
+          # Use the given format when reading the log file: auto, docker or cri. The default is
+          # auto; it will automatically detect the format.
+          format: "auto"
+          # encoding: "utf-8"
+          encoding: "plain"
+          # /var/log/containers holds symlinks.
+          ### symlinks: true
+          ignore_older: "48h"
+          close_inactive: "72h"
+          scan_frequency: "3s"
+          # "message":"Parse line error: invalid CRI log format","service.name":"filebeat","ecs.version":"1.6.0"
+          # cri.parse_flags: true
+          # combine_partial: true
+          # close_inactive: "48h"
+          # cri:
+          #   parse_flags: true
+          # To collect container logs, each Filebeat instance needs access to the local log's path,
+          # which is actually a log directory mounted from the host. With this configuration,
+          # Filebeat can collect logs from all the files that exist under the /var/log/containers/
+          # directory.
+          paths:
+            - "/var/log/containers/*.log"
+          fields_under_root: true
+          fields:
+            index_prefix: "memories"
+          processors:
+            # Set each event with the machine's local time zone offset from UTC.
+            - add_locale:
+                format: offset
+            # Set each event with host metadata.
+            - add_host_metadata: ~
+            - add_kubernetes_metadata:
+                in_cluster: true
+                host: $(NODE_NAME)
+                ### default_matchers.enabled: false
+                matchers:
+                  - logs_path:
+                      logs_path: "/var/log/containers/"
+            # Decode fields containing JSON strings and replaces the strings with valid JSON
+            # objects.
+            - decode_json_fields:
+                fields: ["message", "app", "service", "msgIg"]
+                process_array: false
+                max_depth: 1
+                target: ""
+                overwrite_keys: false
+
+
+      # (3) The Processors section is used to configure processing across data exported by Filebeat
+      # (optional). You can define a processor (https://coralogix.com/blog/filebeat-configuration-best-practices-tutorial/) at the top-level in the configuration; the processor
+      # is applied to all data collected by Filebeat. Furthermore, you can define a processor under
+      # a specific input; the processor is applied to the data collected for that input. For a list
+      # of type of processors, go to https://www.elastic.co/guide/en/beats/filebeat/current/defining-processors.html#processors
+      (4) The Output section determines the output destination of the processed data.
+      # ========================================= Outputs =========================================
+      # Configure what output to use when sending the data collected by the beat. Only a single
+      # output may be defined.
+      # See https://www.elastic.co/guide/en/beats/filebeat/current/configuring-output.html
+      output.logstash:
+        enabled: true
+        protocol: "http"
+        # The Logstash hosts.
+        hosts: ["mem-logstash.memories.svc.cluster.local:5044"]
+        ssl.enabled: false
+        # Number of workers per Logstash host.
+        worker: 4
+        loadbalance: false
+        ttl: 0
+        pipelining: 2
+
+      # See https://www.elastic.co/guide/en/beats/filebeat/current/setup-kibana-endpoint.html
+      # setup.kibana:
+      #   enabled: true
+      #   protocol: "http"
+      #   host: "mem-kibana.memories.svc.cluster.local:5601"
+      #   path: "/kibana"
+      #   ssl:
+      #     enabled: false
+      #     verification_mode: "none"
+        
+
+      # logging:
+      #   # Available log levels are: critical, error, warning, info (default), debug.
+      #   # Set logging.level to debug to see the generated events by the running filebeat instance.
+      #   # level: info
+      #   level: debug
+      #   # At debug level, you can selectively enable logging only for some components. To enable all
+      #   # selectors use ["*"]. Examples of other selectors are "beat", "publish", "service".
+      #   selectors: ["publish"]
+      #   to_files: true
+      #   to_syslog: false
+      #   files:
+      #     path: '/var/log/my_filebeat'
+      #     name: my_filebeat.log
+      #     keepfiles: 7
+      #     permissions: 0660
+
+
       EOF
-    "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
   }
 }
 
@@ -356,21 +473,21 @@ resource "kubernetes_daemonset" "daemonset" {
             read_only = true
           }
           # See read_only_root_filesystem.
-          volume_mount {
-            name = "tmp"
-            mount_path = "/tmp"
-            read_only = false
-          }
+          # volume_mount {
+          #   name = "tmp"
+          #   mount_path = "/tmp"
+          #   read_only = false
+          # }
         }
         volume {
           name = "config"
           config_map {
             name = kubernetes_config_map.config_files.metadata[0].name
             default_mode = "0600"
-            items {
-              key = "filebeat.yml"
-              path = "filebeat.yml"  # File name.
-            }
+            # items {
+            #   key = "filebeat.yml"
+            #   path = "filebeat.yml"  # File name.
+            # }
           }
         }
         # The data folder stores a registry of read status for all files so that Filebeat doesn't
@@ -400,12 +517,12 @@ resource "kubernetes_daemonset" "daemonset" {
             path = "/var/log"
           }
         }
-        volume {
-          name = "tmp"
-          host_path {
-            path = "/tmp"
-          }
-        }
+        # volume {
+        #   name = "tmp"
+        #   host_path {
+        #     path = "/tmp"
+        #   }
+        # }
       }
     }
   }

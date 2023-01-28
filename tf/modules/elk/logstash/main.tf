@@ -100,6 +100,7 @@ Define local variables.
 locals {
   pod_selector_label = "rs-${var.service_name}"
   svc_selector_label = "svc-${var.service_name}"
+  ls_label = "logstash"
 }
 
 resource "kubernetes_config_map" "config" {
@@ -136,7 +137,7 @@ resource "kubernetes_config_map" "config" {
         beats {
           # type => "beats"
           port => 5044
-          ecs_compatibility => v8
+          # ecs_compatibility => v8
           # # ecs_compatibility => disabled
           ssl => false
         }
@@ -144,15 +145,25 @@ resource "kubernetes_config_map" "config" {
       filter {
         # Container logs are received with a variable named index_prefix;
         # since it is in json format, we can decode it via json filter plugin.
-        if [index_prefix] == "memories" {
-          # if [message] =~ "/^\{.*\}$/" {
-          if [message] =~ "\A\{.+\}\z" {
+        if [index_prefix][memories] {
+          if [message] =~ "/^\{.*\}$/" {
+          # if [message] =~ "\A\{.+\}\z" {
             json {
               source => "message"
-              skip_on_invalid_json => true
+              skip_on_invalid_json => false
             }
           }
+
+
+          # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json filter instead of a codec. This is because Filebeat sends its data as JSON and the contents of your log line are contained in the message field.
+          # json {
+          #   source => "message"
+          #   skip_on_invalid_json => false
+          # }
+
         }
+
+
 
         # Do not expose the index_prefix field to Kibana.
         mutate {
@@ -169,20 +180,8 @@ resource "kubernetes_config_map" "config" {
           index => "%%{[@metadata][index_prefix]}"
           template_overwrite => false
           manage_template => false
-          sniffing => false
+          # sniffing => false
           # document_type => "%%{[@metadata][type]}"
-          # data_stream => true
-          #  data_stream_timestamp => "@timestamp"
-          # data_stream_type => "logs"
-          # data_stream_dataset => "memories"
-          # data_stream_namespace => "memories"
-          # Ending with the date of the log.
-          # index => "memories-logs"
-          # action => "create"
-          # ilm_enabled => false
-          # ilm_rollover_alias => "custom"
-          # ilm_pattern => "000001"
-          # ilm_policy => "custom_policy"
         }
         # Send events to the standard output interface; the events are visible in the terminal
         # running Logstash.
@@ -226,6 +225,7 @@ resource "kubernetes_deployment" "deployment" {
           pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
           svc_selector_lbl = local.svc_selector_label
+          ls_lbl = local.ls_label
         }
       }
       #

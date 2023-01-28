@@ -311,7 +311,7 @@ module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
   image_pull_policy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -356,7 +356,7 @@ module "mem-elasticsearch-data" {
   ]
   source = "./modules/elk/elasticsearch/es-data"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
   image_pull_policy = "IfNotPresent"
   publish_not_ready_addresses = true
   namespace = local.namespace
@@ -396,7 +396,7 @@ module "mem-elasticsearch-client" {
   ]
   source = "./modules/elk/elasticsearch/es-client"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.5.0"
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 2
@@ -429,7 +429,7 @@ module "mem-kibana" {
   ]
   source = "./modules/elk/kibana"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/kibana/kibana:8.5.0"
+  image_tag = "docker.elastic.co/kibana/kibana:8.6.0"
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
@@ -469,7 +469,7 @@ module "mem-kibana" {
   service_name = local.svc_kibana
 }
 
-
+/***
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
@@ -477,7 +477,7 @@ module "mem-logstash" {
   ]
   source = "./modules/elk/logstash"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/logstash/logstash:8.5.0"
+  image_tag = "docker.elastic.co/logstash/logstash:8.6.0"
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   replicas = 1
@@ -492,7 +492,7 @@ module "mem-logstash" {
   logstash_service_target_port = 9600
   service_name = local.svc_logstash
 }
-
+***/
 
 
 
@@ -500,12 +500,13 @@ module "mem-logstash" {
 module "mem-filebeat" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
-    module.mem-logstash,
+    //module.mem-logstash,
+    module.mem-elasticsearch-client,
     module.mem-kibana
   ]
   source = "./modules/elk/filebeat"
   app_name = var.app_name
-  image_tag = "docker.elastic.co/beats/filebeat:8.5.0"
+  image_tag = "docker.elastic.co/beats/filebeat:8.6.0"
   image_pull_policy = "IfNotPresent"
   namespace = local.namespace
   host_network = true
@@ -521,7 +522,9 @@ module "mem-filebeat" {
     ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
     ELASTICSEARCH_PORT: 9200
   }
-  logstash_hosts = "http://${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
+  # logstash_hosts = "http://${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
+  elasticsearch_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  kibana_host = "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
   service_name = local.svc_filebeat
 }
 

@@ -14,6 +14,9 @@ variable namespace {
   default = "default"
   type = string
 }
+variable logstash_hosts {
+  type = string
+}
 variable elasticsearch_hosts {
   type = string
 }
@@ -215,6 +218,8 @@ resource "kubernetes_config_map" "config_files" {
     }
   }
   data = {
+    # Filebeat will automatically upload the default "fields.yml" file once Elasticsearch output is
+    # enacted.
     "memories-fields.yml" = <<EOF
       - key: filebeat-memories
         title: filebeat-memories
@@ -251,15 +256,15 @@ resource "kubernetes_config_map" "config_files" {
             analyzer: "english"
             norms: false
             required: true
-          - name: "@timestamp"
+          - name: "timestamp"
             type: "date"
-            # format: "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-            ignore_malformed: true
+            format: "yyyy-MM-dd HH:mm:ss"
+            # format: "strict_date_optional_time"
+            # ignore_malformed: true
             # https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-date-format.html
             # https://www.elastic.co/guide/en/elasticsearch/reference/current/date.html#multiple-date-formats
             # format: "YYYY-MM-ddTHH:mm:ss.SSSSS||strict_date_optional_time||epoch_millis"
-            # format: "2023-01-10T20:15:25.000+00:00"
-            # index: true
+            index: true
             required: true
       EOF
     # "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
@@ -283,48 +288,66 @@ resource "kubernetes_config_map" "config_files" {
           # auto; it will automatically detect the format.
           format: "auto"
           # The plain encoding is special because it does not validate or transform any input.
-          # encoding: "utf-8"
-          encoding: "plain"
-          # The symlinks option allows Filebeat to harvest symlinks in addition to regular files.
-          # symlinks: true
+          encoding: "utf-8"
+          # encoding: "plain"
           # You must set ignore_older to be greater than close_inactive.
           ignore_older: "72h"
           close_inactive: "48h"
           scan_frequency: "10s"
-          json:
-            # message_key: "message"
-            keys_under_root: true
-            overwrite_keys: true
-            add_error_key: true
-            # ignore_decoding_error: true
-          # include_lines: ["^{"]
+          # Decode JSON options. Enable this if your logs are structured in JSON.
+          # json:
+          #   # JSON key on which to apply the line filtering and multiline settings. This key must
+          #   # be top level, and its value must be string, otherwise it is ignored. If the key is
+          #   # not defined, the line filtering and multiline features cannot be used.
+          #   # message_key: "service"
+          #   # By default, the decoded JSON is placed under a 'json' key in the output document. If
+          #   # you enable this setting, the keys are copied to the top level of the output document.
+          #   keys_under_root: true
+          #   # If keys_under_root and this setting are enabled, then the values from the decoded
+          #   # JSON object overwrite the fields that Filebeat normally adds in case of conflicts.
+          #   overwrite_keys: true
+          #   add_error_key: true
+          #   ignore_decoding_error: true
+          # 
+          # Regarding Filebeat's own regular expressions you can go here .
+          # https://www.elastic.co/guide/en/beats/filebeat/current/regexp-support.html
+          #  To test if your regular expressions work you can try them out here.
+          # https://regexr.com/
+          # include_lines: ['mem-metadata|mem-history']
+          # Ensure that multiline log entries (entries that span over a few lines separated by
+          # '\n') will be merged into single log events; i.e., it will append the lines that don't
+          # match the pattern to the previous line that does match.
+          # multiline:
+          #   pattern: '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+          #   negate: true
+          #   match: after
           # To collect container logs, each Filebeat instance needs access to the local log's path,
           # which is actually a log directory mounted from the host. With this configuration,
           # Filebeat can collect logs from all the files that exist under the /var/log/containers/
           # directory.
           paths: ["/var/log/containers/*.log"]
-          # Optional fields that you can specify to add additional information to the output.
+          # Optional (custom) fields that you can specify to add additional information to the output.
           # fields:
-          #   index_prefix: ["memories-filebeat"]
+          #   index_prefix: ["memories"]
           # If this option is set to true, the custom fields are stored as top-level fields in the
           # output document instead of being grouped under a fields sub-dictionary.
-          fields_under_root: true
+          # fields_under_root: true
           # If present, this formatted string overrides the index for events from this input (for
           # elasticsearch outputs), or sets the raw_index field of the event's metadata (for other outputs).
           # index: "%%{[agent.name]}-%%{[fields.index_prefix]}-%%{[agent.version]}-%%{+yyyy.MM.dd}"
           # By default, all events contain host.name. This option can be set to true to disable the
           # addition of this field to all events.
           publisher_pipeline.disable_host: false
+          # If you define a list of processors, they are executed in the order they are defined
+          # below.
           processors:
-            # - decode_json_fields:
-            #     fields: ["message", "app", "msgId", "timestamp", "service", "level"]
-            #     process_array: false
-            #     max_depth: 1
-            #     target: "json"
-            #     overwrite_keys: true
-            #     add_error_key: true
-            # - drop_fields:
-            #     fields: ["message"]
+            - decode_json_fields:
+                fields: ["message"]
+                process_array: false
+                max_depth: 1
+                target:
+                overwrite_keys: true
+                add_error_key: true
             # Set each event with host metadata.
             # - add_host_metadata: ~
             - add_kubernetes_metadata:
@@ -334,13 +357,17 @@ resource "kubernetes_config_map" "config_files" {
                 matchers:
                   - logs_path:
                       logs_path: "/var/log/containers/"
+            # - drop_fields:
+            #     fields: ["ecs.version", "agent.version", "agent.type", "agent.id",
+            #              "agent.ephemeral_id", "agent.name", "input.type", "host.name", "tags"]
+            #     ignore_missing: true
       # (3) The Processors section is used to configure processing across data exported by Filebeat
       # (optional). You can define a processor (https://coralogix.com/blog/filebeat-configuration-best-practices-tutorial/) at the top-level in the configuration; the processor
       # is applied to all data collected by Filebeat. Furthermore, you can define a processor under
       # a specific input; the processor is applied to the data collected for that input. For a list
       # of type of processors, go to https://www.elastic.co/guide/en/beats/filebeat/current/defining-processors.html#processors
       # processors:
-      #   # https://www.elastic.co/guide/en/beats/filebeat/current/processor-timestamp.html
+        # https://www.elastic.co/guide/en/beats/filebeat/current/processor-timestamp.html
         # - timestamp:
         #     field: "timestamp"
         #     target_field: "mem-timestamp"
@@ -348,12 +375,7 @@ resource "kubernetes_config_map" "config_files" {
         #     ignore_failure: true
         #     timezone: "Europe/London"
         #     layouts:
-        #       - "2006-01-02T15:04:05.00000"
-      #         # - "RFC850"
-      #         # - "RFC1123"
-      #         # - "RFC1123Z"
-      #         # - "RFC3339"
-      #         # - "RFC3339Nano"
+        #       - "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
         # - drop_fields:
         #     fields: ["timestamp"]
       # (4) The Output section determines the output destination of the processed data.
@@ -361,62 +383,65 @@ resource "kubernetes_config_map" "config_files" {
       # Configure what output to use when sending the data collected by the beat. Only a single
       # output may be defined.
       # See https://www.elastic.co/guide/en/beats/filebeat/current/configuring-output.html
-      # output.logstash:
-      #   enabled: true
-      #   protocol: "http"
-      #   # The Logstash hosts.
-      #   hosts: ["mem-logstash.memories.svc.cluster.local:5044"]
-      #   ssl.enabled: false
-      #   # Number of workers per Logstash host.
-      #   worker: 4
-      #   loadbalance: false
-      #   ttl: 0
-      #   pipelining: 2
-
-      # https://www.elastic.co/guide/en/beats/filebeat/current/elasticsearch-output.html
-      output.elasticsearch:
+      # ------------------------------------ Logstash Output --------------------------------------
+      output.logstash:
         enabled: true
-        allow_older_versions: true
-        # To enable SSL, add https to all URLs defined under hosts.
-        hosts: ["${var.elasticsearch_hosts}"]
-        # It is recommended to include agent.version in the name to avoid mapping issues when you upgrade.
-        index: "filebeat-%%{[agent.version]}-memories-%%{+yyyy.MM.dd}"
-        # index: "memories-filebeat-%%{[agent.version]}-%%{+yyyy.MM.dd}"
-        # non_indexable_policy.dead_letter_index:
-        #   index: "memories-dead-letter-index"
-        worker: 1
+        # The Logstash hosts without http:// or https://.
+        hosts: ["${var.logstash_hosts}"]
+        compression_level: 3
+        escape_html: false
+        # Number of workers per Logstash host.
+        worker: 2
+        loadbalance: false
+        ttl: 0
+        pipelining: 2
+        index: "memories-filebeat"
         ssl:
           enabled: false
+      # ------------------------------------ Elasticsearch Output ---------------------------------
+      # https://www.elastic.co/guide/en/beats/filebeat/current/elasticsearch-output.html
+      # output.elasticsearch:
+      #   enabled: true
+      #   allow_older_versions: true
+      #   # To enable SSL, add https to all URLs defined under hosts.
+      #   hosts: ["${var.elasticsearch_hosts}"]
+      #   # It is recommended to include agent.version in the name to avoid mapping issues when you upgrade.
+      #   index: "memories-filebeat-%%{[agent.version]}-memories-%%{+yyyy.MM.dd}"
+      #   # index: "memories-filebeat-%%{[agent.version]}-%%{+yyyy.MM.dd}"
+      #   # non_indexable_policy.dead_letter_index:
+      #   #   index: "memories-dead-letter-index"
+      #   worker: 1
+      #   ssl:
+      #     enabled: false
       setup:
         # Index Lifecycle Management (ILM).
         # If ILM is enabled (which is typically the default), setup.template.name and setup.template.pattern are ignored.
         # https://www.elastic.co/guide/en/beats/filebeat/current/ilm.html
         ilm:
           enabled: false
-          # overwrite: true
-          # policy_name: "memories"
-          # rollover_alias: "filebeat-%%{[agent.version]}-memories-%%{+yyyy.MM.dd}"
-          # patern: "{now/d}-000001"
-        # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-template.html#filebeat-template
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/index-templates.html
+      #     # overwrite: true
+      #     # policy_name: "memories"
+      #     # rollover_alias: "filebeat-%%{[agent.version]}-memories-%%{+yyyy.MM.dd}"
+      #     # patern: "{now/d}-000001"
+      #   # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-template.html#filebeat-template
+      #   # https://www.elastic.co/guide/en/elasticsearch/reference/current/index-templates.html
         template:
           enabled: true
-          # path: "filebeat.template.json"
-          # name: "memories-filebeat-%%{[agent.version]}"
-          name: "filebeat-%%{[agent.version]}-memories"
-          # pattern: "memories-filebeat-%%{[agent.version]}-*"
-          pattern: "filebeat-%%{[agent.version]}-*"
+      #     # path: "filebeat.template.json"
+      #     # name: "memories-filebeat-%%{[agent.version]}"
+          name: "index_prefix-filebeat-%%{[agent.version]}-memories"
+      #     # pattern: "memories-filebeat-%%{[agent.version]}-*"
+          pattern: "index_prefix-filebeat-%%{[agent.version]}-*"
           overwrite: true
-          fields: "/etc/memories-fields.yml"
-          # append_fields:
-          #   - name: timestamp
-          #     type: date
-          # settings:
-          #   index.number_of_shards: 1
-          #   index.number_of_replicas: 2
+      #     fields: "/etc/memories-fields.yml"
+      #     # append_fields:
+      #     #   - name: timestamp
+      #     #     type: date
+      #     # settings:
+      #     #   index.number_of_shards: 1
+      #     #   index.number_of_replicas: 2
         # See https://www.elastic.co/guide/en/beats/filebeat/current/setup-kibana-endpoint.html
         kibana:
-          # enabled: true
           host: "${var.kibana_host}"
           path: "/kibana"
           ssl:
@@ -424,9 +449,8 @@ resource "kubernetes_config_map" "config_files" {
         # dashboards:
         #   enabled: true
         #   beat: "filebeat"
-          # index: "%%{[fields.index_prefix]}-%%{[agent.version]}-%%{+yyyy.MM.dd}"
-          # index: "memories-%%{[agent.name]}-%%{[agent.version]}-*"
-          # kibana_index: ".kibana-memories"
+        #   index: "filebeat-%%{[agent.version]}-memories-*"
+        #   kibana_index: ".kibana-memories"
       EOF
   }
 }
@@ -472,6 +496,11 @@ resource "kubernetes_daemonset" "daemonset" {
       }
       #
       spec {
+        toleration {
+          key = "node-role.kubernetes.io/master"
+          operator = "Equal"
+          effect = "NoSchedule"
+        }
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         host_network = var.host_network

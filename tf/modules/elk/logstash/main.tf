@@ -114,74 +114,75 @@ resource "kubernetes_config_map" "config" {
   data = {
     # Settings and configuration options for Logstash are defined in the logstash.yml configuration
     # file. A full list of supported settings can be found in the reference guide:
-    # https://www.elastic.co/guide/en/logstash/8.0/logstash-settings-file.html
+    # https://www.elastic.co/guide/en/logstash/8.6/logstash-settings-file.html
     # (1) Define the network address on which Logstash will listen; 0.0.0.0 denotes that it needs
     #     to listen on all available interfaces.
-    # "logstash.yml" = <<EOF
-    #   # The path to the Logstash config for the main pipeline.
-    #   path.config: /usr/share/logstash/pipeline
-    #   # Define the maximum number of events the filter and output plugins will accept each time
-    #   # they run.
-    #   pipeline.batch.size: 125  # Events per batch per worker thread used by the pipeline.
-    #   # Determine how long Logstash will wait to collect a full batch of events before dispatching
-    #   # it for processing. If there are not enough events in the queue, a smaller batch will be
-    #   # dispatched once the delay time period is passed.
-    #   pipeline.batch.delay: 50  # In milliseconds.
-    #   # Determine the type of queue used by Logstash.
-    #   queue.type: "memory"
-    #   EOF
+    "logstash.yml" = <<EOF
+      http:
+        host: "0.0.0.0"
+      path:
+        # The path to the Logstash config for the main pipeline.
+        config: /usr/share/logstash/pipeline
+      pipeline:
+        # Define the maximum number of events the filter and output plugins will accept each time
+        # they run.
+        batch:
+          size: 125  # Events per batch per worker thread used by the pipeline.
+          # Determine how long Logstash will wait to collect a full batch of events before
+          # dispatching it for processing. If there are not enough events in the queue, a smaller
+          # batch will be dispatched once the delay time period is passed.
+          delay: 50  # In milliseconds.
+      queue:
+        # Determine the type of queue used by Logstash.
+        type: "memory"
+      EOF
     # Any Logstash configuration must contain at least one input plugin and one output plugin.
     # Filters are optional.
-    "logstash.conf" = <<EOF
+    "logstash-pipeline.conf" = <<EOF
       input {
+        # From where is the data coming.
         beats {
-          # type => "beats"
           port => 5044
-          # ecs_compatibility => v8
-          # # ecs_compatibility => disabled
           ssl => false
         }
       }
       filter {
         # Container logs are received with a variable named index_prefix;
         # since it is in json format, we can decode it via json filter plugin.
-        if [index_prefix][memories] {
-          if [message] =~ "/^\{.*\}$/" {
-          # if [message] =~ "\A\{.+\}\z" {
-            json {
-              source => "message"
-              skip_on_invalid_json => false
-            }
-          }
-
-
-          # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json filter instead of a codec. This is because Filebeat sends its data as JSON and the contents of your log line are contained in the message field.
-          # json {
-          #   source => "message"
-          #   skip_on_invalid_json => false
-          # }
-
-        }
-
-
-
-        # Do not expose the index_prefix field to Kibana.
+        # if [index_prefix][memories] {
+        #   grok {
+        #     match => { "message" => "%%{TIMESTAMP_ISO8601:timestamp} %%{LOGLEVEL:level} %%{GREEDYDATA:message}" }
+        #   }
+        #   # if [message] =~ "/^\{.*\}$/" {
+        #   # # if [message] =~ "\A\{.+\}\z" {
+            # json {
+            #   source => "message"
+            #   # skip_on_invalid_json => false
+            # }
+        #   # }
+        #   # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json filter instead of a codec. This is because Filebeat sends its data as JSON and the contents of your log line are contained in the message field.
+        #   # json {
+        #   #   source => "message"
+        #   #   skip_on_invalid_json => false
+        #   # }
+        # }
         mutate {
+          add_field => { "description" => "From memories!!!999" }
           # @metadata is not exposed outside of Logstash by default.
-          add_field => { "[@metadata][index_prefix]" => "%%{index_prefix}-%%{+YYYY.MM.dd}" }
-          # Since we added the index_prefix to metadata, we no longer need the ["index_prefix"]
-          # field.
-          remove_field => ["index_prefix"]
+          # add_field => { "[@metadata][index_prefix]" => "%%{index_prefix}-%%{+YYYY.MM.dd}" }
+          # We added the index_prefix field to the metadata, and we no longer need the field. Do
+          # not expose the index_prefix field to Kibana.
+          # remove_field => ["index_prefix"]
+          remove_field => ["agent", "stream", "input", "host", "tags", "ecs"]
         }
       }
       output {
         elasticsearch {
           hosts => ["${var.es_hosts}"]
-          index => "%%{[@metadata][index_prefix]}"
+          index => "%%{[@metadata][beat]}-%%{[@metadata][version]}-%%{+YYYY.MM.dd}"
           template_overwrite => false
           manage_template => false
-          # sniffing => false
-          # document_type => "%%{[@metadata][type]}"
+          ssl => false
         }
         # Send events to the standard output interface; the events are visible in the terminal
         # running Logstash.
@@ -276,16 +277,16 @@ resource "kubernetes_deployment" "deployment" {
               memory = var.qos_limits_memory
             }
           }
-          # volume_mount {
-          #   name = "config"
-          #   mount_path = "/usr/share/logstash/config"
-          #   read_only = true
-          # }
+          volume_mount {
+            name = "logstash"
+            mount_path = "/usr/share/logstash/config"
+            # read_only = true
+          }
           volume_mount {
             name = "config"
             # The directory that Logstash reads configurations from by default.
-            mount_path = "/usr/share/logstash/pipeline/"
-            read_only = true
+            mount_path = "/usr/share/logstash/pipeline"
+            # read_only = true
           }
         }
         volume {
@@ -296,24 +297,22 @@ resource "kubernetes_deployment" "deployment" {
             # readable and writable only by the user and group that owns it.
             default_mode = "0600"  # Octal
             items {
-              key = "logstash.conf"
-              path = "logstash.conf"  #File name.
+              key = "logstash-pipeline.conf"
+              path = "logstash-pipeline.conf"  #File name.
             }
           }
         }
-        # volume {
-        #   name = "pipeline"
-        #   config_map {
-        #     name = kubernetes_config_map.config.metadata[0].name
-        #     # Although ConfigMap should be used for non-sensitive configuration data, make the file
-        #     # readable and writable only by the user and group that owns it.
-        #     default_mode = "0400"  # Octal
-        #     items {
-        #       key = "pipeline.conf"
-        #       path = "pipeline.conf"  #File name.
-        #     }
-        #   }
-        # }
+        volume {
+          name = "logstash"
+          config_map {
+            name = kubernetes_config_map.config.metadata[0].name
+            default_mode = "0600"  # Octal
+            items {
+              key = "logstash.yml"
+              path = "logstash.yml"  #File name.
+            }
+          }
+        }
       }
     }
   }

@@ -469,7 +469,7 @@ module "mem-kibana" {
   service_name = local.svc_kibana
 }
 
-/***
+# /***
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
@@ -485,14 +485,14 @@ module "mem-logstash" {
   qos_limits_memory = "4Gi"
   qos_requests_cpu = "800m"
   qos_requests_memory = "4Gi"
-  es_hosts = "${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  es_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
   beats_service_port = 5044
   beats_service_target_port = 5044
   logstash_service_port = 9600
   logstash_service_target_port = 9600
   service_name = local.svc_logstash
 }
-***/
+# ***/
 
 
 
@@ -500,9 +500,9 @@ module "mem-logstash" {
 module "mem-filebeat" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
-    //module.mem-logstash,
-    module.mem-elasticsearch-client,
-    module.mem-kibana
+    module.mem-logstash
+    # module.mem-elasticsearch-client,
+    # module.mem-kibana
   ]
   source = "./modules/elk/filebeat"
   app_name = var.app_name
@@ -519,12 +519,15 @@ module "mem-filebeat" {
   qos_limits_cpu = "600m"
   qos_limits_memory = "200Mi"
   env = {
-    ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
+    # ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
+    ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}"
     ELASTICSEARCH_PORT: 9200
   }
-  # logstash_hosts = "http://${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
-  elasticsearch_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
-  kibana_host = "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
+  logstash_hosts = "${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
+  # elasticsearch_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  elasticsearch_hosts = "http://${local.svc_elasticsearch_client}:9200"
+  # kibana_host = "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
+  kibana_host = "http://${local.svc_kibana}:5601"
   service_name = local.svc_filebeat
 }
 

@@ -124,6 +124,8 @@ resource "kubernetes_config_map" "config" {
         # The path to the Logstash config for the main pipeline.
         config: /usr/share/logstash/pipeline
       pipeline:
+        # ecs_compatibility: disabled
+        ecs_compatibility: v8
         # Define the maximum number of events the filter and output plugins will accept each time
         # they run.
         batch:
@@ -146,34 +148,76 @@ resource "kubernetes_config_map" "config" {
           ssl => false
         }
       }
+
+      # filter {
+      #   # merge json fields to top-level event
+      #   if [message] {
+      #     if [message] =~ "\A\{.+\}\z" {
+      #       ruby {
+      #         code => '
+      #           msgObj = JSON.parse(event.get("message"))
+      #           msgObj.each { |k,v|
+      #             event.set("#{k}", v)
+      #           }
+      #           event.remove("message")
+      #         '
+      #       }
+      #     }
+      #   }
+      # }
+
+      # filter {
+      #   #   mutate { gsub => [ "message", '"message": "', '"message": ', "message", '"([^"]+)$', '\1' ] }
+      #   # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json
+      #   # filter instead of a codec. This is because Filebeat sends its data as JSON and the
+      #   # contents of your log line are contained in the message field.
+      #   json {
+      #     source => "message"
+      #     # remove_field => ["message"]
+      #     skip_on_invalid_json => true
+      #     # target => "memories-logs"
+      #   }
+      #   # mutate { replace => { "message" => "%%{message}" } }
+      # }
+
+
       filter {
-        # Container logs are received with a variable named index_prefix;
-        # since it is in json format, we can decode it via json filter plugin.
-        # if [index_prefix][memories] {
-        #   grok {
-        #     match => { "message" => "%%{TIMESTAMP_ISO8601:timestamp} %%{LOGLEVEL:level} %%{GREEDYDATA:message}" }
-        #   }
-        #   # if [message] =~ "/^\{.*\}$/" {
-        #   # # if [message] =~ "\A\{.+\}\z" {
-            # json {
-            #   source => "message"
-            #   # skip_on_invalid_json => false
-            # }
-        #   # }
-        #   # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json filter instead of a codec. This is because Filebeat sends its data as JSON and the contents of your log line are contained in the message field.
-        #   # json {
-        #   #   source => "message"
-        #   #   skip_on_invalid_json => false
-        #   # }
-        # }
+        grok {
+          match => [
+            "message",
+            "\"app\":%%{QUOTEDSTRING:mem-app},\"level\":%%{QUOTEDSTRING:mem-level},\"message\":%%{QUOTEDSTRING:mem-message},\"requestId\":%%{QUOTEDSTRING:mem-requestId},\"service\":%%{QUOTEDSTRING:mem-service},\"timestamp\":\"%%{TIMESTAMP_ISO8601:mem-timestamp}\""
+          ]
+          # overwrite => ["message"]
+        }
+
         mutate {
-          add_field => { "description" => "From memories!!!999" }
-          # @metadata is not exposed outside of Logstash by default.
-          # add_field => { "[@metadata][index_prefix]" => "%%{index_prefix}-%%{+YYYY.MM.dd}" }
-          # We added the index_prefix field to the metadata, and we no longer need the field. Do
-          # not expose the index_prefix field to Kibana.
-          # remove_field => ["index_prefix"]
-          remove_field => ["agent", "stream", "input", "host", "tags", "ecs"]
+          gsub => ["mem-app", "\"", ""]
+          gsub => ["mem-level", "\"", ""]
+          gsub => ["mem-message", "\"", ""]
+          gsub => ["mem-service", "\"", ""]
+          gsub => ["mem-requestId", "\"", ""]
+        }
+
+
+      }
+
+      filter {
+          # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json
+          # filter instead of a codec. This is because Filebeat sends its data as JSON and the
+          # contents of your log line are contained in the message field.
+          # json {
+          #   source => "message"
+          #   # remove_field => ["message"]
+          #   skip_on_invalid_json => true
+          #   target => "memories-logs"
+          # }
+
+        mutate {
+
+          #  ,
+          remove_field => ["agent", "stream", "input", "host", "tags", "ecs", "[kubernetes][node]",
+                           "[kubernetes][namespace_labels]", "container", "[event][original]",
+                           "message"]
         }
       }
       output {

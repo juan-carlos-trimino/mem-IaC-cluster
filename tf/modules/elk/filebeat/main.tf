@@ -296,17 +296,17 @@ resource "kubernetes_config_map" "config_files" {
           scan_frequency: "10s"
           # Decode JSON options. Enable this if your logs are structured in JSON.
           # json:
-          #   # JSON key on which to apply the line filtering and multiline settings. This key must
-          #   # be top level, and its value must be string, otherwise it is ignored. If the key is
-          #   # not defined, the line filtering and multiline features cannot be used.
-          #   # message_key: "service"
-          #   # By default, the decoded JSON is placed under a 'json' key in the output document. If
-          #   # you enable this setting, the keys are copied to the top level of the output document.
-          #   keys_under_root: true
-          #   # If keys_under_root and this setting are enabled, then the values from the decoded
-          #   # JSON object overwrite the fields that Filebeat normally adds in case of conflicts.
-          #   overwrite_keys: true
-          #   add_error_key: true
+            # JSON key on which to apply the line filtering and multiline settings. This key must
+            # be top level, and its value must be string, otherwise it is ignored. If the key is
+            # not defined, the line filtering and multiline features cannot be used.
+            # message_key: "message"
+            # By default, the decoded JSON is placed under a 'json' key in the output document. If
+            # you enable this setting, the keys are copied to the top level of the output document.
+            # keys_under_root: true
+            # If keys_under_root and this setting are enabled, then the values from the decoded
+            # JSON object overwrite the fields that Filebeat normally adds in case of conflicts.
+            # overwrite_keys: true
+            # add_error_key: true
           #   ignore_decoding_error: true
           # 
           # Regarding Filebeat's own regular expressions you can go here .
@@ -341,13 +341,13 @@ resource "kubernetes_config_map" "config_files" {
           # If you define a list of processors, they are executed in the order they are defined
           # below.
           processors:
-            - decode_json_fields:
-                fields: ["message"]
-                process_array: false
-                max_depth: 1
-                target:
-                overwrite_keys: true
-                add_error_key: true
+          #   - decode_json_fields:
+          #       fields: ["message"]
+          #       process_array: false
+          #       max_depth: 1
+          #       target:
+          #       overwrite_keys: true
+          #       add_error_key: true
             # Set each event with host metadata.
             # - add_host_metadata: ~
             - add_kubernetes_metadata:

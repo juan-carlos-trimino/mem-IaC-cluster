@@ -268,6 +268,19 @@ resource "kubernetes_config_map" "config_files" {
             required: true
       EOF
     # "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
+    # To configure Filebeat, edit the configuration file. The default configuration file is called
+    # filebeat.yml.
+    # -------------------------------------------------------------------------------------------------
+    # For more available modules and options, please see the filebeat.reference.yml
+    # (https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html) sample
+    # configuration file.
+
+    # ====================================== Filebeat Inputs ==========================================
+    # To configure inputs:
+    #   https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
+    # Inputs specify how Filebeat locates and processes input data.
+    # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+
     # To see a full example of the configuration file, go to https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
     # The Filebeat configuration file consists, mainly, of the following sections. For some more information on how to configure Filebeat(https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.html).
     "filebeat.yml" = <<EOF

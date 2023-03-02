@@ -197,8 +197,6 @@ resource "kubernetes_config_map" "config" {
           gsub => ["mem-service", "\"", ""]
           gsub => ["mem-requestId", "\"", ""]
         }
-
-
       }
 
       filter {

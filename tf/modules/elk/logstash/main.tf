@@ -115,10 +115,10 @@ resource "kubernetes_config_map" "config" {
     # Settings and configuration options for Logstash are defined in the logstash.yml configuration
     # file. A full list of supported settings can be found in the reference guide:
     # https://www.elastic.co/guide/en/logstash/8.6/logstash-settings-file.html
-    # (1) Define the network address on which Logstash will listen; 0.0.0.0 denotes that it needs
-    #     to listen on all available interfaces.
     "logstash.yml" = <<EOF
       http:
+        # Define the network address on which Logstash will listen; 0.0.0.0 denotes that it needs
+        # to listen on all available interfaces.
         host: "0.0.0.0"
       path:
         # The path to the Logstash config for the main pipeline.
@@ -138,8 +138,8 @@ resource "kubernetes_config_map" "config" {
         # Determine the type of queue used by Logstash.
         type: "memory"
       EOF
-    # Any Logstash configuration must contain at least one input plugin and one output plugin.
-    # Filters are optional.
+    # Any Logstash configuration must contain at least one input plugin and one output plugin;
+    # filters are optional.
     "logstash-pipeline.conf" = <<EOF
       input {
         # From where is the data coming.
@@ -148,49 +148,18 @@ resource "kubernetes_config_map" "config" {
           ssl => false
         }
       }
-
-      # filter {
-      #   # merge json fields to top-level event
-      #   if [message] {
-      #     if [message] =~ "\A\{.+\}\z" {
-      #       ruby {
-      #         code => '
-      #           msgObj = JSON.parse(event.get("message"))
-      #           msgObj.each { |k,v|
-      #             event.set("#{k}", v)
-      #           }
-      #           event.remove("message")
-      #         '
-      #       }
-      #     }
-      #   }
-      # }
-
-      # filter {
-      #   #   mutate { gsub => [ "message", '"message": "', '"message": ', "message", '"([^"]+)$', '\1' ] }
-      #   # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json
-      #   # filter instead of a codec. This is because Filebeat sends its data as JSON and the
-      #   # contents of your log line are contained in the message field.
-      #   json {
-      #     source => "message"
-      #     # remove_field => ["message"]
-      #     skip_on_invalid_json => true
-      #     # target => "memories-logs"
-      #   }
-      #   # mutate { replace => { "message" => "%%{message}" } }
-      # }
-
-
+      #
       filter {
         grok {
           match => [
+            # Filebeat sends its data as JSON, and the contents of the log line are contained in
+            # the message field.
             "message",
             "\"app\":%%{QUOTEDSTRING:mem-app},\"level\":%%{QUOTEDSTRING:mem-level},\"message\":%%{QUOTEDSTRING:mem-message},\"requestId\":%%{QUOTEDSTRING:mem-requestId},\"service\":%%{QUOTEDSTRING:mem-service},\"timestamp\":\"%%{TIMESTAMP_ISO8601:mem-timestamp}\""
           ]
-          # overwrite => ["message"]
         }
-
         mutate {
+          # Remove the extra " in the value side of the key:value; e.g., "key":"\"value\""
           gsub => ["mem-app", "\"", ""]
           gsub => ["mem-level", "\"", ""]
           gsub => ["mem-message", "\"", ""]
@@ -198,21 +167,8 @@ resource "kubernetes_config_map" "config" {
           gsub => ["mem-requestId", "\"", ""]
         }
       }
-
       filter {
-          # To parse JSON log lines in Logstash that were sent from Filebeat you need to use a json
-          # filter instead of a codec. This is because Filebeat sends its data as JSON and the
-          # contents of your log line are contained in the message field.
-          # json {
-          #   source => "message"
-          #   # remove_field => ["message"]
-          #   skip_on_invalid_json => true
-          #   target => "memories-logs"
-          # }
-
         mutate {
-
-          #  ,
           remove_field => ["agent", "stream", "input", "host", "tags", "ecs", "[kubernetes][node]",
                            "[kubernetes][namespace_labels]", "container", "[event][original]",
                            "message"]
@@ -322,13 +278,13 @@ resource "kubernetes_deployment" "deployment" {
           volume_mount {
             name = "logstash"
             mount_path = "/usr/share/logstash/config"
-            # read_only = true
+            read_only = true
           }
           volume_mount {
             name = "config"
             # The directory that Logstash reads configurations from by default.
             mount_path = "/usr/share/logstash/pipeline"
-            # read_only = true
+            read_only = true
           }
         }
         volume {

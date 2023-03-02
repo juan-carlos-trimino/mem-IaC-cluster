@@ -158,6 +158,7 @@ resource "kubernetes_config_map" "config" {
             "\"app\":%%{QUOTEDSTRING:mem-app},\"level\":%%{QUOTEDSTRING:mem-level},\"message\":%%{QUOTEDSTRING:mem-message},\"requestId\":%%{QUOTEDSTRING:mem-requestId},\"service\":%%{QUOTEDSTRING:mem-service},\"timestamp\":\"%%{TIMESTAMP_ISO8601:mem-timestamp}\""
           ]
         }
+        #
         mutate {
           # Remove the extra " in the value side of the key:value; e.g., "key":"\"value\""
           gsub => ["mem-app", "\"", ""]
@@ -167,6 +168,7 @@ resource "kubernetes_config_map" "config" {
           gsub => ["mem-requestId", "\"", ""]
         }
       }
+      #
       filter {
         mutate {
           remove_field => ["agent", "stream", "input", "host", "tags", "ecs", "[kubernetes][node]",
@@ -174,6 +176,7 @@ resource "kubernetes_config_map" "config" {
                            "message"]
         }
       }
+      #
       output {
         elasticsearch {
           hosts => ["${var.es_hosts}"]

@@ -412,11 +412,10 @@ module "mem-elasticsearch-client" {
     EOL
   }
   es_configmap = local.es_configmap
-  # The client exposes two ports:
-  # (1) 9300 to communicate with the other nodes of the cluster;
-  # (2) 9200 for the HTTP API.
+  # Port 9200 for the HTTP API.
   http_service_port = 9200
   http_service_target_port = 9200
+  # Port 9300 to communicate with the other nodes of the cluster.
   transport_service_port = 9300
   transport_service_target_port = 9300
   service_name = local.svc_elasticsearch_client
@@ -438,18 +437,16 @@ module "mem-kibana" {
   qos_limits_cpu = "750m"
   qos_limits_memory = "1Gi"
   env = {
-    # "cluster.name": "cluster-elk"
     # https://github.com/elastic/kibana/blob/main/config/kibana.yml
     # https://www.elastic.co/guide/en/kibana/current/settings.html
     # This setting specifies the host of the back end server. To allow remote users to connect, set
     # the value to the IP address or DNS name of the Kibana server.
     "server.host": local.svc_dns_kibana
-    # "server.host": "0.0.0.0"
     # Kibana is served by a back end server. This setting specifies the port to use.
     "server.port": 5601
     # The URLs of the Elasticsearch instances to use for all your queries.
-    "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
-    ELASTICSEARCH_HOSTS: "[\"http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200\"]"
+    "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}:9200\"]"
+    ELASTICSEARCH_HOSTS: "[\"http://${local.svc_elasticsearch_client}:9200\"]"
     SERVER_BASEPATH: "/kibana"
     SERVER_REWRITEBASEPATH: true
     # X-Pack settings.
@@ -463,13 +460,11 @@ module "mem-kibana" {
     "xpack.ml.enabled": false
     "xpack.graph.enabled": false
   }
-  # service_type = "LoadBalancer"
   service_port = 5601
   service_target_port = 5601
   service_name = local.svc_kibana
 }
 
-# /***
 module "mem-logstash" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
@@ -485,24 +480,19 @@ module "mem-logstash" {
   qos_limits_memory = "4Gi"
   qos_requests_cpu = "800m"
   qos_requests_memory = "4Gi"
-  es_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
+  es_hosts = "http://${local.svc_elasticsearch_client}:9200"
   beats_service_port = 5044
   beats_service_target_port = 5044
   logstash_service_port = 9600
   logstash_service_target_port = 9600
   service_name = local.svc_logstash
 }
-# ***/
-
-
 
 # Filebeat is the agent that ships logs to Logstash.
 module "mem-filebeat" {
   count = var.k8s_manifest_crd ? 0 : 1
   depends_on = [
     module.mem-logstash
-    # module.mem-elasticsearch-client,
-    # module.mem-kibana
   ]
   source = "./modules/elk/filebeat"
   app_name = var.app_name
@@ -518,21 +508,11 @@ module "mem-filebeat" {
   qos_requests_memory = "100Mi"
   qos_limits_cpu = "600m"
   qos_limits_memory = "200Mi"
-  env = {
-    # ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
-    ELASTICSEARCH_HOST: "http://${local.svc_elasticsearch_client}"
-    ELASTICSEARCH_PORT: 9200
-  }
-  logstash_hosts = "${local.svc_logstash}.${local.namespace}.svc.cluster.local:5044"
-  # elasticsearch_hosts = "http://${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local:9200"
-  elasticsearch_hosts = "http://${local.svc_elasticsearch_client}:9200"
-  # kibana_host = "http://${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
+  logstash_hosts = "${local.svc_logstash}:5044"
   kibana_host = "http://${local.svc_kibana}:5601"
   service_name = local.svc_filebeat
 }
-
 # ***/  # elk
-
 
 ###################################################################################################
 # mongodb                                                                                         #

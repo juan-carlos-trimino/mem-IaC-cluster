@@ -283,6 +283,12 @@ resource "kubernetes_deployment" "deployment" {
             mount_path = "/usr/share/logstash/config"
             read_only = true
           }
+          volume_mount {
+            name = "config"
+            # The directory that Logstash reads configurations from by default.
+            mount_path = "/usr/share/logstash/pipeline"
+            read_only = true
+          }
         }
         volume {
           name = "logstash"
@@ -295,6 +301,21 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
         }
+        volume {
+          name = "config"
+          config_map {
+            name = kubernetes_config_map.config.metadata[0].name
+            # Although ConfigMap should be used for non-sensitive configuration data, make the file
+            # readable and writable only by the user and group that owns it.
+            default_mode = "0600"  # Octal
+            items {
+              key = "logstash-pipeline.conf"
+              path = "logstash-pipeline.conf"  # File name.
+            }
+          }
+        }
+
+
       }
     }
   }

@@ -279,7 +279,7 @@ module "whoiam" {
 ###################################################################################################
 # elk                                                                                             #
 ###################################################################################################
-/*** elk
+/*** elk cert-manager
 module "elk-issuer" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/cert-manager/issuer"
@@ -307,6 +307,7 @@ module "elk-certificate" {
   secret_name = local.es_secret_cert_name
 }
 ***/
+# /*** elk
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"

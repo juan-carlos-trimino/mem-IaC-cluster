@@ -45,7 +45,7 @@ allowPrivilegedContainer: true
 # allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
 # Setting it to false ensures that no child process of a container can gain more privileges than
 # its parent.
-allowPrivilegeEscalation: true
+allowPrivilegeEscalation: false
 #
 allowHostDirVolumePlugin: false
 # Control whether the pod may use the node network namespace. Doing so gives the pod access to the
@@ -98,6 +98,7 @@ seLinuxContext:
   type: RunAsAny
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
+# system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>
 users: [
   system:serviceaccount:mem-filebeat-service-account
 ]

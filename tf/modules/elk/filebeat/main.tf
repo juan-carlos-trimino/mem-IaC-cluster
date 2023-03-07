@@ -411,9 +411,19 @@ resource "kubernetes_daemonset" "daemonset" {
               }
             }
           }
+          # In Linux when a filesystem is mounted into a non-empty directory, the directory will
+          # only contain the files from the newly mounted filesystem. The files in the original
+          # directory are inaccessible for as long as the filesystem is mounted. In cases when the
+          # original directory contains crucial files, mounting a volume could break the container.
+          # To overcome this limitation, K8s provides an additional subPath property on the
+          # volumeMount; this property mounts a single file or a single directory from the volume
+          # instead of mounting the whole volume, and it does not hide the existing files in the
+          # original directory.
           volume_mount {
             name = "config"
+            # Mounting into a file, not a directory.
             mount_path = "/etc/filebeat.yml"
+            # Instead of mounting the whole volume, only mounting the given entry.
             sub_path = "filebeat.yml"
             read_only = true
           }
@@ -442,12 +452,19 @@ resource "kubernetes_daemonset" "daemonset" {
         }
         volume {
           name = "config"
+          # A configMap volume will expose each entry of the ConfigMap as a file, but a configMap
+          # volume can be populated with only part of the ConfigMap's entries.
           config_map {
             name = kubernetes_config_map.config_files.metadata[0].name
+            # By default, the permissions on all files in a configMap volume are set to 644
+            # (rw-r--r--).
             default_mode = "0600"  # Octal
+            # Selecting which entries to include in the volume by listing them.
             items {
+              # Include the entry under this key.
               key = "filebeat.yml"
-              path = "filebeat.yml"  # File name.
+              # The entry's value will be stored in this file.
+              path = "filebeat.yml"
             }
           }
         }

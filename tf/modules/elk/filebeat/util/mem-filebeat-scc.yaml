@@ -45,13 +45,13 @@ allowPrivilegedContainer: true
 # allowPrivilegeEscalation=true. This defaults to allowed so as to not break setuid binaries.
 # Setting it to false ensures that no child process of a container can gain more privileges than
 # its parent.
-allowPrivilegeEscalation: false
+allowPrivilegeEscalation: true
 #
-allowHostDirVolumePlugin: false
+allowHostDirVolumePlugin: true
 # Control whether the pod may use the node network namespace. Doing so gives the pod access to the
 # loopback device, services listening on localhost, and could be used to snoop on network activity
 # of other pods on the same node.
-allowHostNetwork: false
+allowHostNetwork: true
 # Provide a list of ranges of allowable ports in the host network namespace. Defined as a list of
 # HostPortRange, with min(inclusive) and max(inclusive). Defaults to no allowed host ports.
 allowHostPorts: false
@@ -94,13 +94,12 @@ supplementalGroups:
   type: RunAsAny
 #
 seLinuxContext:
-  # type: MustRunAs
-  type: RunAsAny
+  type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 # system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>
 users: [
-  system:serviceaccount:mem-filebeat-service-account
+  system:serviceaccount:memories:mem-filebeat-service-account
 ]
 groups: [
   system:authenticated

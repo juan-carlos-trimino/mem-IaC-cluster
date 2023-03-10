@@ -41,6 +41,7 @@ locals {
   ####################
   # Name of Services #
   ####################
+  svc_finances = "fin-finances"
   svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
@@ -902,3 +903,45 @@ module "mem-video-upload" {
   service_name = local.svc_video_upload
 }
 # ***/  # app
+# /*** #finances
+module "fin-finances" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  # Specify the location of the module, which contains the file main.tf.
+  source = "./modules/deployment"
+  dir_name = "../../${local.svc_finances}"
+  app_name = var.app_name
+  app_version = var.app_version
+  namespace = local.namespace
+  replicas = 1
+  qos_limits_cpu = "400m"
+  qos_limits_memory = "400Mi"
+  cr_login_server = local.cr_login_server
+  cr_username = var.cr_username
+  cr_password = var.cr_password
+  # Configure environment variables specific to the mem-gateway.
+  env = {
+    SVC_NAME: local.svc_gateway
+    SVC_DNS_METADATA: local.svc_dns_metadata
+    SVC_DNS_HISTORY: local.svc_dns_history
+    SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
+    SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
+    SVC_DNS_KIBANA: local.svc_dns_kibana
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
+    MAX_RETRIES: 20
+  }
+  readiness_probe = [{
+    http_get = [{
+      path = "/readiness"
+      port = 0
+      scheme = "HTTP"
+    }]
+    initial_delay_seconds = 30
+    period_seconds = 20
+    timeout_seconds = 2
+    failure_threshold = 4
+    success_threshold = 1
+  }]
+  service_name = local.svc_gateway
+}
+
+# ***/ #finances

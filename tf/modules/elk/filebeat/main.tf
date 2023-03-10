@@ -4,11 +4,24 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "image_tag" {}
-variable "path_to_files" {}
-variable "namespace" {
+variable app_name {
+  type = string
+}
+variable image_tag {
+  type = string
+}
+variable namespace {
   default = "default"
+  type = string
+}
+variable logstash_hosts {
+  type = string
+}
+variable kibana_host {
+  type = string
+}
+variable util_path {
+  type = string
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
@@ -17,8 +30,9 @@ variable "namespace" {
 # When using a tag other that latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
 # Containers in a pod usually run under separate Linux namespaces, which isolate their processes
 # from processes running in other containers or in the node's default namespace. Certain pods
@@ -29,35 +43,39 @@ variable "imagePullPolicy" {
 # get its own IP address, and if it runs a process that binds to a port, the process will be bound
 # to the node's port. (It allows a pod to listen to all network traffic for all pods on the node
 # and communicate with other pods on the network namespace.)
-# $ kubectl exec <pod-name> ifconfig
-variable "host_network" {
+# $ kubectl exec <pod-name> -n <namespace> -- ifconfig
+variable host_network {
   default = false
   type = bool
 }
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
+  type = string
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
+  type = string
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
+  type = string
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
+  type = string
 }
-variable "revision_history_limit" {
+variable revision_history_limit {
   default = 2
   type = number
 }
 # The termination grace period defaults to 30, which means the pod's containers will be given 30
 # seconds to terminate gracefully before they're killed forcibly.
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-variable "service_name" {
-  default = ""
+variable service_name {
+  type = string
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
@@ -71,21 +89,32 @@ variable "service_name" {
 # open, a random pod is selected and then all network packets belonging to that connection
 # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
 # always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
+  type = string
 }
-variable "dns_name" {
+variable dns_name {
   default = ""
+  type = string
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
+  type = string
+}
+
+/***
+Define local variables.
+***/
+locals {
+  pod_selector_label = "ps-${var.service_name}"
+  fb_label = "filebeat"
 }
 
 resource "null_resource" "scc-filebeat" {
   provisioner "local-exec" {
-    command = "oc apply -f ./utility-files/filebeat/mem-filebeat-scc.yaml"
+    command = "oc apply -f ./modules/elk/filebeat/util/mem-filebeat-scc.yaml"
   }
   #
   provisioner "local-exec" {
@@ -133,7 +162,7 @@ resource "kubernetes_cluster_role" "cluster_role" {
     api_groups = [""]
     verbs = ["get", "watch", "list"]
     # The plural form must be used when specifying resources.
-    resources = ["pods", "namespaces"]
+    resources = ["pods", "namespaces", "nodes"]
   }
   rule {
     api_groups = ["security.openshift.io"]
@@ -179,15 +208,106 @@ resource "kubernetes_config_map" "config_files" {
     }
   }
   data = {
-    "kubernetes.yml" = <<EOF
-      - type: docker
-        containers.ids:
-        - "*"
-        processors:
-          - add_kubernetes_metadata:
-            in_cluster: true
+    # "filebeat.yml" = "${file("${var.util_path}/filebeat.yml")}"
+    # To configure Filebeat, edit the configuration file. The default configuration file is called
+    # filebeat.yml.
+    # -------------------------------------------------------------------------------------------------
+    # For more available modules and options, please see the filebeat.reference.yml
+    # (https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html) sample
+    # configuration file.
+
+    # ====================================== Filebeat Inputs ==========================================
+    # To configure inputs:
+    #   https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
+    # Inputs specify how Filebeat locates and processes input data.
+    # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+
+    # To see a full example of the configuration file, go to https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+    # The Filebeat configuration file consists, mainly, of the following sections. For some more information on how to configure Filebeat(https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.html).
+    "filebeat.yml" = <<EOF
+      # (1) The Modules configuration section can help with the collection, parsing, and visualization of common log formats (optional).
+      # (2) The Inputs section determines the input sources (mandatory if not using Module configuration). If you are not using modules, you need to configure the Filebeat manually.
+      # To configure inputs:
+      #   https://www.elastic.co/guide/en/beats/filebeat/current/configuration-filebeat-options.html
+      # Inputs specify how Filebeat locates and processes input data.
+      # https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-reference-yml.html
+      filebeat.inputs:
+        # Use the container input to read containers log files.
+        - type: "container"
+          # Change to true to enable this input configuration.
+          enabled: true
+          # Read from the specified streams only: all (default), stdout or stderr.
+          stream: "all"
+          # Use the given format when reading the log file: auto, docker or cri. The default is
+          # auto; it will automatically detect the format.
+          format: "auto"
+          # The plain encoding is special because it does not validate or transform any input.
+          encoding: "utf-8"
+          # encoding: "plain"
+          # You must set ignore_older to be greater than close_inactive.
+          ignore_older: "72h"
+          close_inactive: "48h"
+          scan_frequency: "10s"
+          # To collect container logs, each Filebeat instance needs access to the local log's path,
+          # which is actually a log directory mounted from the host. With this configuration,
+          # Filebeat can collect logs from all the files that exist under the /var/log/containers/
+          # directory.
+          paths: ["/var/log/containers/*.log"]
+          # Optional (custom) fields that you can specify to add additional information to the output.
+          # fields:
+          ##   index_prefix: ["memories"]
+          # If this option is set to true, the custom fields are stored as top-level fields in the
+          # output document instead of being grouped under a fields sub-dictionary.
+          # fields_under_root: true
+          # If present, this formatted string overrides the index for events from this input (for
+          # elasticsearch outputs), or sets the raw_index field of the event's metadata (for other outputs).
+          # index: "%%{[agent.name]}-%%{[fields.index_prefix]}-%%{[agent.version]}-%%{+yyyy.MM.dd}"
+          # By default, all events contain host.name. This option can be set to true to disable the
+          # addition of this field to all events.
+          publisher_pipeline.disable_host: false
+          # If you define a list of processors, they are executed in the order they are defined
+          # below.
+          processors:
+            - add_kubernetes_metadata:
+                in_cluster: true
+                host: $(NODE_NAME)
+                default_matchers.enabled: false
+                matchers:
+                  - logs_path:
+                      logs_path: "/var/log/containers/"
+      # (3) The Processors section is used to configure processing across data exported by Filebeat
+      # (optional). You can define a processor (https://coralogix.com/blog/filebeat-configuration-best-practices-tutorial/) at the top-level in the configuration; the processor
+      # is applied to all data collected by Filebeat. Furthermore, you can define a processor under
+      # a specific input; the processor is applied to the data collected for that input. For a list
+      # of type of processors, go to https://www.elastic.co/guide/en/beats/filebeat/current/defining-processors.html#processors
+      # (4) The Output section determines the output destination of the processed data.
+      # ========================================= Outputs =========================================
+      # Configure what output to use when sending the data collected by the beat. Only a single
+      # output may be defined.
+      # See https://www.elastic.co/guide/en/beats/filebeat/current/configuring-output.html
+      # ------------------------------------ Logstash Output --------------------------------------
+      output.logstash:
+        enabled: true
+        # The Logstash hosts without http:// or https://.
+        hosts: ["${var.logstash_hosts}"]
+        compression_level: 3
+        escape_html: false
+        # Number of workers per Logstash host.
+        worker: 2
+        loadbalance: false
+        ttl: 0
+        pipelining: 2
+        index: "memories-filebeat"
+        ssl:
+          enabled: false
+      setup:
+        # See https://www.elastic.co/guide/en/beats/filebeat/current/setup-kibana-endpoint.html
+        kibana:
+          host: "${var.kibana_host}"
+          path: "/kibana"
+          ssl:
+            enabled: false
       EOF
-    "filebeat.yml" = "${file("${var.path_to_files}/filebeat.yml")}"
   }
 }
 
@@ -203,39 +323,58 @@ resource "kubernetes_daemonset" "daemonset" {
     labels = {
       app = var.app_name
     }
+    # For OpenShift only!!!
+    # Override the default node selector for the kube-system namespace (or your custom namespace)
+    # to allow for scheduling on any node. This command sets the node selector for the project to
+    # an empty string. If you don't run this command, the default node selector will skip master
+    # nodes.
+    annotations = {
+      "openshift.io/node-selector" = ""
+    }
   }
   #
   spec {
     selector {
       match_labels = {
-        pod = var.service_name
+        # It must match the labels in the Pod template (.spec.template.metadata.labels).
+        pod_selector_lbl = local.pod_selector_label
       }
     }
-    revision_history_limit = var.revision_history_limit
-    #
+    # Pod template.
     template {
       metadata {
         labels = {
-          pod = var.service_name
+          app = var.app_name
+          # It must match the labels in the Pod template (.spec.template.metadata.labels).
+          pod_selector_lbl = local.pod_selector_label
+          fb_lbl = local.fb_label
         }
       }
       #
       spec {
+        toleration {
+          key = "node-role.kubernetes.io/master"
+          operator = "Equal"
+          effect = "NoSchedule"
+        }
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         host_network = var.host_network
-        ################# jct
+        # For Pods running with hostNetwork, you should explicitly set its DNS policy to
+        # "ClusterFirstWithHostNet". Otherwise, Pods running with hostNetwork and "ClusterFirst"
+        # will fallback to the behavior of the "Default" policy.
         dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
+          # https://www.elastic.co/guide/en/beats/filebeat/master/running-on-kubernetes.html#_red_hat_openshift_configuration
           security_context {
+            run_as_non_root = false
             run_as_user = 0
             # By setting this property to true, the app will not be allowed to write to /tmp, and
             # the error below will be generated. To avoid the error, mount a volume to the /tmp
             # directory.
-            # log: exiting because of error: log: cannot create log: open /tmp/filebeat.kube-c8l9uj1d06jc36g628o0-itzroks6630-default-00000291.root.log.WARNING.20220314-023504.1: read-only file system
             read_only_root_filesystem = true
             # Filebeat needs extra configuration to run in the Openshift environment; enable the
             # container to be privileged as an administrator for Openshift.
@@ -244,7 +383,11 @@ resource "kubernetes_daemonset" "daemonset" {
             #  /usr/share/filebeat/data/meta.json.new: permission denied
             privileged = true
           }
-          # Docker (CMD)
+          # Docker (CMD).
+          # -c -> Specify the configuration file to use for Filebeat.
+          # -e => Log to stderr and disables syslog/file output.
+          # Location of our filebeat.yml file; MUST MATCH the mount_path in the volume_mount of
+          # "config."
           args = ["-c", "/etc/filebeat.yml", "-e"]
           resources {
             requests = {
@@ -268,9 +411,19 @@ resource "kubernetes_daemonset" "daemonset" {
               }
             }
           }
+          # In Linux when a filesystem is mounted into a non-empty directory, the directory will
+          # only contain the files from the newly mounted filesystem. The files in the original
+          # directory are inaccessible for as long as the filesystem is mounted. In cases when the
+          # original directory contains crucial files, mounting a volume could break the container.
+          # To overcome this limitation, K8s provides an additional subPath property on the
+          # volumeMount; this property mounts a single file or a single directory from the volume
+          # instead of mounting the whole volume, and it does not hide the existing files in the
+          # original directory.
           volume_mount {
             name = "config"
+            # Mounting into a file, not a directory.
             mount_path = "/etc/filebeat.yml"
+            # Instead of mounting the whole volume, only mounting the given entry.
             sub_path = "filebeat.yml"
             read_only = true
           }
@@ -288,7 +441,7 @@ resource "kubernetes_daemonset" "daemonset" {
           # command, but a copy is kept at this path).
           volume_mount {
             name = "varlibdockercontainers"
-            mount_path = "/var/lib/docker/containers"
+            mount_path = "/var/log/containers/"
             read_only = true
           }
           volume_mount {
@@ -296,27 +449,32 @@ resource "kubernetes_daemonset" "daemonset" {
             mount_path = "/var/log"
             read_only = true
           }
-          # See read_only_root_filesystem.
-          volume_mount {
-            name = "tmp"
-            mount_path = "/tmp"
-            read_only = false
-          }
         }
         volume {
           name = "config"
+          # A configMap volume will expose each entry of the ConfigMap as a file, but a configMap
+          # volume can be populated with only part of the ConfigMap's entries.
           config_map {
             name = kubernetes_config_map.config_files.metadata[0].name
-            default_mode = "0600"
+            # By default, the permissions on all files in a configMap volume are set to 644
+            # (rw-r--r--).
+            default_mode = "0600"  # Octal
+            # Selecting which entries to include in the volume by listing them.
             items {
+              # Include the entry under this key.
               key = "filebeat.yml"
-              path = "filebeat.yml"  # File name.
+              # The entry's value will be stored in this file.
+              path = "filebeat.yml"
             }
           }
         }
+        # The data folder stores a registry of read status for all files so that Filebeat doesn't
+        # send everything again on a pod restart.
         volume {
           name = "data"
           host_path {
+            # When Filebeat runs as non-root user, this directory needs to be writable by group
+            # (g+w).
             path = "/var/lib/filebeat-data"
             type = "DirectoryOrCreate"
           }
@@ -328,19 +486,13 @@ resource "kubernetes_daemonset" "daemonset" {
           # files.
           host_path {
             # Access the node's /var/lib/docker/containers.
-            path = "/var/lib/docker/containers"  # Directory location on host.
+            path = "/var/log/containers/"  # Directory location on host.
           }
         }
         volume {
           name = "varlog"
           host_path {
             path = "/var/log"
-          }
-        }
-        volume {
-          name = "tmp"
-          host_path {
-            path = "/tmp"
           }
         }
       }

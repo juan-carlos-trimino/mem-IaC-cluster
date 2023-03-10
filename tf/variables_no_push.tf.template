@@ -28,18 +28,6 @@ variable resource_group_name {
   sensitive = true
 }
 
-variable cr_username {
-  description = "Username for dockerhub."
-  default = "<required>"
-  sensitive = true
-}
-
-variable cr_password {
-  description = "Password for dockerhub."
-  default = "<required>"
-  sensitive = true
-}
-
 variable region {
   description = "The IBM Cloud region where all resources will be deployed; e.g., us-south, eu-de, etc."
   default = "<required>"
@@ -49,6 +37,18 @@ variable region {
 variable ibmcloud_timeout {
   description = "The timeout, expressed in seconds, for interacting with IBM Cloud APIs."
   default = "900"
+  sensitive = true
+}
+
+variable cr_username {
+  description = "Username for dockerhub."
+  default = "<required>"
+  sensitive = true
+}
+
+variable cr_password {
+  description = "Password for dockerhub."
+  default = "<required>"
   sensitive = true
 }
 
@@ -171,6 +171,29 @@ variable traefik_dns_api_token {
 }
 
 variable traefik_le_email {
+  default = "<required>"
+  sensitive = true
+}
+
+#################
+# The ELK Stack #
+#################
+variable es_username {
+  default = "<required>"
+  sensitive = true
+}
+
+variable es_password {
+  default = "<required>"
+  sensitive = true
+}
+
+variable kibana_username {
+  default = "<required>"
+  sensitive = true
+}
+
+variable kibana_password {
   default = "<required>"
   sensitive = true
 }

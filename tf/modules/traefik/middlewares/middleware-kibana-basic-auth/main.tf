@@ -13,11 +13,11 @@ variable namespace {
 variable service_name {
   type = string
 }
-variable traefik_gateway_username {
+variable kibana_username {
   type = string
   sensitive = true
 }
-variable traefik_gateway_password {
+variable kibana_password {
   type = string
   sensitive = true
 }
@@ -36,7 +36,7 @@ resource "kubernetes_secret" "secret" {
     # value includes a randomly selected salt, each call to this function will return a different
     # value, even if the given string and cost are the same.
     # Traefik supports passwords hashed with MD5, SHA1, or BCrypt.
-    users = "${var.traefik_gateway_username}:${bcrypt(var.traefik_gateway_password, 10)}"
+    users = "${var.kibana_username}:${bcrypt(var.kibana_password, 10)}"
   }
   type = "Opaque"
 }

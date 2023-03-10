@@ -10,8 +10,7 @@ locals {
   ###########
   # Traefik #
   ###########
-  secret_cert_name = "le-secret-cert"
-  # dashboard_secret_cert_name = "le-dashboard-secret-cert"
+  traefik_secret_cert_name = "le-secret-cert"
   issuer_name = "le-acme-issuer"
   tls_store = "default"
   tls_options = "tlsoptions"
@@ -19,32 +18,46 @@ locals {
   # Ingress Routes #
   ##################
   ingress_route = "mem-ingress-route"
-  ingress_route_dashboard = "mem-ingress-route-dashboard"
   ###############
   # Middlewares #
   ###############
   middleware_compress = "mem-mw-compress"
   middleware_rate_limit = "mem-mw-rate-limit"
   middleware_error_page = "mem-mw-error-page"
+  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
+  middleware_kibana_basic_auth = "mem-mw-kibana-basic-auth"
   middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
   middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
-  middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
+  #################
+  # Elasticsearch #
+  #################
+  es_issuer = "es-selfsigned-issuer"
+  es_secret_cert_name = "es-secret-cert"
+  es_configmap = "es-config"
+  es_service_account = "es-service-account"
   ####################
   # Name of Services #
   ####################
+  svc_finances = "fin-finances"
   svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
-  svc_kibana = "mem-kibana"
   svc_metadata = "mem-metadata"
   svc_mongodb = "mem-mongodb"
   svc_rabbitmq = "mem-rabbitmq"
   svc_video_storage = "mem-video-storage"
   svc_video_streaming = "mem-video-streaming"
   svc_video_upload = "mem-video-upload"
+  svc_elasticsearch_headless = "mem-elasticsearch-headless"
+  svc_elasticsearch_master = "mem-elasticsearch-master"
+  svc_elasticsearch_data = "mem-elasticsearch-data"
+  svc_elasticsearch_client = "mem-elasticsearch-client"
+  svc_kibana = "mem-kibana"
+  svc_logstash = "mem-logstash"
+  svc_filebeat = "mem-filebeat"
   ############
   # Services #
   ############
@@ -66,11 +79,10 @@ locals {
   #
   # It is possible to allow the guest user to connect from a remote host by setting the
   # loopback_users configuration to none. (See rabbitmq.conf)
-  svc_dns_rabbitmq = "amqp://${var.rabbitmq_default_user}:${var.rabbitmq_default_pass}@${local.svc_rabbitmq}.${local.namespace}.svc.cluster.local:5672"
+  svc_dns_rabbitmq = "amqp://${var.rabbitmq_default_user}:${var.rabbitmq_default_pass}@${local.svc_rabbitmq}-headless.${local.namespace}.svc.cluster.local:5672"
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
-  # svc_dns_elasticsearch = "mem-elasticsearch.${local.namespace}.svc.cluster.local:9200"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
 }
 
@@ -90,6 +102,16 @@ module "traefik" {
   service_name = "mem-traefik"
 }
 
+module "middleware-gateway-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
+  app_name = var.app_name
+  namespace = local.namespace
+  traefik_gateway_username = var.traefik_gateway_username
+  traefik_gateway_password = var.traefik_gateway_password
+  service_name = local.middleware_gateway_basic_auth
+}
+
 module "middleware-dashboard-basic-auth" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-dashboard-basic-auth"
@@ -101,6 +123,16 @@ module "middleware-dashboard-basic-auth" {
   service_name = local.middleware_dashboard_basic_auth
 }
 
+module "middleware-kibana-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-kibana-basic-auth"
+  app_name = var.app_name
+  namespace = local.namespace
+  kibana_username = var.kibana_username
+  kibana_password = var.kibana_password
+  service_name = local.middleware_kibana_basic_auth
+}
+
 module "middleware-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
@@ -110,16 +142,6 @@ module "middleware-rabbitmq" {
   traefik_rabbitmq_password = var.traefik_rabbitmq_password
   service_name1 = local.middleware_rabbitmq1
   service_name2 = local.middleware_rabbitmq2
-}
-
-module "middleware-gateway-basic-auth" {
-  count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-gateway-basic-auth"
-  app_name = var.app_name
-  namespace = local.namespace
-  traefik_gateway_username = var.traefik_gateway_username
-  traefik_gateway_password = var.traefik_gateway_password
-  service_name = local.middleware_gateway_basic_auth
 }
 
 module "middleware-compress" {
@@ -162,7 +184,7 @@ module "tlsstore" {
   source = "./modules/traefik/tlsstore"
   app_name = var.app_name
   namespace = "default"
-  secret_name = local.secret_cert_name
+  secret_name = local.traefik_secret_cert_name
   service_name = local.tls_store
 }
 
@@ -186,8 +208,10 @@ module "ingress-route" {
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_security_headers = local.middleware_security_headers
+  middleware_kibana_basic_auth = local.middleware_kibana_basic_auth
   svc_gateway = local.svc_gateway
-  secret_name = local.secret_cert_name
+  svc_kibana = local.svc_kibana
+  secret_name = local.traefik_secret_cert_name
   issuer_name = local.issuer_name
   # host_name = "169.46.98.220.nip.io"
   # host_name = "memories.mooo.com"
@@ -195,17 +219,6 @@ module "ingress-route" {
   service_name = local.ingress_route
 }
 # ***/ # traefik
-
-/*** # web service app for testing Traefik
-module "whoiam" {
-  count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/whoami"
-  app_name = var.app_name
-  app_version = var.app_version
-  namespace = local.namespace
-  service_name = "mem-whoami"
-}
-***/ # Web service
 
 ###################################################################################################
 # cert manager                                                                                    #
@@ -227,8 +240,8 @@ module "acme-issuer" {
   acme_email = var.traefik_le_email
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token
@@ -246,14 +259,267 @@ module "certificate" {
   # records on that name.
   # common_name = "trimino.xyz"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
-  secret_name = local.secret_cert_name
+  secret_name = local.traefik_secret_cert_name
 }
 # ***/ # cert manager
 
 ###################################################################################################
+# whoami                                                                                          #
+###################################################################################################
+/*** # web service app for testing Traefik
+module "whoiam" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/whoami"
+  app_name = var.app_name
+  app_version = var.app_version
+  namespace = local.namespace
+  service_name = "mem-whoami"
+}
+***/ # Web service
+
+###################################################################################################
+# elk                                                                                             #
+###################################################################################################
+/*** elk cert-manager
+module "elk-issuer" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/cert-manager/issuer"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.es_issuer
+}
+
+module "elk-certificate" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/cert-manager/certificates"
+  app_name = var.app_name
+  namespace = local.namespace
+  issuer_name = local.es_issuer
+  certificate_name = "elk-cert"
+  # The A record maps a name to one or more IP addresses when the IP are known and stable.
+  # The CNAME record maps a name to another name. It should only be used when there are no other
+  # records on that name.
+  # common_name = "trimino.xyz"
+  dns_names = [
+    local.svc_elasticsearch_client,
+    "${local.svc_elasticsearch_client}.${local.namespace}",
+    "${local.svc_elasticsearch_client}.${local.namespace}.svc.cluster.local"
+  ]
+  secret_name = local.es_secret_cert_name
+}
+***/
+# /*** elk
+module "mem-elasticsearch-master" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/elk/elasticsearch/es-master"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  publish_not_ready_addresses = true
+  namespace = local.namespace
+  replicas = 3
+  # The default is to deploy all pods serially. By setting this to parallel, all pods are started
+  # at the same time when bootstrapping the cluster.
+  pod_management_policy = "Parallel"
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
+  qos_limits_cpu = "1000m"
+  qos_limits_memory = "2Gi"
+  pvc_access_modes = ["ReadWriteOnce"]
+  pvc_storage_size = "2Gi"
+  pvc_storage_class_name = "ibmc-block-silver"
+  env = {
+    "node.roles": "[master]"
+    ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    "discovery.seed_hosts": <<EOL
+      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
+    EOL
+    "cluster.initial_master_nodes": <<EOL
+      "${local.svc_elasticsearch_master}-0,
+       ${local.svc_elasticsearch_master}-1,
+       ${local.svc_elasticsearch_master}-2"
+    EOL
+  }
+  es_configmap = local.es_configmap
+  es_service_account = local.es_service_account
+  transport_service_port = 9300
+  transport_service_target_port = 9300
+  service_name_headless = local.svc_elasticsearch_headless
+  service_name = local.svc_elasticsearch_master
+}
+
+module "mem-elasticsearch-data" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-elasticsearch-master
+  ]
+  source = "./modules/elk/elasticsearch/es-data"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  publish_not_ready_addresses = true
+  namespace = local.namespace
+  replicas = 2
+  pod_management_policy = "Parallel"
+  qos_limits_cpu = "3000m"
+  qos_limits_memory = "8Gi"
+  pvc_access_modes = ["ReadWriteOnce"]
+  pvc_storage_size = "50Gi"
+  pvc_storage_class_name = "ibmc-block-silver"
+  env = {
+    "node.roles": "[data]"
+    ES_JAVA_OPTS: "-Xms4g -Xmx4g"
+    "discovery.seed_hosts": <<EOL
+      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
+    EOL
+    "cluster.initial_master_nodes": <<EOL
+      "${local.svc_elasticsearch_master}-0,
+       ${local.svc_elasticsearch_master}-1,
+       ${local.svc_elasticsearch_master}-2"
+    EOL
+  }
+  es_configmap = local.es_configmap
+  es_service_account = local.es_service_account
+  transport_service_port = 9300
+  transport_service_target_port = 9300
+  service_name_headless = local.svc_elasticsearch_headless
+  service_name = local.svc_elasticsearch_data
+}
+
+module "mem-elasticsearch-client" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-elasticsearch-data
+  ]
+  source = "./modules/elk/elasticsearch/es-client"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/elasticsearch/elasticsearch:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  namespace = local.namespace
+  replicas = 2
+  qos_limits_cpu = "1000m"
+  qos_limits_memory = "4Gi"
+  env = {
+    "node.roles": "[remote_cluster_client]"  # A coordinating node.
+    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+    "discovery.seed_hosts": <<EOL
+      "${local.svc_elasticsearch_master}-0.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-1.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local,
+       ${local.svc_elasticsearch_master}-2.${local.svc_elasticsearch_headless}.${local.namespace}.svc.cluster.local"
+    EOL
+  }
+  es_configmap = local.es_configmap
+  # Port 9200 for the HTTP API.
+  http_service_port = 9200
+  http_service_target_port = 9200
+  # Port 9300 to communicate with the other nodes of the cluster.
+  transport_service_port = 9300
+  transport_service_target_port = 9300
+  service_name = local.svc_elasticsearch_client
+}
+
+module "mem-kibana" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-elasticsearch-client
+  ]
+  source = "./modules/elk/kibana"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/kibana/kibana:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  namespace = local.namespace
+  replicas = 1
+  qos_requests_cpu = "200m"
+  qos_requests_memory = "500Mi"
+  qos_limits_cpu = "750m"
+  qos_limits_memory = "1Gi"
+  env = {
+    # https://github.com/elastic/kibana/blob/main/config/kibana.yml
+    # https://www.elastic.co/guide/en/kibana/current/settings.html
+    # This setting specifies the host of the back end server. To allow remote users to connect, set
+    # the value to the IP address or DNS name of the Kibana server.
+    "server.host": local.svc_dns_kibana
+    # Kibana is served by a back end server. This setting specifies the port to use.
+    "server.port": 5601
+    # The URLs of the Elasticsearch instances to use for all your queries.
+    "elasticsearch.hosts": "[\"http://${local.svc_elasticsearch_client}:9200\"]"
+    ELASTICSEARCH_HOSTS: "[\"http://${local.svc_elasticsearch_client}:9200\"]"
+    SERVER_BASEPATH: "/kibana"
+    SERVER_REWRITEBASEPATH: true
+    # X-Pack settings.
+    "xpack.license.self_generated.type": "basic"
+    "xpack.security.enabled": false
+    "xpack.security.transport.ssl.enabled": false
+    "xpack.security.transport.ssl.verification_mode": "none"
+    "xpack.security.http.ssl.enabled": false
+    # Disable unused xpack features.
+    "xpack.reporting.enabled": false
+    "xpack.ml.enabled": false
+    "xpack.graph.enabled": false
+  }
+  service_port = 5601
+  service_target_port = 5601
+  service_name = local.svc_kibana
+}
+
+module "mem-logstash" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-kibana
+  ]
+  source = "./modules/elk/logstash"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/logstash/logstash:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  namespace = local.namespace
+  replicas = 1
+  qos_limits_cpu = "2500m"
+  qos_limits_memory = "4Gi"
+  qos_requests_cpu = "800m"
+  qos_requests_memory = "4Gi"
+  es_hosts = "http://${local.svc_elasticsearch_client}:9200"
+  beats_service_port = 5044
+  beats_service_target_port = 5044
+  logstash_service_port = 9600
+  logstash_service_target_port = 9600
+  service_name = local.svc_logstash
+}
+
+# Filebeat is the agent that ships logs to Logstash.
+module "mem-filebeat" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-logstash
+  ]
+  source = "./modules/elk/filebeat"
+  app_name = var.app_name
+  image_tag = "docker.elastic.co/beats/filebeat:8.6.0"
+  image_pull_policy = "IfNotPresent"
+  namespace = local.namespace
+  host_network = true
+  util_path = "./modules/elk/filebeat/util"
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
+  qos_requests_cpu = "500m"
+  qos_requests_memory = "100Mi"
+  qos_limits_cpu = "600m"
+  qos_limits_memory = "200Mi"
+  logstash_hosts = "${local.svc_logstash}:5044"
+  kibana_host = "http://${local.svc_kibana}:5601"
+  service_name = local.svc_filebeat
+}
+# ***/  # elk
+
+###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-# /*** mongodb - deployment
+# /*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -263,9 +529,9 @@ module "mem-mongodb" {
   image_tag = "mongo:5.0"
   namespace = local.namespace
   replicas = 1
-  # Limits and request for CPU resources are measured in millicores. If the container needs one full
-  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
-  # '250m.'
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
   qos_limits_cpu = "400m"
   qos_limits_memory = "1Gi"
   # qos_limits_memory = "500Mi"
@@ -279,7 +545,7 @@ module "mem-mongodb" {
 }
 # ***/  # mongodb - deployment
 
-/*** mongodb - statefulset
+/*** mongodb - statefulset active
 # StatefulSet.
 # (1) When a container is started for the first time it will execute files with extensions .sh and
 #     .js that are found in /docker-entrypoint-initdb.d. Files will be executed in alphabetical
@@ -305,9 +571,9 @@ module "mem-mongodb" {
   publish_not_ready_addresses = true
   namespace = local.namespace
   replicas = 3
-  # Limits and request for CPU resources are measured in millicores. If the container needs one full
-  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
-  # '250m.'
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
   qos_limits_cpu = "400m"
   qos_limits_memory = "1Gi"
   # qos_limits_memory = "500Mi"
@@ -339,9 +605,10 @@ module "mem-rabbitmq" {
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.15-management-alpine"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   # image_tag = "rabbitmq:3.9.7-alpine"
-  path_rabbitmq_files = "./utility-files/rabbitmq"
+  # path_rabbitmq_files = "./utility-files/rabbitmq"
+  path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   namespace = local.namespace
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
@@ -361,7 +628,7 @@ module "mem-rabbitmq" {
 }
 ***/  # rabbitmq - deployment
 
-# /*** rabbitmq - statefulset
+# /*** rabbitmq - statefulset goodxxcxx
 # StatefulSet.
 module "mem-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -370,7 +637,7 @@ module "mem-rabbitmq" {
   app_version = var.app_version
   # This image has the RabbitMQ dashboard.
   image_tag = "rabbitmq:3.9.7-management-alpine"
-  imagePullPolicy = "IfNotPresent"
+  image_pull_policy = "IfNotPresent"
   path_rabbitmq_files = "./modules/rabbitmq-statefulset/util"
   #
   rabbitmq_erlang_cookie = var.rabbitmq_erlang_cookie
@@ -383,9 +650,9 @@ module "mem-rabbitmq" {
   # between cluster members, odd numbers of cluster nodes are highly recommended: 1, 3, 5, 7
   # and so on.
   replicas = 1
-  # Limits and request for CPU resources are measured in millicores. If the container needs one full
-  # core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the value of
-  # '250m.'
+  # Limits and requests for CPU resources are measured in millicores. If the container needs one
+  # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
+  # value of '250m.'
   qos_limits_cpu = "400m"
   qos_limits_memory = "300Mi"
   pvc_access_modes = ["ReadWriteOnce"]
@@ -429,11 +696,13 @@ module "mem-gateway" {
   cr_password = var.cr_password
   # Configure environment variables specific to the mem-gateway.
   env = {
+    SVC_NAME: local.svc_gateway
     SVC_DNS_METADATA: local.svc_dns_metadata
     SVC_DNS_HISTORY: local.svc_dns_history
     SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
     SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
     SVC_DNS_KIBANA: local.svc_dns_kibana
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -467,9 +736,11 @@ module "mem-history" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_history
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
     DB_NAME: local.db_history
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -489,6 +760,9 @@ module "mem-history" {
 
 module "mem-metadata" {
   count = var.k8s_manifest_crd ? 0 : 1
+  depends_on = [
+    module.mem-mongodb
+  ]
   source = "./modules/deployment"
   dir_name = "../../${local.svc_metadata}/metadata"
   app_name = var.app_name
@@ -501,9 +775,11 @@ module "mem-metadata" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_metadata
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
     DB_NAME: local.db_metadata
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -535,6 +811,7 @@ module "mem-video-storage" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_storage
     BUCKET_NAME: var.bucket_name
     # Without HMAC.
     AUTHENTICATION_TYPE: "iam"
@@ -548,6 +825,7 @@ module "mem-video-storage" {
     # SECRET_ACCESS_KEY: var.secret_access_key
     # ENDPOINT: var.public_endpoint
     #
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   service_name = local.svc_video_storage
@@ -567,8 +845,10 @@ module "mem-video-streaming" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_streaming
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -601,8 +881,10 @@ module "mem-video-upload" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    SVC_NAME: local.svc_video_upload
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
   readiness_probe = [{
@@ -621,3 +903,45 @@ module "mem-video-upload" {
   service_name = local.svc_video_upload
 }
 # ***/  # app
+# /*** #finances
+module "fin-finances" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  # Specify the location of the module, which contains the file main.tf.
+  source = "./modules/deployment"
+  dir_name = "../../${local.svc_finances}"
+  app_name = var.app_name
+  app_version = var.app_version
+  namespace = local.namespace
+  replicas = 1
+  qos_limits_cpu = "400m"
+  qos_limits_memory = "400Mi"
+  cr_login_server = local.cr_login_server
+  cr_username = var.cr_username
+  cr_password = var.cr_password
+  # Configure environment variables specific to the mem-gateway.
+  env = {
+    SVC_NAME: local.svc_gateway
+    SVC_DNS_METADATA: local.svc_dns_metadata
+    SVC_DNS_HISTORY: local.svc_dns_history
+    SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
+    SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
+    SVC_DNS_KIBANA: local.svc_dns_kibana
+    APP_NAME_VER: "${var.app_name} ${var.app_version}"
+    MAX_RETRIES: 20
+  }
+  readiness_probe = [{
+    http_get = [{
+      path = "/readiness"
+      port = 0
+      scheme = "HTTP"
+    }]
+    initial_delay_seconds = 30
+    period_seconds = 20
+    timeout_seconds = 2
+    failure_threshold = 4
+    success_threshold = 1
+  }]
+  service_name = local.svc_gateway
+}
+
+# ***/ #finances

@@ -20,10 +20,11 @@ variable acme_server {
   type = string
 }
 variable dns_names {
-  type = list
   default = []
+  type = list
 }
 variable traefik_dns_api_token {
+  sensitive = true
   type = string
 }
 

@@ -21,7 +21,7 @@ variable "namespace" {
 # When using a tag other that latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable image_pull_policy {
   default = "Always"
 }
 variable "env" {
@@ -344,7 +344,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
         container {
           name = var.service_name
           image = var.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           security_context {
             run_as_non_root = true
             run_as_user = 1060
@@ -374,11 +374,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
             container_port = var.mgmt_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
-          port {
-            name = "epmd"
-            container_port = 4369
-            protocol = "TCP"
-          }
+          # port {
+          #   name = "epmd"
+          #   container_port = 4369
+          #   protocol = "TCP"
+          # }
           resources {
             requests = {
               # If a Container specifies its own memory limit, but does not specify a memory
@@ -511,7 +511,8 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
           volume_mount {
             name = "configs"
-            mount_path = "/etc/rabbitmq"
+            # mount_path = "/etc/rabbitmq"
+            mount_path = "/config/rabbitmq"
             read_only = true
           }
         }
@@ -605,39 +606,18 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
     }
     session_affinity = local.session_affinity
-    port {
-      name = "epmd"  # Node discovery.
-      port = 4369
-      target_port = 4369
-      protocol = "TCP"
-    }
-    port {
-      name = "cluster-rpc"  # Inter-node communication.
-      port = 25672
-      target_port = 25672
-      protocol = "TCP"
-    }
-    type = local.service_type
-    cluster_ip = "None"  # Headless Service.
-    publish_not_ready_addresses = var.publish_not_ready_addresses
-  }
-}
-
-# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-resource "kubernetes_service" "service" {
-  metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  #
-  spec {
-    selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-    }
-    session_affinity = var.service_session_affinity
+    # port {
+    #   name = "epmd"  # Node discovery.
+    #   port = 4369
+    #   target_port = 4369
+    #   protocol = "TCP"
+    # }
+    # port {
+    #   name = "cluster-rpc"  # Inter-node communication.
+    #   port = 25672
+    #   target_port = 25672
+    #   protocol = "TCP"
+    # }
     port {
       name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
       port = var.amqp_service_port  # Service port.
@@ -650,6 +630,39 @@ resource "kubernetes_service" "service" {
       target_port = var.mgmt_service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = var.service_type
+    type = local.service_type
+    cluster_ip = "None"  # Headless Service.
+    publish_not_ready_addresses = var.publish_not_ready_addresses
   }
 }
+
+# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
+# resource "kubernetes_service" "service" {
+#   metadata {
+#     name = var.dns_name != "" ? var.dns_name : var.service_name
+#     namespace = var.namespace
+#     labels = {
+#       app = var.app_name
+#     }
+#   }
+#   #
+#   spec {
+#     selector = {
+#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+#     }
+#     session_affinity = var.service_session_affinity
+#     port {
+#       name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
+#       port = var.amqp_service_port  # Service port.
+#       target_port = var.amqp_service_target_port  # Pod port.
+#       protocol = "TCP"
+#     }
+#     port {
+#       name = "mgmt"  # management UI and HTTP API).
+#       port = var.mgmt_service_port  # Service port.
+#       target_port = var.mgmt_service_target_port  # Pod port.
+#       protocol = "TCP"
+#     }
+#     type = var.service_type
+#   }
+# }

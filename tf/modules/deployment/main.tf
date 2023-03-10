@@ -4,22 +4,37 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "app_version" {}
-variable "image_tag" {
-  default = ""
+variable app_name {
+  type = string
 }
-variable "namespace" {
+variable app_version {
+  type = string
+}
+variable image_tag {
+  default = ""
+  type = string
+}
+variable namespace {
   default = "default"
+  type = string
 }
-variable "dir_name" {}
-variable "cr_login_server" {}
-variable "cr_username" {}
-variable "cr_password" {}
-variable "dns_name" {
+variable dir_name {
+  type = string
+}
+variable cr_login_server {
+  type = string
+}
+variable cr_username {
+  type = string
+}
+variable cr_password {
+  type = string
+}
+variable dns_name {
   default = ""
+  type = string
 }
-variable "readiness_probe" {
+variable readiness_probe {
   default = []
   type = list(object({
     http_get = list(object({
@@ -53,43 +68,49 @@ variable "readiness_probe" {
 # latest tag (either explicitly or by not specifying the tag at all), imagePullPolicy defaults to
 # Always, but if the container refers to any other tag, the policy defaults to IfNotPresent.
 #
-# When using a tag other that latest, the imagePullPolicy property must be set if changes are made
+# When using a tag other than latest, the imagePullPolicy property must be set if changes are made
 # to an image without changing the tag. Better yet, always push changes to an image under a new
 # tag.
-variable "imagePullPolicy" {
+variable image_pull_policy {
   default = "Always"
+  type = string
 }
-variable "env" {
+variable env {
   default = {}
   type = map
 }
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
+  type = string
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
+  type = string
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
+  type = string
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
+  type = string
 }
-variable "replicas" {
+variable replicas {
   default = 1
   type = number
 }
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
-variable "service_name" {
-  default = ""
+variable service_name {
+  type = string
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
+  type = string
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
@@ -102,24 +123,25 @@ variable "service_type" {
 # open, a random pod is selected and then all network packets belonging to that connection
 # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
 # always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
+  type = string
 }
-variable "service_port" {
-  type = number
+variable service_port {
   default = 80
-}
-variable "service_target_port" {
   type = number
+}
+variable service_target_port {
   default = 8080
+  type = number
 }
 
 /***
 Define local variables.
 ***/
 locals {
-  rs_label = "rs-${var.service_name}"
-  svc_label = "svc-${var.service_name}"
+  pod_selector_label = "rs-${var.service_name}"
+  svc_selector_label = "svc-${var.service_name}"
   image_tag = (
                 var.image_tag == "" ?
                 "${var.cr_login_server}/${var.cr_username}/${var.service_name}:${var.app_version}" :
@@ -217,11 +239,12 @@ resource "kubernetes_deployment" "deployment" {
   spec {
     # The desired number of pods that should be running.
     replicas = var.replicas
+    # revision_history_limit = var.revision_history_limit
     # The label selector determines the pods the ReplicaSet manages.
     selector {
       match_labels = {
         # It must match the labels in the Pod template.
-        rs_lbl = local.rs_label
+        pod_selector_lbl = local.pod_selector_label
       }
     }
     # The Pod template.
@@ -233,9 +256,9 @@ resource "kubernetes_deployment" "deployment" {
         labels = {
           app = var.app_name
           # It must match the label selector of the ReplicaSet.
-          rs_lbl = local.rs_label
+          pod_selector_lbl = local.pod_selector_label
           # It must match the label selector of the Service.
-          svc_lbl = local.svc_label
+          svc_selector_lbl = local.svc_selector_label
         }
       }
       # The Pod template's specification.
@@ -247,7 +270,7 @@ resource "kubernetes_deployment" "deployment" {
         container {
           name = var.service_name
           image = local.image_tag
-          image_pull_policy = var.imagePullPolicy
+          image_pull_policy = var.image_pull_policy
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -294,7 +317,9 @@ resource "kubernetes_deployment" "deployment" {
               # Similarly, if a Container specifies its own CPU limit, but does not specify a CPU
               # request, Kubernetes automatically assigns a CPU request that matches the limit.
               cpu = var.qos_requests_cpu == "" ? var.qos_limits_cpu : var.qos_requests_cpu
-              memory = var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              memory = (
+                var.qos_requests_memory == "" ? var.qos_limits_memory : var.qos_requests_memory
+              )
             }
             limits = {
               cpu = var.qos_limits_cpu
@@ -332,7 +357,7 @@ resource "kubernetes_service" "service" {
   spec {
     # The label selector determines which pods belong to the service.
     selector = {
-      svc_lbl = local.svc_label
+      svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
     port {

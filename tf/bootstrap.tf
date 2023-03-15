@@ -41,7 +41,7 @@ locals {
   ####################
   # Name of Services #
   ####################
-  svc_finances = "fin-finances"
+  svc_finance = "fin-finance"
   svc_error_page = "mem-error-page"
   svc_gateway = "mem-gateway"
   svc_history = "mem-history"
@@ -89,7 +89,7 @@ locals {
 ###################################################################################################
 # traefik                                                                                         #
 ###################################################################################################
-# /*** traefik
+/*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -218,12 +218,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-# ***/ # traefik
+***/ # traefik
 
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-# /*** cert manager
+/*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
@@ -261,7 +261,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.traefik_secret_cert_name
 }
-# ***/ # cert manager
+***/ # cert manager
 
 ###################################################################################################
 # whoami                                                                                          #
@@ -308,7 +308,7 @@ module "elk-certificate" {
   secret_name = local.es_secret_cert_name
 }
 ***/
-# /*** elk
+/*** elk
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -514,12 +514,12 @@ module "mem-filebeat" {
   kibana_host = "http://${local.svc_kibana}:5601"
   service_name = local.svc_filebeat
 }
-# ***/  # elk
+***/  # elk
 
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-# /*** mongodb - deployment goodxxxx
+/*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -543,7 +543,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# ***/  # mongodb - deployment
+***/  # mongodb - deployment
 
 /*** mongodb - statefulset active
 # StatefulSet.
@@ -628,7 +628,7 @@ module "mem-rabbitmq" {
 }
 ***/  # rabbitmq - deployment
 
-# /*** rabbitmq - statefulset goodxxcxx
+/*** rabbitmq - statefulset goodxxcxx
 # StatefulSet.
 module "mem-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -674,12 +674,12 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-# ***/  # rabbitmq - statefulset
+***/  # rabbitmq - statefulset
 
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-# /*** app
+/*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -902,13 +902,14 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-# ***/  # app
+***/  # app
 # /*** #finances
-module "fin-finances" {
+
+module "fin-finance" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
   source = "./modules/deployment"
-  dir_name = "../../${local.svc_finances}"
+  dir_name = "../../${local.svc_finance}"
   app_name = var.app_name
   app_version = var.app_version
   namespace = local.namespace
@@ -920,12 +921,7 @@ module "fin-finances" {
   cr_password = var.cr_password
   # Configure environment variables specific to the mem-gateway.
   env = {
-    SVC_NAME: local.svc_gateway
-    SVC_DNS_METADATA: local.svc_dns_metadata
-    SVC_DNS_HISTORY: local.svc_dns_history
-    SVC_DNS_VIDEO_UPLOAD: local.svc_dns_video_upload
-    SVC_DNS_VIDEO_STREAMING: local.svc_dns_video_streaming
-    SVC_DNS_KIBANA: local.svc_dns_kibana
+    SVC_NAME: local.svc_finance
     APP_NAME_VER: "${var.app_name} ${var.app_version}"
     MAX_RETRIES: 20
   }
@@ -941,7 +937,9 @@ module "fin-finances" {
     failure_threshold = 4
     success_threshold = 1
   }]
-  service_name = local.svc_gateway
+  service_port = 18000
+  service_target_port = 18000
+  service_name = local.svc_finance
 }
 
 # ***/ #finances

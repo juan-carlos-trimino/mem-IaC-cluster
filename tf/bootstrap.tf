@@ -2,6 +2,7 @@
 # $ terraform apply -var="app_version=1.0.0" -auto-approve
 # $ terraform apply -var="app_version=1.0.0" -var="k8s_manifest_crd=false" -auto-approve
 # $ terraform destroy -var="app_version=1.0.0" -auto-approve
+# $ kubectl get all -n memories
 locals {
   namespace = kubernetes_namespace.ns.metadata[0].name
   cr_login_server = "docker.io"
@@ -84,6 +85,8 @@ locals {
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
   svc_dns_kibana = "${local.svc_kibana}.${local.namespace}.svc.cluster.local:5601"
+  //
+  svc_dns_finance = "${local.svc_finance}.${local.namespace}.svc.cluster.local"
 }
 
 ###################################################################################################
@@ -719,7 +722,6 @@ module "mem-gateway" {
   }]
   service_name = local.svc_gateway
   # service_type = "LoadBalancer"
-  # service_session_affinity = "None"
 }
 
 module "mem-history" {
@@ -923,7 +925,9 @@ module "fin-finance" {
   env = {
     SVC_NAME: local.svc_finance
     APP_NAME_VER: "${var.app_name} ${var.app_version}"
+    PORT: "8080"
     MAX_RETRIES: 20
+    SERVER = local.svc_dns_finance
   }
   readiness_probe = [{
     http_get = [{
@@ -937,9 +941,8 @@ module "fin-finance" {
     failure_threshold = 4
     success_threshold = 1
   }]
-  service_port = 18000
-  service_target_port = 18000
   service_name = local.svc_finance
+  service_type = "LoadBalancer"
 }
 
 # ***/ #finances

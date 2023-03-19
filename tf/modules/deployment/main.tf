@@ -277,16 +277,6 @@ resource "kubernetes_deployment" "deployment" {
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          # port {
-          #   name = "http"
-          #   container_port = 8080  # The port the container (app) is listening.
-          #   protocol = "TCP"
-          # }
-          # port {
-          #   name = "https"
-          #   container_port = 8443  # The port the container (app) is listening.
-          #   protocol = "TCP"
-          # }
           port {
             container_port = var.service_target_port  # The port the app is listening.
             protocol = "TCP"
@@ -363,17 +353,8 @@ resource "kubernetes_service" "service" {
     port {
       port = var.service_port  # Service port.
       target_port = var.service_target_port  # Pod port.
+      protocol = "TCP"
     }
-    # port {
-    #   name = "http"
-    #   port = 80  # Service port.
-    #   target_port = "http"  # Pod port.
-    # }
-    # port {
-    #   name = "https"
-    #   port = 443
-    #   target_port = "https"
-    # }
     type = var.service_type
   }
 }

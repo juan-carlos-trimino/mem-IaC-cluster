@@ -10,6 +10,9 @@ variable app_name {
 variable namespace {
   type = string
 }
+variable svc_finance {
+  type = string
+}
 variable svc_gateway {
   type = string
 }
@@ -274,6 +277,52 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
+
+
+
+        # {
+        #   kind = "Rule"
+        #   # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
+        #   # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
+        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/fin`)"
+        #   # See https://doc.traefik.io/traefik/v2.0/routing/routers/#priority
+        #   priority = 20
+        #   # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
+        #   # the request is forwarded to the service.
+        #   # Middlewares are applied in the same order as their declaration in router.
+        #   middlewares = [
+        #     {
+        #       # ???????????????????????
+        #       name = var.middleware_gateway_basic_auth
+        #       namespace = var.namespace
+        #     },
+        #     {
+        #       name = var.middleware_rate_limit
+        #       namespace = var.namespace
+        #     },
+        #     {
+        #       name = var.middleware_security_headers
+        #       namespace = var.namespace
+        #     }
+        #   ]
+        #   services = [
+        #     {
+        #       kind = "Service"
+        #       name = var.svc_finance
+        #       namespace = var.namespace
+        #       port = 80  # K8s service.
+        #       weight = 1
+        #       passHostHeader = true
+        #       responseForwarding = {
+        #         flushInterval = "100ms"
+        #       }
+        #       strategy = "RoundRobin"
+        #     }
+        #   ]
+        # },
+
+
+
         {
           kind = "Rule"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/kibana`)"

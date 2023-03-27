@@ -212,6 +212,7 @@ module "ingress-route" {
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
   middleware_security_headers = local.middleware_security_headers
   middleware_kibana_basic_auth = local.middleware_kibana_basic_auth
+  svc_finance = local.svc_finance
   svc_gateway = local.svc_gateway
   svc_kibana = local.svc_kibana
   secret_name = local.traefik_secret_cert_name
@@ -311,7 +312,7 @@ module "elk-certificate" {
   secret_name = local.es_secret_cert_name
 }
 ***/
-/*** elk
+# /*** elk
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -517,12 +518,12 @@ module "mem-filebeat" {
   kibana_host = "http://${local.svc_kibana}:5601"
   service_name = local.svc_filebeat
 }
-***/  # elk
+# ***/  # elk
 
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-/*** mongodb - deployment goodxxxx
+# /*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -546,7 +547,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-***/  # mongodb - deployment
+# ***/  # mongodb - deployment
 
 /*** mongodb - statefulset active
 # StatefulSet.
@@ -631,7 +632,7 @@ module "mem-rabbitmq" {
 }
 ***/  # rabbitmq - deployment
 
-/*** rabbitmq - statefulset goodxxcxx
+# /*** rabbitmq - statefulset goodxxcxx
 # StatefulSet.
 module "mem-rabbitmq" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -677,12 +678,12 @@ module "mem-rabbitmq" {
   }
   service_name = local.svc_rabbitmq
 }
-***/  # rabbitmq - statefulset
+# ***/  # rabbitmq - statefulset
 
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-/*** app
+# /*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -904,8 +905,8 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-***/  # app
-# /*** #finances
+# ***/  # app
+/*** #finances
 
 module "fin-finance" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -925,9 +926,9 @@ module "fin-finance" {
   env = {
     SVC_NAME: local.svc_finance
     APP_NAME_VER: "${var.app_name} ${var.app_version}"
-    PORT: "8080"
+    # PORT: "8080"
     MAX_RETRIES: 20
-    SERVER = local.svc_dns_finance
+    SERVER = "http://${local.svc_dns_finance}"
   }
   readiness_probe = [{
     http_get = [{
@@ -945,4 +946,4 @@ module "fin-finance" {
   service_type = "LoadBalancer"
 }
 
-# ***/ #finances
+***/ #finances

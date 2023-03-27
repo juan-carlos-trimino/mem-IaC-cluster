@@ -238,9 +238,9 @@ certificatesResolvers:
       # email address used for registration.
       # email: 'someone@trimino.xyz'
       # Production.
-      # caServer: https://acme-v02.api.letsencrypt.org/directory
+      caServer: https://acme-v02.api.letsencrypt.org/directory
       # Staging.
-      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
       # Match the path to persistence.
       storage: '/traefik-certs/acme.json'
       # Certificates' duration in hours.

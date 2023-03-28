@@ -314,8 +314,6 @@ resource "kubernetes_deployment" "deployment" {
             }
           }
         }
-
-
       }
     }
   }

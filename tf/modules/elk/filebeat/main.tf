@@ -316,23 +316,18 @@ resource "kubernetes_daemonset" "daemonset" {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         termination_grace_period_seconds = var.termination_grace_period_seconds
         host_network = var.host_network
-        # For Pods running with hostNetwork, you should explicitly set its DNS policy to
-        # "ClusterFirstWithHostNet". Otherwise, Pods running with hostNetwork and "ClusterFirst"
-        # will fallback to the behavior of the "Default" policy.
         dns_policy = "ClusterFirstWithHostNet"
         container {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.image_pull_policy
-          security_context {xxxxxxxxxxxxxxxxxxxx
+          security_context {
             run_as_non_root = false
             run_as_user = 0
+            # By setting this property to true, the app will not be allowed to write to /tmp, and
+            # the error below will be generated. To avoid the error, mount a volume to the /tmp
+            # directory.
             read_only_root_filesystem = true
-            # Filebeat needs extra configuration to run in the Openshift environment; enable the
-            # container to be privileged as an administrator for Openshift.
-            # (filebeat pods enter in CrashLoopBackOff status, and the following error appears:
-            #  Exiting: Failed to create Beat meta file: open
-            #  /usr/share/filebeat/data/meta.json.new: permission denied)
             privileged = true
           }
           # -c -> Specify the configuration file to use for Filebeat.
@@ -383,7 +378,7 @@ resource "kubernetes_daemonset" "daemonset" {
             mount_path = "/usr/share/filebeat/data"  # Directory location on host.
             read_only = false
           }
-          # /var/log/containers is one of a few filesystems that Filebeat will have access.
+          # /var/log/containers is one of a few filesystems that Filebeat will need to access.
           # Notice that the volume type of this path is hostPath, which means that Filebeat will
           # have access to this path on the node rather than the container. Kubernetes uses this
           # path on the node to write data about the containers, additionally, any STDOUT or STDERR
@@ -436,7 +431,7 @@ resource "kubernetes_daemonset" "daemonset" {
           # running on the same node and using the same path in their hostPath volume see the same
           # files.
           host_path {
-            # Access the node's /var/lib/docker/containers.
+            # Access the node's /var/log/containers.
             path = "/var/log/containers/"  # Directory location on host.
           }
         }

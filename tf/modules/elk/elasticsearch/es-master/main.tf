@@ -175,7 +175,7 @@ resource "kubernetes_config_map" "es_config" {
     "http.port": 9200
     # ----------------------------------------- Discovery -----------------------------------------
     # ------------------------------------------ Security -----------------------------------------
-    #
+    # For more information about security, please visit the links below:
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/configuring-stack-security.html
     # https://www.elastic.co/guide/en/elasticsearch/reference/8.5/security-basic-setup.html
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
@@ -212,9 +212,6 @@ resource "kubernetes_service_account" "service_account" {
     labels = {
       app = var.app_name
     }
-    # annotations = {
-    #   "kubernetes.io/enforce-mountable-secrets" = true
-    # }
   }
 }
 
@@ -423,13 +420,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
               value = env.value
             }
           }
-          # liveness_probe {
-          #   tcp_socket {
-          #     port = "transport" # var.transport_service_target_port
-          #   }
-          #   initial_delay_seconds = 20
-          #   period_seconds = 10
-          # }
           volume_mount {
             name = "es-storage"
             mount_path = "/es-data"

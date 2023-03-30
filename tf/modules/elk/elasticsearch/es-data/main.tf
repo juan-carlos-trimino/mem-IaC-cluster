@@ -105,64 +105,7 @@ locals {
   svc_selector_label = "svc-${var.service_name_headless}"
   es_label = "es-cluster"
 }
-/***
-resource "kubernetes_service_account" "service_account" {
-  metadata {
-    name = "${var.service_name}-service-account"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-}
 
-resource "kubernetes_role" "role" {
-  metadata {
-    name = "${var.service_name}-role"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  rule {
-    # Resources in the core apiGroup, which has no name - hence the "".
-    api_groups = [""]
-    verbs = ["get", "watch", "list"]
-    # The plural form must be used when specifying resources.
-    resources = ["endpoints", "services", "namespaces"]
-  }
-  rule {
-    api_groups = ["security.openshift.io"]
-    verbs = ["use"]
-    resources = ["securitycontextconstraints"]
-    resource_names = ["mem-elasticsearch-scc"]
-  }
-}
-
-resource "kubernetes_role_binding" "role_binding" {
-  metadata {
-    name = "${var.service_name}-role-binding"
-    namespace = var.namespace
-    labels = {
-      app = var.app_name
-    }
-  }
-  # A RoleBinding always references a single Role, but it can bind the Role to multiple subjects.
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind = "Role"
-    # This RoleBinding references the Role specified below...
-    name = kubernetes_role.role.metadata[0].name
-  }
-  # ... and binds it to the specified ServiceAccount in the specified namespace.
-  subject {
-    # The default permissions for a ServiceAccount don't allow it to list or modify any resources.
-    kind = "ServiceAccount"
-    name = kubernetes_service_account.service_account.metadata[0].name
-    namespace = kubernetes_service_account.service_account.metadata[0].namespace
-  }
-}
-***/
 resource "kubernetes_stateful_set" "stateful_set" {
   metadata {
     name = var.service_name
@@ -203,7 +146,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
       }
       #
       spec {
-        # service_account_name = kubernetes_service_account.service_account.metadata[0].name
         service_account_name = var.es_service_account
         affinity {
           pod_anti_affinity {

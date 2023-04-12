@@ -114,9 +114,9 @@ variable mongodb_password {
   sensitive = true
 }
 
-############################
-# For StatefulSet rabbitMQ #
-############################
+##########################
+# RabbitMQ (StatefulSet) #
+##########################
 variable rabbitmq_erlang_cookie {
   default = "<required>"
   sensitive = true

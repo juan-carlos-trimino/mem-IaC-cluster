@@ -244,8 +244,8 @@ module "acme-issuer" {
   acme_email = var.traefik_le_email
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token

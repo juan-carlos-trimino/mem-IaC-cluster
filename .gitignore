@@ -74,9 +74,6 @@ tf/modules/mongodb-deploy/*
 tf/modules/mongodb-statefulset/*
 !tf/modules/mongodb-statefulset/main.tf
 #
-!tf/modules/rabbitmq-deploy/
-tf/modules/rabbitmq-deploy/*
-!tf/modules/rabbitmq-deploy/main.tf
 !tf/modules/rabbitmq-statefulset/
 tf/modules/rabbitmq-statefulset/*
 !tf/modules/rabbitmq-statefulset/main.tf

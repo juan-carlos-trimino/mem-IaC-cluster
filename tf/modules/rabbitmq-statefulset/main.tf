@@ -4,14 +4,14 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {}
-variable "app_version" {}
-variable "image_tag" {}
-variable "path_rabbitmq_files" {}
-variable "rabbitmq_erlang_cookie" {}
-variable "rabbitmq_default_pass" {}
-variable "rabbitmq_default_user" {}
-variable "namespace" {
+variable app_name {}
+variable app_version {}
+variable image_tag {}
+variable path_rabbitmq_files {}
+variable rabbitmq_erlang_cookie {}
+variable rabbitmq_default_pass {}
+variable rabbitmq_default_user {}
+variable namespace {
   default = "default"
 }
 # Be aware that the default imagePullPolicy depends on the image tag. If a container refers to the
@@ -24,58 +24,59 @@ variable "namespace" {
 variable image_pull_policy {
   default = "Always"
 }
-variable "env" {
+variable env {
   default = {}
   type = map
 }
-variable "qos_requests_cpu" {
+variable qos_requests_cpu {
   default = ""
 }
-variable "qos_requests_memory" {
+variable qos_requests_memory {
   default = ""
 }
-variable "qos_limits_cpu" {
+variable qos_limits_cpu {
   default = "0"
 }
-variable "qos_limits_memory" {
+variable qos_limits_memory {
   default = "0"
 }
-variable "replicas" {
+variable replicas {
   default = 1
   type = number
 }
-variable "termination_grace_period_seconds" {
+variable termination_grace_period_seconds {
   default = 30
   type = number
 }
 # To relax the StatefulSet ordering guarantee while preserving its uniqueness and identity
 # guarantee.
-variable "pod_management_policy" {
+variable pod_management_policy {
   default = "OrderedReady"
 }
 # The primary use case for setting this field is to use a StatefulSet's Headless Service to
 # propagate SRV records for its Pods without respect to their readiness for purpose of peer
 # discovery.
-variable "publish_not_ready_addresses" {
+variable publish_not_ready_addresses {
   default = "false"
   type = bool
 }
-variable "pvc_access_modes" {
+variable pvc_access_modes {
   default = []
   type = list
 }
-variable "pvc_storage_class_name" {
+variable pvc_storage_class_name {
   default = ""
 }
-variable "pvc_storage_size" {
+variable pvc_storage_size {
   default = "20Gi"
 }
-variable "service_name" {
+variable service_name {
   default = ""
 }
 # The service normally forwards each connection to a randomly selected backing pod. To
 # ensure that connections from a particular client are passed to the same Pod each time,
 # set the service's sessionAffinity property to ClientIP instead of None (default).
+#
 # Session affinity and Web Browsers (for LoadBalancer Services)
 # Since the service is now exposed externally, accessing it with a web browser will hit
 # the same pod every time. If the sessionAffinity is set to None, then why? The browser
@@ -84,46 +85,35 @@ variable "service_name" {
 # open, a random pod is selected and then all network packets belonging to that connection
 # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
 # always get hit (until the connection is closed).
-variable "service_session_affinity" {
+variable service_session_affinity {
   default = "None"
 }
-variable "amqp_service_port" {
+variable amqp_service_port {
   type = number
 }
-variable "amqp_service_target_port" {
+variable amqp_service_target_port {
   type = number
 }
-variable "mgmt_service_port" {
+variable mgmt_service_port {
   type = number
 }
-variable "mgmt_service_target_port" {
+variable mgmt_service_target_port {
   type = number
 }
-variable "dns_name" {
+variable dns_name {
   default = ""
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
-variable "service_type" {
+variable service_type {
   default = "ClusterIP"
 }
-#
+
 locals {
-  # The service normally forwards each connection to a randomly selected backing pod. To
-  # ensure that connections from a particular client are passed to the same Pod each time,
-  # set the service's sessionAffinity property to ClientIP instead of None (default).
-  #
-  # Session affinity and Web Browsers (for LoadBalancer Services)
-  # Since the service is now exposed externally, accessing it with a web browser will hit
-  # the same pod every time. If the sessionAffinity is set to None, then why? The browser
-  # is using keep-alive connections and sends all its requests through a single connection.
-  # Services work at the connection level, and when a connection to a service is initially
-  # open, a random pod is selected and then all network packets belonging to that connection
-  # are sent to that single pod. Even with the sessionAffinity set to None, the same pod will
-  # always get hit (until the connection is closed).
-  session_affinity = "None"
-  service_type = "ClusterIP"
-  service_name = "${var.service_name}-headless"
+  svc_name = "${var.service_name}-headless"
+  pod_selector_label = "ps-${var.service_name}"
+  svc_selector_label = "svc-${local.svc_name}"
+  rmq_label = "rmq-cluster"
 }
 
 resource "null_resource" "scc-rabbitmq" {
@@ -153,9 +143,9 @@ resource "kubernetes_secret" "secret" {
   # communicate with each other. For two nodes to be able to communicate, they must have the same
   # shared secret called the Erlang cookie.
   data = {
-    cookie = "${var.rabbitmq_erlang_cookie}"
-    pass = "${var.rabbitmq_default_pass}"
-    user = "${var.rabbitmq_default_user}"
+    cookie = var.rabbitmq_erlang_cookie
+    pass = var.rabbitmq_default_pass
+    user = var.rabbitmq_default_user
   }
   type = "Opaque"
 }
@@ -281,62 +271,59 @@ resource "kubernetes_stateful_set" "stateful_set" {
     namespace = var.namespace
     labels = {
       app = var.app_name
-      pod = var.service_name
     }
   }
   #
   spec {
     replicas = var.replicas
+    # A headless service gives network identity to the RabbitMQ nodes and enables them to cluster.
+    # The name of the service that governs this StatefulSet.
+    # This service must exist before the StatefulSet and is responsible for the network identity of
+    # the set. Pods get DNS/hostnames that follow the pattern:
+    #   pod-name.service-name.namespace.svc.cluster.local.
+    service_name = local.svc_name
     pod_management_policy = var.pod_management_policy
-    # Headless service that gives network identity to the RabbitMQ nodes and enables them to
-    # cluster. The name of the service that governs this StatefulSet. This service must exist
-    # before the StatefulSet and is responsible for the network identity of the set. Pods get
-    # DNS/hostnames that follow the pattern: pod-name.service-name.namespace.svc.cluster.local.
-    service_name = local.service_name
+    # Pod Selector - You must set the .spec.selector field of a StatefulSet to match the labels of
+    # its .spec.template.metadata.labels. Failing to specify a matching Pod Selector will result in
+    # a validation error during StatefulSet creation.
     selector {
       match_labels = {
-        pod = var.service_name
+        # It must match the labels in the Pod template (.spec.template.metadata.labels).
+        pod_selector_lbl = local.pod_selector_label
       }
     }
-    #
+    # Pod template.
     template {
       metadata {
+        # Labels attach to the Pod.
         labels = {
-          pod = var.service_name
+          app = var.app_name
+          # It must match the label for the pod selector (.spec.selector.matchLabels).
+          pod_selector_lbl = local.pod_selector_label
+          # It must match the label selector of the Service.
+          svc_selector_lbl = local.svc_selector_label
+          rmq_lbl = local.rmq_label
         }
       }
       #
       spec {
         service_account_name = kubernetes_service_account.service_account.metadata[0].name
         affinity {
-          # The pod anti-affinity rule says that the pod prefers to not schedule onto a node if
-          # that node is already running a pod with label having key 'replicaset' and value
-          # 'running_one'.
           pod_anti_affinity {
-            # Defines a preferred rule.
-            preferred_during_scheduling_ignored_during_execution {
-              # Specifies a weight for a preferred rule. The node with the highest weight is
-              # preferred.
-              weight = 100
-              pod_affinity_term {
-                label_selector {
-                  match_expressions {
-                    # Description of the pod label that determines when the anti-affinity rule
-                    # applies. Specifies a key and value for the label.
-                    key = "replicaset"
-                    # The operator represents the relationship between the label on the existing
-                    # pod and the set of values in the matchExpression parameters in the
-                    # specification for the new pod. Can be In, NotIn, Exists, or DoesNotExist.
-                    operator = "In"
-                    values = ["rs_rabbitmq"]
-                  }
+            required_during_scheduling_ignored_during_execution {
+              label_selector {
+                match_expressions {
+                  # Description of the pod label that determines when the anti-affinity rule
+                  # applies. Specifies a key and value for the label.
+                  key = "rmq_lbl"
+                  # The operator represents the relationship between the label on the existing
+                  # pod and the set of values in the matchExpression parameters in the
+                  # specification for the new pod. Can be In, NotIn, Exists, or DoesNotExist.
+                  operator = "In"
+                  values = ["${local.rmq_label}"]
                 }
-                # By default, the label selector only matches pods in the same namespace as the pod
-                # that is being scheduled. To select pods from other namespaces, add the
-                # appropriate namespace(s) in the namespaces field.
-                namespaces = ["${var.namespace}"]
-                topology_key = "kubernetes.io/hostname"
               }
+              topology_key = "kubernetes.io/hostname"
             }
           }
         }
@@ -374,11 +361,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             container_port = var.mgmt_service_target_port  # The port the app is listening.
             protocol = "TCP"
           }
-          # port {
-          #   name = "epmd"
-          #   container_port = 4369
-          #   protocol = "TCP"
-          # }
           resources {
             requests = {
               # If a Container specifies its own memory limit, but does not specify a memory
@@ -418,7 +400,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # selected by the service.
           env {
             name = "K8S_SERVICE_NAME"
-            value = local.service_name
+            value = local.svc_name
           }
           # When a node starts up, it checks whether it has been assigned a node name. If no value
           # was explicitly configured, the node resolves its hostname and prepends rabbit to it to
@@ -463,15 +445,15 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # RabbitMQ nodes and CLI tools use a shared secret known as the Erlang Cookie, to
           # authenticate to each other. The cookie value is a string of alphanumeric characters up
           # to 255 characters in size.
-          # env {
-          #   name = "RABBITMQ_ERLANG_COOKIE"
-          #   value_from {
-          #     secret_key_ref {
-          #       name = kubernetes_secret.secret.metadata[0].name
-          #       key = "cookie"
-          #     }
-          #   }
-          # }
+          env {
+            name = "RABBITMQ_ERLANG_COOKIE"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.secret.metadata[0].name
+                key = "cookie"
+              }
+            }
+          }
           dynamic "env" {
             for_each = var.env
             content {
@@ -501,17 +483,26 @@ resource "kubernetes_stateful_set" "stateful_set" {
           volume_mount {
             name = "rabbitmq-storage"
             mount_path = "/var/lib/rabbitmq/mnesia"
+            read_only = false
           }
+          # In Linux when a filesystem is mounted into a non-empty directory, the directory will
+          # only contain the files from the newly mounted filesystem. The files in the original
+          # directory are inaccessible for as long as the filesystem is mounted. In cases when the
+          # original directory contains crucial files, mounting a volume could break the container.
+          # To overcome this limitation, K8s provides an additional subPath property on the
+          # volumeMount; this property mounts a single file or a single directory from the volume
+          # instead of mounting the whole volume, and it does not hide the existing files in the
+          # original directory.
           volume_mount {
             name = "erlang-cookie"
+            # Mounting into a file, not a directory.
             mount_path = "/var/lib/rabbitmq/mnesia/.erlang.cookie"
-            # mount_path = "/var/lib/rabbitmq/.erlang.cookie"
+            # Instead of mounting the whole volume, only mounting the given entry.
             sub_path = ".erlang.cookie"
             read_only = false
           }
           volume_mount {
             name = "configs"
-            # mount_path = "/etc/rabbitmq"
             mount_path = "/config/rabbitmq"
             read_only = true
           }
@@ -521,9 +512,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
           secret {
             secret_name = kubernetes_secret.secret.metadata[0].name
             default_mode = "0600"  # Octal
+            # Selecting which entries to include in the volume by listing them.
             items {
+              # Include the entry under this key.
               key = "cookie"
-              path = ".erlang.cookie"  #File name.
+              # The entry's value will be stored in this file.
+              path = ".erlang.cookie"
             }
           }
         }
@@ -531,9 +525,9 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = "configs"
           config_map {
             name = kubernetes_config_map.config.metadata[0].name
-            # Although ConfigMap should be used for non-sensitive configuration data, make the file
-            # readable and writable only by the user and group that owns it.
-            default_mode = "0400"  # Octal
+            # By default, the permissions on all files in a configMap volume are set to 644
+            # (rw-r--r--).
+            default_mode = "0600"  # Octal
             items {
               key = "enabled_plugins"
               path = "enabled_plugins"  #File name.
@@ -579,22 +573,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
   }
 }
 
-# Unlike stateless pods, stateful pods sometimes need to be addressable by their hostname. For this
-# reason, a StatefulSet requires a corresponding governing headless Service that's used to provide
-# the actual network identity to each pod. Through this Service, each pod gets its own DNS entry
-# thereby allowing its peers in the cluster to address the pod by its hostname. For example, if the
-# governing Service belongs to the default namespace and is called service1, and the pod name is
-# pod-0, the pod can be reached by its fully qualified domain name of
-# pod-0.service1.default.svc.cluster.local.
-#
-# To list the SRV records for the stateful pods, perform a DNS lookup from inside a pod running in
-# the cluster:
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV <service-name>.<namespace>.svc.cluster.local
-#
-# $ kubectl run -it srvlookup --image=tutum/dnsutils --rm --restart=Never -- dig SRV mem-rabbitmq-headless.memories.svc.cluster.local
+# Before deploying a StatefulSet, you will need to create a headless Service, which will be used
+# to provide the network identity for your stateful pods.
 resource "kubernetes_service" "headless_service" {  # For inter-node communication.
   metadata {
-    name = local.service_name
+    name = local.svc_name
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -603,21 +586,10 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
   #
   spec {
     selector = {
-      pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
+      # All pods with the svc_selector_lbl=local.svc_selector_label label belong to this service.
+      svc_selector_lbl = local.svc_selector_label
     }
-    session_affinity = local.session_affinity
-    # port {
-    #   name = "epmd"  # Node discovery.
-    #   port = 4369
-    #   target_port = 4369
-    #   protocol = "TCP"
-    # }
-    # port {
-    #   name = "cluster-rpc"  # Inter-node communication.
-    #   port = 25672
-    #   target_port = 25672
-    #   protocol = "TCP"
-    # }
+    session_affinity = var.service_session_affinity
     port {
       name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
       port = var.amqp_service_port  # Service port.
@@ -630,39 +602,8 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
       target_port = var.mgmt_service_target_port  # Pod port.
       protocol = "TCP"
     }
-    type = local.service_type
+    type = var.service_type
     cluster_ip = "None"  # Headless Service.
     publish_not_ready_addresses = var.publish_not_ready_addresses
   }
 }
-
-# Declare a K8s service to create a DNS record to make the microservice accessible within the cluster.
-# resource "kubernetes_service" "service" {
-#   metadata {
-#     name = var.dns_name != "" ? var.dns_name : var.service_name
-#     namespace = var.namespace
-#     labels = {
-#       app = var.app_name
-#     }
-#   }
-#   #
-#   spec {
-#     selector = {
-#       pod = kubernetes_stateful_set.stateful_set.metadata[0].labels.pod
-#     }
-#     session_affinity = var.service_session_affinity
-#     port {
-#       name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
-#       port = var.amqp_service_port  # Service port.
-#       target_port = var.amqp_service_target_port  # Pod port.
-#       protocol = "TCP"
-#     }
-#     port {
-#       name = "mgmt"  # management UI and HTTP API).
-#       port = var.mgmt_service_port  # Service port.
-#       target_port = var.mgmt_service_target_port  # Pod port.
-#       protocol = "TCP"
-#     }
-#     type = var.service_type
-#   }
-# }

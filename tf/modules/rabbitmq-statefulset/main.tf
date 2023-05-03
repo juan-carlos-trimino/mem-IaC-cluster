@@ -26,7 +26,7 @@ variable image_pull_policy {
 }
 variable env {
   default = {}
-  type = map
+  type = map(any)
 }
 variable qos_requests_cpu {
   default = ""
@@ -62,7 +62,7 @@ variable publish_not_ready_addresses {
 }
 variable pvc_access_modes {
   default = []
-  type = list
+  type = list(any)
 }
 variable pvc_storage_class_name {
   default = ""
@@ -100,9 +100,6 @@ variable mgmt_service_port {
 variable mgmt_service_target_port {
   type = number
 }
-variable dns_name {
-  default = ""
-}
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
 variable service_type {
@@ -113,7 +110,7 @@ locals {
   svc_name = "${var.service_name}-headless"
   pod_selector_label = "ps-${var.service_name}"
   svc_selector_label = "svc-${local.svc_name}"
-  rmq_label = "rmq-cluster"
+  rmq_label = "mem-rmq-cluster"
 }
 
 resource "null_resource" "scc-rabbitmq" {
@@ -143,6 +140,9 @@ resource "kubernetes_secret" "secret" {
   # communicate with each other. For two nodes to be able to communicate, they must have the same
   # shared secret called the Erlang cookie.
   data = {
+    # RabbitMQ nodes and CLI tools use a shared secret known as the Erlang Cookie, to authenticate
+    # to each other. The cookie value is a string of alphanumeric characters up to 255 characters
+    # in size.
     cookie = var.rabbitmq_erlang_cookie
     pass = var.rabbitmq_default_pass
     user = var.rabbitmq_default_user
@@ -202,13 +202,13 @@ resource "kubernetes_role" "role" {
   rule {
     api_groups = [""]
     verbs = ["create"]
-    resources = ["events"]
+    resources  = ["events"]
   }
   rule {
     api_groups = ["security.openshift.io"]
     verbs = ["use"]
     resources = ["securitycontextconstraints"]
-    resource_names = ["mem-mongodb-scc"]
+    resource_names = ["mem-rabbitmq-scc"]
   }
 }
 
@@ -251,7 +251,7 @@ resource "kubernetes_config_map" "config" {
     # The enabled_plugins file is usually located in the node data directory or under /etc,
     # together with configuration files. The file contains a list of plugin names ending with
     # a dot.
-    "enabled_plugins" = "[rabbitmq_management, rabbitmq_peer_discovery_k8s]."
+    "enabled_plugins" = "[rabbitmq_federation, rabbitmq_management, rabbitmq_peer_discovery_k8s]."
     "rabbitmq.conf" = "${file("${var.path_rabbitmq_files}/rabbitmq.conf")}"
   }
 }
@@ -338,13 +338,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
             run_as_group = 1060
             read_only_root_filesystem = false
           }
-          # lifecycle {
-          #   post_start {
-          #     exec {
-          #       command = ["sh", "-c", "echo The $(RABBIT_POD_NAME) is running. && ls -al /var/lib/rabbitmq/mnesia"]
-          #     }
-          #   }
-          # }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -353,12 +346,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # everyone using the cluster can quickly see what ports each pod exposes.
           port {
             name = "amqp"
-            container_port = var.amqp_service_target_port  # The port the app is listening.
+            container_port = var.amqp_service_target_port # The port the app is listening.
             protocol = "TCP"
           }
           port {
             name = "mgmt"
-            container_port = var.mgmt_service_target_port  # The port the app is listening.
+            container_port = var.mgmt_service_target_port # The port the app is listening.
             protocol = "TCP"
           }
           resources {
@@ -442,18 +435,6 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
-          # RabbitMQ nodes and CLI tools use a shared secret known as the Erlang Cookie, to
-          # authenticate to each other. The cookie value is a string of alphanumeric characters up
-          # to 255 characters in size.
-          env {
-            name = "RABBITMQ_ERLANG_COOKIE"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.secret.metadata[0].name
-                key = "cookie"
-              }
-            }
-          }
           dynamic "env" {
             for_each = var.env
             content {
@@ -485,6 +466,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
             mount_path = "/var/lib/rabbitmq/mnesia"
             read_only = false
           }
+          volume_mount {
+            name = "rabbitmq-storage"
+            mount_path = "/var/lib/rabbitmq/mnesia/$(RABBITMQ_NODENAME).pid"
+            sub_path = "$(RABBITMQ_NODENAME).pid"
+            read_only = false
+          }
           # In Linux when a filesystem is mounted into a non-empty directory, the directory will
           # only contain the files from the newly mounted filesystem. The files in the original
           # directory are inaccessible for as long as the filesystem is mounted. In cases when the
@@ -502,7 +489,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
             read_only = false
           }
           volume_mount {
-            name = "configs"
+            name = "config"
             mount_path = "/config/rabbitmq"
             read_only = true
           }
@@ -511,7 +498,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = "erlang-cookie"
           secret {
             secret_name = kubernetes_secret.secret.metadata[0].name
-            default_mode = "0600"  # Octal
+            default_mode = "0600" # Octal
             # Selecting which entries to include in the volume by listing them.
             items {
               # Include the entry under this key.
@@ -522,19 +509,19 @@ resource "kubernetes_stateful_set" "stateful_set" {
           }
         }
         volume {
-          name = "configs"
+          name = "config"
           config_map {
             name = kubernetes_config_map.config.metadata[0].name
             # By default, the permissions on all files in a configMap volume are set to 644
             # (rw-r--r--).
-            default_mode = "0600"  # Octal
+            default_mode = "0600" # Octal
             items {
               key = "enabled_plugins"
-              path = "enabled_plugins"  #File name.
+              path = "enabled_plugins" #File name.
             }
             items {
               key = "rabbitmq.conf"
-              path = "rabbitmq.conf"  #File name.
+              path = "rabbitmq.conf" #File name.
             }
           }
         }
@@ -575,7 +562,7 @@ resource "kubernetes_stateful_set" "stateful_set" {
 
 # Before deploying a StatefulSet, you will need to create a headless Service, which will be used
 # to provide the network identity for your stateful pods.
-resource "kubernetes_service" "headless_service" {  # For inter-node communication.
+resource "kubernetes_service" "headless_service" { # For inter-node communication.
   metadata {
     name = local.svc_name
     namespace = var.namespace
@@ -591,19 +578,19 @@ resource "kubernetes_service" "headless_service" {  # For inter-node communicati
     }
     session_affinity = var.service_session_affinity
     port {
-      name = "amqp"  # AMQP 0-9-1 and AMQP 1.0 clients.
-      port = var.amqp_service_port  # Service port.
-      target_port = var.amqp_service_target_port  # Pod port.
+      name = "amqp"                       # AMQP 0-9-1 and AMQP 1.0 clients.
+      port = var.amqp_service_port        # Service port.
+      target_port = var.amqp_service_target_port # Pod port.
       protocol = "TCP"
     }
     port {
-      name = "mgmt"  # management UI and HTTP API).
-      port = var.mgmt_service_port  # Service port.
-      target_port = var.mgmt_service_target_port  # Pod port.
+      name = "mgmt"                       # management UI and HTTP API).
+      port = var.mgmt_service_port        # Service port.
+      target_port = var.mgmt_service_target_port # Pod port.
       protocol = "TCP"
     }
     type = var.service_type
-    cluster_ip = "None"  # Headless Service.
+    cluster_ip = "None" # Headless Service.
     publish_not_ready_addresses = var.publish_not_ready_addresses
   }
 }

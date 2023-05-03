@@ -18,6 +18,10 @@ variable namespace {
   default = "default"
   type = string
 }
+variable dockerfile_name {
+  default = "Dockerfile-prod"
+  type = string
+}
 variable dir_name {
   type = string
 }
@@ -28,10 +32,6 @@ variable cr_username {
   type = string
 }
 variable cr_password {
-  type = string
-}
-variable dns_name {
-  default = ""
   type = string
 }
 variable readiness_probe {
@@ -161,7 +161,7 @@ resource "null_resource" "docker_build" {
   }
   #
   provisioner "local-exec" {
-    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/Dockerfile-prod ${var.dir_name}"
+    command = "docker build -t ${local.image_tag} --file ${var.dir_name}/${var.dockerfile_name} ${var.dir_name}"
   }
 }
 
@@ -271,6 +271,9 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = local.image_tag
           image_pull_policy = var.image_pull_policy
+          security_context {
+            read_only_root_filesystem = false
+          }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
           # container is accepting connections through a port bound to the 0.0.0.0 address, other
@@ -337,7 +340,7 @@ resource "kubernetes_deployment" "deployment" {
 # cluster.
 resource "kubernetes_service" "service" {
   metadata {
-    name = var.dns_name != "" ? var.dns_name : var.service_name
+    name = var.service_name
     namespace = var.namespace
     labels = {
       app = var.app_name

@@ -71,17 +71,13 @@ readOnlyRootFilesystem: false
 # Provide a list of capabilities that are allowed to be added to a container. The default set of
 # capabilities are implicitly allowed. The empty set means that no additional capabilities may be
 # added beyond the default set. * can be used to allow all capabilities.
-allowedCapabilities: [
-]
+allowedCapabilities: []
 # The capabilities which are added to containers by default, in addition to the runtime defaults.
-defaultAddCapabilities: [
-]
+defaultAddCapabilities: []
 # The capabilities which must be dropped from containers. These capabilities are removed from the
 # default set, and must not be added. Capabilities listed in requiredDropCapabilities must not be
 # included in allowedCapabilities or defaultAddCapabilities.
-requiredDropCapabilities: [
-  ALL
-]
+requiredDropCapabilities: [ALL]
 # Control which user ID the containers are run with.
 runAsUser:
   type: MustRunAs
@@ -96,25 +92,14 @@ supplementalGroups:
 #
 seLinuxContext:
   type: RunAsAny
-  # type: MustRunAs
 # The users and groups fields on the SCC control which users can access the SCC. All authenticated
 # users are granted access to the Restricted SCC.
 # system:serviceaccount:<serviceaccount_namespace>:<serviceaccount_name>
-users: [
-  system:serviceaccount:memories:mem-mongodb-service-account
-]
-groups: [
-  system:authenticated
-]
+users: [system:serviceaccount:memories:mem-rabbitmq-service-account]
+groups: [system:authenticated]
 # Provide a list of allowed volume types.
 # Notes:
 # (1) For backwards compatibility, the usage of allowHostDirVolumePlugin overrides settings in the
 #     volumes field.
-volumes: [
-  configMap,
-  downwardAPI,
-  emptyDir,
-  persistentVolumeClaim,
-  projected,
-  secret
-]
+volumes:
+  [configMap, downwardAPI, emptyDir, persistentVolumeClaim, projected, secret]

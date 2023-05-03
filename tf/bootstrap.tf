@@ -92,7 +92,7 @@ locals {
 ###################################################################################################
 # traefik                                                                                         #
 ###################################################################################################
-/*** traefik
+# /*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -222,12 +222,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-***/ # traefik
+# ***/ # traefik
 
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-/*** cert manager
+# /*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
@@ -265,7 +265,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.traefik_secret_cert_name
 }
-***/ # cert manager
+# ***/ # cert manager
 
 ###################################################################################################
 # whoami                                                                                          #
@@ -685,7 +685,7 @@ module "mem-gateway" {
     success_threshold = 1
   }]
   service_name = local.svc_gateway
-  service_type = "LoadBalancer"
+  # service_type = "LoadBalancer"
 }
 
 module "mem-history" {
@@ -908,5 +908,4 @@ module "fin-finance" {
   service_name = local.svc_finance
   service_type = "LoadBalancer"
 }
-
 ***/ #finances

@@ -145,6 +145,16 @@ variable traefik_dashboard_password {
   sensitive = true
 }
 
+variable traefik_gateway_username {
+  default = "<required>"
+  sensitive = true
+}
+
+variable traefik_gateway_password {
+  default = "<required>"
+  sensitive = true
+}
+
 variable traefik_rabbitmq_username {
   default = "<required>"
   sensitive = true
@@ -155,12 +165,12 @@ variable traefik_rabbitmq_password {
   sensitive = true
 }
 
-variable traefik_gateway_username {
+variable traefik_kibana_username {
   default = "<required>"
   sensitive = true
 }
 
-variable traefik_gateway_password {
+variable traefik_kibana_password {
   default = "<required>"
   sensitive = true
 }

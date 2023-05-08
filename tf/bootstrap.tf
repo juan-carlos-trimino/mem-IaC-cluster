@@ -28,8 +28,9 @@ locals {
   middleware_gateway_basic_auth = "mem-mw-gateway-basic-auth"
   middleware_dashboard_basic_auth = "mem-mw-dashboard-basic-auth"
   middleware_kibana_basic_auth = "mem-mw-kibana-basic-auth"
-  middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
-  middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
+  middleware_rabbitmq_basic_auth = "mem-mw-rabbitmq-basic-auth"
+  # middleware_rabbitmq1 = "mem-mw-rabbitmq-basic-auth"
+  # middleware_rabbitmq2 = "mem-mw-rabbitmq-strip-prefix"
   middleware_security_headers = "mem-mw-security-headers"
   middleware_redirect_https = "mem-mw-redirect-https"
   #################
@@ -100,7 +101,7 @@ module "traefik" {
   source = "./modules/traefik/traefik"
   app_name = var.app_name
   namespace = local.namespace
-  chart_version = "10.24.0"
+  chart_version = "23.0.1"
   api_auth_token = var.traefik_dns_api_token
   service_name = "mem-traefik"
 }
@@ -126,25 +127,24 @@ module "middleware-dashboard-basic-auth" {
   service_name = local.middleware_dashboard_basic_auth
 }
 
-module "middleware-kibana-basic-auth" {
-  count = var.k8s_manifest_crd ? 0 : 1
-  source = "./modules/traefik/middlewares/middleware-kibana-basic-auth"
-  app_name = var.app_name
-  namespace = local.namespace
-  kibana_username = var.kibana_username
-  kibana_password = var.kibana_password
-  service_name = local.middleware_kibana_basic_auth
-}
-
-module "middleware-rabbitmq" {
+module "middleware-rabbitmq-basic-auth" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/traefik/middlewares/middleware-rabbitmq-basic-auth"
   app_name = var.app_name
   namespace = local.namespace
   traefik_rabbitmq_username = var.traefik_rabbitmq_username
   traefik_rabbitmq_password = var.traefik_rabbitmq_password
-  service_name1 = local.middleware_rabbitmq1
-  service_name2 = local.middleware_rabbitmq2
+  service_name = local.middleware_rabbitmq_basic_auth
+}
+
+module "middleware-kibana-basic-auth" {
+  count = var.k8s_manifest_crd ? 0 : 1
+  source = "./modules/traefik/middlewares/middleware-kibana-basic-auth"
+  app_name = var.app_name
+  namespace = local.namespace
+  traefik_kibana_username = var.traefik_kibana_username
+  traefik_kibana_password = var.traefik_kibana_password
+  service_name = local.middleware_kibana_basic_auth
 }
 
 module "middleware-compress" {
@@ -210,11 +210,14 @@ module "ingress-route" {
   middleware_compress = local.middleware_compress
   middleware_gateway_basic_auth = local.middleware_gateway_basic_auth
   middleware_dashboard_basic_auth = local.middleware_dashboard_basic_auth
-  middleware_security_headers = local.middleware_security_headers
   middleware_kibana_basic_auth = local.middleware_kibana_basic_auth
+  middleware_rabbitmq_basic_auth = local.middleware_rabbitmq_basic_auth
+  middleware_security_headers = local.middleware_security_headers
   svc_finance = local.svc_finance
   svc_gateway = local.svc_gateway
   svc_kibana = local.svc_kibana
+  svc_rabbitmq = "${local.svc_rabbitmq}-headless"
+  # svc_rabbitmq = local.svc_dns_rabbitmq
   secret_name = local.traefik_secret_cert_name
   issuer_name = local.issuer_name
   # host_name = "169.46.98.220.nip.io"
@@ -244,8 +247,8 @@ module "acme-issuer" {
   acme_email = var.traefik_le_email
   # Let's Encrypt has two different services, one for staging (letsencrypt-staging) and one for
   # production (letsencrypt-prod).
-  # acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
-  acme_server = "https://acme-v02.api.letsencrypt.org/directory"
+  acme_server = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  # acme_server = "https://acme-v02.api.letsencrypt.org/directory"
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   # Digital Ocean token requires base64 encoding.
   traefik_dns_api_token = var.traefik_dns_api_token

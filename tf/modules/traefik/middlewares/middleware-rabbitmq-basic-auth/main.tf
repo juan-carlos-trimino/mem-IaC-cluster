@@ -4,30 +4,27 @@ A Terraform reusable module for deploying microservices
 -------------------------------------------------------
 Define input variables to the module.
 ***/
-variable "app_name" {
+variable app_name {
   type = string
 }
-variable "namespace" {
+variable namespace {
   type = string
 }
-variable "service_name1" {
+variable service_name {
   type = string
 }
-variable "traefik_rabbitmq_username" {
+variable traefik_rabbitmq_username {
   type = string
   sensitive = true
 }
-variable "traefik_rabbitmq_password" {
+variable traefik_rabbitmq_password {
   type = string
   sensitive = true
-}
-variable "service_name2" {
-  type = string
 }
 
 resource "kubernetes_secret" "secret" {
   metadata {
-    name = "${var.service_name1}-secret"
+    name = "${var.service_name}-secret"
     namespace = var.namespace
     labels = {
       app = var.app_name
@@ -44,12 +41,12 @@ resource "kubernetes_secret" "secret" {
   type = "Opaque"
 }
 
-resource "kubernetes_manifest" "middleware1" {
+resource "kubernetes_manifest" "middleware" {
   manifest = {
     apiVersion = "traefik.containo.us/v1alpha1"
     kind = "Middleware"
     metadata = {
-      name = var.service_name1
+      name = var.service_name
       namespace = var.namespace
       labels = {
         app = var.app_name
@@ -58,33 +55,11 @@ resource "kubernetes_manifest" "middleware1" {
     #
     spec = {
       basicAuth = {
+        headerField = "X-WebAuth-User"
         removeHeader = true
         # The users option is an array of authorized users. Each user will be declared using the
         # name:encoded-password format.
         secret = kubernetes_secret.secret.metadata[0].name
-      }
-    }
-  }
-}
-
-resource "kubernetes_manifest" "middleware2" {
-  manifest = {
-    apiVersion = "traefik.containo.us/v1alpha1"
-    kind = "Middleware"
-    metadata = {
-      name = var.service_name2
-      namespace = var.namespace
-      labels = {
-        app = var.app_name
-      }
-    }
-    #
-    spec = {
-      stripPrefix = {
-        prefixes = [
-          "/rabbitmq"
-        ]
-        forceSlash = false
       }
     }
   }

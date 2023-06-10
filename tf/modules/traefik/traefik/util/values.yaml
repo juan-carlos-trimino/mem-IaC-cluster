@@ -155,20 +155,6 @@ ports:
     # The exposed port for this service.
     exposedPort: 9000
     protocol: TCP
-
-  # rabbitmq:
-  #   port: 15672
-  #   # DO NOT expose the traefik port on production deployments. To access it from outside of the
-  #   # cluster, use `kubectl port-forward` or create a secure ingress.
-  #   # $ kubectl port-forward -n memories $(kubectl get pods -n memories --selector "app.kubernetes.io/name=traefik" --output=name) 9000:9000
-  #   # From a browser, use http://127.0.0.1:9000/dashboard/ to see the Traefik dashboard; the trailing slash / in /dashboard/ is mandatory.
-  #   expose: false
-  #   # The exposed port for this service.
-  #   exposedPort: 15672
-  #   protocol: TCP
-
-
-
   web:
     port: 8080  # Traefik port.
     expose: true

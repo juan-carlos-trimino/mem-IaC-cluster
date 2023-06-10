@@ -16,10 +16,10 @@ variable svc_finance {
 variable svc_gateway {
   type = string
 }
-variable svc_kibana {
+variable svc_rabbitmq {
   type = string
 }
-variable svc_rabbitmq {
+variable svc_kibana {
   type = string
 }
 variable middleware_rate_limit {
@@ -34,10 +34,10 @@ variable middleware_gateway_basic_auth {
 variable middleware_dashboard_basic_auth {
   type = string
 }
-variable middleware_kibana_basic_auth {
+variable middleware_rabbitmq_basic_auth {
   type = string
 }
-variable middleware_rabbitmq_basic_auth {
+variable middleware_kibana_basic_auth {
   type = string
 }
 variable middleware_security_headers {
@@ -81,6 +81,79 @@ resource "kubernetes_manifest" "ingress-route" {
         "websecure"
       ]
       routes = [
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+          priority = 40
+          middlewares = [
+            {
+              name = var.middleware_dashboard_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "TraefikService"
+              # If you enable the API, a new special service named api@internal is created and can
+              # then be referenced in a router.
+              name = "api@internal"
+              port = 9000  # K8s service.
+              # (default 1) A weight used by the weighted round-robin strategy (WRR).
+              weight = 1
+              # (default true) PassHostHeader controls whether to leave the request's Host Header
+              # as it was before it reached the proxy, or whether to let the proxy set it to the
+              # destination (backend) host.
+              passHostHeader = true
+              responseForwarding = {
+                # (default 100ms) Interval between flushes of the buffered response body to the
+                # client.
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/ping`)"
+          priority = 40
+          middlewares = [
+            {
+              name = var.middleware_dashboard_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "TraefikService"
+              # If you enable the API, a new special service named api@internal is created and can
+              # then be referenced in a router.
+              name = "ping@internal"
+              port = 9000  # K8s service.
+              # (default 1) A weight used by the weighted round-robin strategy (WRR).
+              weight = 1
+              # (default true) PassHostHeader controls whether to leave the request's Host Header
+              # as it was before it reached the proxy, or whether to let the proxy set it to the
+              # destination (backend) host.
+              passHostHeader = true
+              responseForwarding = {
+                # (default 100ms) Interval between flushes of the buffered response body to the
+                # client.
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+/***
         {
           kind = "Rule"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (Path(`/upload`) || Path(`/api/upload`))"
@@ -174,78 +247,6 @@ resource "kubernetes_manifest" "ingress-route" {
         },
         {
           kind = "Rule"
-          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-          priority = 40
-          middlewares = [
-            {
-              name = var.middleware_dashboard_basic_auth
-              namespace = var.namespace
-            },
-            {
-              name = var.middleware_security_headers
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "TraefikService"
-              # If you enable the API, a new special service named api@internal is created and can
-              # then be referenced in a router.
-              name = "api@internal"
-              port = 9000  # K8s service.
-              # (default 1) A weight used by the weighted round-robin strategy (WRR).
-              weight = 1
-              # (default true) PassHostHeader controls whether to leave the request's Host Header
-              # as it was before it reached the proxy, or whether to let the proxy set it to the
-              # destination (backend) host.
-              passHostHeader = true
-              responseForwarding = {
-                # (default 100ms) Interval between flushes of the buffered response body to the
-                # client.
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        {
-          kind = "Rule"
-          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/ping`)"
-          priority = 40
-          middlewares = [
-            {
-              name = var.middleware_dashboard_basic_auth
-              namespace = var.namespace
-            },
-            {
-              name = var.middleware_security_headers
-              namespace = var.namespace
-            }
-          ]
-          services = [
-            {
-              kind = "TraefikService"
-              # If you enable the API, a new special service named api@internal is created and can
-              # then be referenced in a router.
-              name = "ping@internal"
-              port = 9000  # K8s service.
-              # (default 1) A weight used by the weighted round-robin strategy (WRR).
-              weight = 1
-              # (default true) PassHostHeader controls whether to leave the request's Host Header
-              # as it was before it reached the proxy, or whether to let the proxy set it to the
-              # destination (backend) host.
-              passHostHeader = true
-              responseForwarding = {
-                # (default 100ms) Interval between flushes of the buffered response body to the
-                # client.
-                flushInterval = "100ms"
-              }
-              strategy = "RoundRobin"
-            }
-          ]
-        },
-        {
-          kind = "Rule"
           # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
           # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/`)"
@@ -283,45 +284,6 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-
-        # {
-        #   kind = "Rule"
-        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/rabbitmq`)"
-        #   priority = 40
-        #   middlewares = [
-        #     {
-        #       name = var.middleware_rabbitmq_basic_auth
-        #       namespace = var.namespace
-        #     },
-        #     {
-        #       name = var.middleware_security_headers
-        #       namespace = var.namespace
-        #     }
-        #   ]
-        #   services = [
-        #     {
-        #       kind = "Service"
-        #       name = var.svc_rabbitmq
-        #       namespace = var.namespace
-        #       port = 15672  # K8s service.
-        #       # (default 1) A weight used by the weighted round-robin strategy (WRR).
-        #       weight = 1
-        #       # (default true) PassHostHeader controls whether to leave the request's Host Header
-        #       # as it was before it reached the proxy, or whether to let the proxy set it to the
-        #       # destination (backend) host.
-        #       passHostHeader = true
-        #       responseForwarding = {
-        #         # (default 100ms) Interval between flushes of the buffered response body to the
-        #         # client.
-        #         flushInterval = "100ms"
-        #       }
-        #       # strategy = "RoundRobin"
-        #     }
-        #   ]
-        # },
-
-
-
         {
           kind = "Rule"
           match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/kibana`)"
@@ -357,98 +319,106 @@ resource "kubernetes_manifest" "ingress-route" {
             }
           ]
         },
-        # {
-        #   kind = "Rule"
-        #   # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
-        #   # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
-        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/fin`)"
-        #   # See https://doc.traefik.io/traefik/v2.0/routing/routers/#priority
-        #   priority = 20
-        #   # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
-        #   # the request is forwarded to the service.
-        #   # Middlewares are applied in the same order as their declaration in router.
-        #   middlewares = [
-        #     {
-        #       # ???????????????????????
-        #       name = var.middleware_gateway_basic_auth
-        #       namespace = var.namespace
-        #     },
-        #     {
-        #       name = var.middleware_rate_limit
-        #       namespace = var.namespace
-        #     },
-        #     {
-        #       name = var.middleware_security_headers
-        #       namespace = var.namespace
-        #     }
-        #   ]
-        #   services = [
-        #     {
-        #       kind = "Service"
-        #       name = var.svc_finance
-        #       namespace = var.namespace
-        #       port = 80  # K8s service.
-        #       weight = 1
-        #       passHostHeader = true
-        #       responseForwarding = {
-        #         flushInterval = "100ms"
-        #       }
-        #       strategy = "RoundRobin"
-        #     }
-        #   ]
-        # },
+***/
+        /*** rabbitmq headless
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/rabbitmq`)"
+          priority = 50
+          # resolution = "DNS"
+          middlewares = [
+            {
+              name = var.middleware_rabbitmq_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_rabbitmq
+              namespace = var.namespace
+              port = 15672  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        ***/ # rabbitmq headless
+        /*** Testing...
+        {
+          kind = "Rule"
+          # match = "Host(`169.46.98.220.nip.io`) && PathPrefix(`/`)"
+          # match = "Host(`memories.mooo.com`) && (PathPrefix(`/`) || Path(`/upload`) || Path(`/api/upload`))"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && PathPrefix(`/fin`)"
+          # See https://doc.traefik.io/traefik/v2.0/routing/routers/#priority
+          priority = 20
+          # The rule is evaluated 'before' any middleware has the opportunity to work, and 'before'
+          # the request is forwarded to the service.
+          # Middlewares are applied in the same order as their declaration in router.
+          middlewares = [
+            {
+              # ???????????????????????
+              name = var.middleware_gateway_basic_auth
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_rate_limit
+              namespace = var.namespace
+            },
+            {
+              name = var.middleware_security_headers
+              namespace = var.namespace
+            }
+          ]
+          services = [
+            {
+              kind = "Service"
+              name = var.svc_finance
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        },
+        ***/ # Testing...
 
-        # Define a low-priority catchall rule that kicks in only if other rules for defined
-        # services can't handle the request.
-        # {
-        #   kind = "Rule"
-        #   match = "HostRegexp(`{host:.+}`)"
-        #   # Set priority to 1 (lowest) to ensure this rule catches all requests not caught by the
-        #   # other rules.
-        #   priority = 1
-        #   middlewares = [
-        #     {
-        #       name = var.middleware_error_page
-        #       namespace = var.namespace
-        #     }
-        #   ]
-        #   services = [
-        #     {
-        #       kind = "Service"
-        #       name = var.svc_error_page
-        #       namespace = var.namespace
-        #       port = 80  # K8s service.
-        #       weight = 1
-        #       passHostHeader = true
-        #       responseForwarding = {
-        #         flushInterval = "100ms"
-        #       }
-        #       strategy = "RoundRobin"
-        #     }
-        #   ]
-        # }
+        /*** whoami
         ###########################################################################################
         # whoami                                                                                  #
         ###########################################################################################
-        # {
-        #   kind = "Rule"
-        #   match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/whoami`)"
-        #   priority = 30
-        #   services = [
-        #     {
-        #       kind = "Service"
-        #       name = "mem-whoami"
-        #       namespace = var.namespace
-        #       port = 80  # K8s service.
-        #       weight = 1
-        #       passHostHeader = true
-        #       responseForwarding = {
-        #         flushInterval = "100ms"
-        #       }
-        #       strategy = "RoundRobin"
-        #     }
-        #   ]
-        # }
+        {
+          kind = "Rule"
+          match = "Host(`${var.host_name}`, `www.${var.host_name}`) && Path(`/whoami`)"
+          priority = 30
+          services = [
+            {
+              kind = "Service"
+              name = "mem-whoami"
+              namespace = var.namespace
+              port = 80  # K8s service.
+              weight = 1
+              passHostHeader = true
+              responseForwarding = {
+                flushInterval = "100ms"
+              }
+              strategy = "RoundRobin"
+            }
+          ]
+        }
+        ***/ # whoami
       ]
       tls = {
         certResolver = "le"
@@ -472,42 +442,3 @@ resource "kubernetes_manifest" "ingress-route" {
     }
   }
 }
-
-
-
-# resource "kubernetes_manifest" "ingress-route-rmq" {
-#   manifest = {
-#     apiVersion = "traefik.containo.us/v1alpha1"
-#     kind = "IngressRouteTCP"
-#     metadata = {
-#       name = "ingress-route-rabbitmq"
-#       namespace = var.namespace
-#       labels = {
-#         app = var.app_name
-#       }
-#     }
-#     #
-#     spec = {
-#       entryPoints = [
-#         "rabbitmq"
-#       ]
-#       routes = [
-#         {
-#           # kind = "Rule"
-#           # match = "HostSNI(`*`)"
-#           match = "Host(`${var.svc_rabbitmq}`)"
-#           services = [
-#             {
-#               # kind = "Service"
-#               name = var.svc_rabbitmq
-#               # namespace = var.namespace
-#               port = 15672  # K8s service.
-#             }
-#           ]
-#         }
-#       ]
-#     }
-#   }
-# }
-
-

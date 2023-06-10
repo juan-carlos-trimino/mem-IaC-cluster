@@ -19,6 +19,7 @@ locals {
   # Ingress Routes #
   ##################
   ingress_route = "mem-ingress-route"
+  ingress_route_tcp_rabbitmq = "mem-ingress-route-tcp-rabbitmq"
   ###############
   # Middlewares #
   ###############
@@ -82,6 +83,7 @@ locals {
   # It is possible to allow the guest user to connect from a remote host by setting the
   # loopback_users configuration to none. (See rabbitmq.conf)
   svc_dns_rabbitmq = "amqp://${var.rabbitmq_default_user}:${var.rabbitmq_default_pass}@${local.svc_rabbitmq}-headless.${local.namespace}.svc.cluster.local:5672"
+  svc_dns_rabbitmq1 = "${local.svc_rabbitmq}-headless.${local.namespace}.svc.cluster.local"
   svc_dns_video_storage = "${local.svc_video_storage}.${local.namespace}.svc.cluster.local"
   svc_dns_video_streaming = "${local.svc_video_streaming}.${local.namespace}.svc.cluster.local"
   svc_dns_video_upload = "${local.svc_video_upload}.${local.namespace}.svc.cluster.local"
@@ -216,8 +218,7 @@ module "ingress-route" {
   svc_finance = local.svc_finance
   svc_gateway = local.svc_gateway
   svc_kibana = local.svc_kibana
-  svc_rabbitmq = "${local.svc_rabbitmq}-headless"
-  # svc_rabbitmq = local.svc_dns_rabbitmq
+  svc_rabbitmq = "${local.svc_rabbitmq}-0.${local.svc_rabbitmq}-headless.${local.namespace}"
   secret_name = local.traefik_secret_cert_name
   issuer_name = local.issuer_name
   # host_name = "169.46.98.220.nip.io"
@@ -315,7 +316,7 @@ module "elk-certificate" {
   secret_name = local.es_secret_cert_name
 }
 ***/
-# /*** elk
+/*** elk
 module "mem-elasticsearch-master" {
   count = var.k8s_manifest_crd ? 0 : 1
   source = "./modules/elk/elasticsearch/es-master"
@@ -521,12 +522,12 @@ module "mem-filebeat" {
   kibana_host = "http://${local.svc_kibana}:5601"
   service_name = local.svc_filebeat
 }
-# ***/  # elk
+***/  # elk
 
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-# /*** mongodb - deployment goodxxxx
+/*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -550,7 +551,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-# ***/  # mongodb - deployment
+***/  # mongodb - deployment
 
 /*** mongodb - statefulset active
 # StatefulSet.
@@ -622,7 +623,7 @@ module "mem-rabbitmq" {
   # Because several features (e.g. quorum queues, client tracking in MQTT) require a consensus
   # between cluster members, odd numbers of cluster nodes are highly recommended: 1, 3, 5, 7
   # and so on.
-  replicas = 3
+  replicas = 1
   # Limits and requests for CPU resources are measured in millicores. If the container needs one
   # full core to run, use the value '1000m.' If the container only needs 1/4 of a core, use the
   # value of '250m.'
@@ -649,7 +650,7 @@ module "mem-rabbitmq" {
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-# /*** app
+/*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -871,9 +872,9 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-# ***/  # app
-/*** #finances
+***/  # app
 
+/*** #finances
 module "fin-finance" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -911,4 +912,4 @@ module "fin-finance" {
   service_name = local.svc_finance
   service_type = "LoadBalancer"
 }
-***/ #finances
+# ***/ #finances

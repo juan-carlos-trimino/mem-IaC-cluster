@@ -584,7 +584,7 @@ resource "kubernetes_service" "headless_service" { # For inter-node communicatio
       protocol = "TCP"
     }
     port {
-      name = "mgmt"                       # management UI and HTTP API).
+      name = "mgmt"                       # Management UI and HTTP API.
       port = var.mgmt_service_port        # Service port.
       target_port = var.mgmt_service_target_port # Pod port.
       protocol = "TCP"

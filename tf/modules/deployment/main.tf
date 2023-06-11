@@ -75,6 +75,20 @@ variable image_pull_policy {
   default = "Always"
   type = string
 }
+variable security_context {
+  default = [{
+    run_as_non_root = true
+    run_as_user = 1100
+    run_as_group = 1100
+    read_only_root_filesystem = false
+  }]
+  type = list(object({
+    run_as_non_root = bool
+    run_as_user = number
+    run_as_group = number
+    read_only_root_filesystem = bool
+  }))
+}
 variable env {
   default = {}
   type = map
@@ -127,13 +141,19 @@ variable service_session_affinity {
   default = "None"
   type = string
 }
-variable service_port {
-  default = 80
-  type = number
-}
-variable service_target_port {
-  default = 8080
-  type = number
+variable port {
+  default = [{
+    name = "ports"
+    service_port = 80
+    target_port = 8080
+    protocol = "TCP"
+  }]
+  type = list(object({
+    name = string
+    service_port = number
+    target_port = number
+    protocol = string
+  }))
 }
 
 /***
@@ -271,8 +291,14 @@ resource "kubernetes_deployment" "deployment" {
           name = var.service_name
           image = local.image_tag
           image_pull_policy = var.image_pull_policy
-          security_context {
-            read_only_root_filesystem = false
+          dynamic "security_context" {
+            for_each = var.security_context
+            content {
+              run_as_non_root = security_context.value["run_as_non_root"]
+              run_as_user = security_context.value["run_as_user"]
+              run_as_group = security_context.value["run_as_group"]
+              read_only_root_filesystem = security_context.value["read_only_root_filesystem"]
+            }
           }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -280,9 +306,13 @@ resource "kubernetes_deployment" "deployment" {
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          port {
-            container_port = var.service_target_port  # The port the app is listening.
-            protocol = "TCP"
+          dynamic "port" {
+            for_each = var.port
+            content {
+              name = port.value["name"]
+              container_port = port.value["target_port"]  # The port the app is listening.
+              protocol = port.value["protocol"]
+            }
           }
           dynamic "readiness_probe" {
             for_each = var.readiness_probe
@@ -297,7 +327,7 @@ resource "kubernetes_deployment" "deployment" {
                 content {
                   #host = http_get.value["host"]
                   path = http_get.value["path"]
-                  port = http_get.value["port"] != 0 ? http_get.value["port"] : var.service_target_port
+                  port = http_get.value["port"] != 0 ? http_get.value["port"] : 8080
                   scheme = http_get.value["scheme"]
                 }
               }
@@ -318,10 +348,6 @@ resource "kubernetes_deployment" "deployment" {
               cpu = var.qos_limits_cpu
               memory = var.qos_limits_memory
             }
-          }
-          env {
-            name = "PORT"
-            value = "8080"
           }
           dynamic "env" {
             for_each = var.env
@@ -353,10 +379,14 @@ resource "kubernetes_service" "service" {
       svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
-    port {
-      port = var.service_port  # Service port.
-      target_port = var.service_target_port  # Pod port.
-      protocol = "TCP"
+    dynamic "port" {
+      for_each = var.port
+      content {
+        name = port.value["name"]
+        port = port.value["service_port"]
+        target_port = port.value["target_port"]
+        protocol = port.value["protocol"]
+      }
     }
     type = var.service_type
   }

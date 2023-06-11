@@ -23,11 +23,28 @@ variable namespace {
 # tag.
 variable image_pull_policy {
   default = "Always"
+  type = string
+}
+variable security_context {
+  default = []
+  type = list(object({
+    run_as_non_root = bool
+    run_as_user = number
+    run_as_group = number
+    read_only_root_filesystem = bool
+  }))
 }
 variable env {
   default = {}
   type = map(any)
 }
+# variable env_field_ref {
+#   default = []
+#   type = list(object({
+#     name = string
+#     field_path = string
+#   }))
+# }
 variable qos_requests_cpu {
   default = ""
 }
@@ -88,17 +105,14 @@ variable service_name {
 variable service_session_affinity {
   default = "None"
 }
-variable amqp_service_port {
-  type = number
-}
-variable amqp_service_target_port {
-  type = number
-}
-variable mgmt_service_port {
-  type = number
-}
-variable mgmt_service_target_port {
-  type = number
+variable port {
+  default = []
+  type = list(object({
+    name = string
+    service_port = number
+    target_port = number
+    protocol = string
+  }))
 }
 # The ServiceType allows to specify what kind of Service to use: ClusterIP (default),
 # NodePort, LoadBalancer, and ExternalName.
@@ -332,11 +346,14 @@ resource "kubernetes_stateful_set" "stateful_set" {
           name = var.service_name
           image = var.image_tag
           image_pull_policy = var.image_pull_policy
-          security_context {
-            run_as_non_root = true
-            run_as_user = 1060
-            run_as_group = 1060
-            read_only_root_filesystem = false
+          dynamic "security_context" {
+            for_each = var.security_context
+            content {
+              run_as_non_root = security_context.value["run_as_non_root"]
+              run_as_user = security_context.value["run_as_user"]
+              run_as_group = security_context.value["run_as_group"]
+              read_only_root_filesystem = security_context.value["read_only_root_filesystem"]
+            }
           }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
           # effect on whether clients can connect to the pod through the port or not. If the
@@ -344,15 +361,13 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # pods can always connect to it, even if the port isn't listed in the pod spec
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
-          port {
-            name = "amqp"
-            container_port = var.amqp_service_target_port # The port the app is listening.
-            protocol = "TCP"
-          }
-          port {
-            name = "mgmt"
-            container_port = var.mgmt_service_target_port # The port the app is listening.
-            protocol = "TCP"
+          dynamic "port" {
+            for_each = var.port
+            content {
+              name = port.value["name"]
+              container_port = port.value["target_port"] # The port the app is listening.
+              protocol = port.value["protocol"]
+            }
           }
           resources {
             requests = {
@@ -435,6 +450,17 @@ resource "kubernetes_stateful_set" "stateful_set" {
               }
             }
           }
+          # dynamic "env" {
+          #   for_each = var.env_field_ref
+          #   content {
+          #     name = env.value["name"]
+          #     value_from {
+          #       field_ref {
+          #         field_path = env.value["field_path"]
+          #       }
+          #     }
+          #   }
+          # }
           dynamic "env" {
             for_each = var.env
             content {
@@ -577,17 +603,14 @@ resource "kubernetes_service" "headless_service" { # For inter-node communicatio
       svc_selector_lbl = local.svc_selector_label
     }
     session_affinity = var.service_session_affinity
-    port {
-      name = "amqp"                       # AMQP 0-9-1 and AMQP 1.0 clients.
-      port = var.amqp_service_port        # Service port.
-      target_port = var.amqp_service_target_port # Pod port.
-      protocol = "TCP"
-    }
-    port {
-      name = "mgmt"                       # Management UI and HTTP API.
-      port = var.mgmt_service_port        # Service port.
-      target_port = var.mgmt_service_target_port # Pod port.
-      protocol = "TCP"
+    dynamic "port" {
+      for_each = var.port
+      content {
+        name = port.value["name"]
+        port = port.value["service_port"]
+        target_port = port.value["target_port"]
+        protocol = port.value["protocol"]
+      }
     }
     type = var.service_type
     cluster_ip = "None" # Headless Service.

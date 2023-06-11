@@ -95,7 +95,7 @@ locals {
 ###################################################################################################
 # traefik                                                                                         #
 ###################################################################################################
-# /*** traefik
+/*** traefik
 # kubectl get pod,middleware,ingressroute,svc -n memories
 # kubectl get all -l "app.kubernetes.io/instance=traefik" -n memories
 # kubectl get all -l "app=memories" -n memories
@@ -226,12 +226,12 @@ module "ingress-route" {
   host_name = "trimino.xyz"
   service_name = local.ingress_route
 }
-# ***/ # traefik
+***/ # traefik
 
 ###################################################################################################
 # cert manager                                                                                    #
 ###################################################################################################
-# /*** cert manager
+/*** cert manager
 module "cert-manager" {
   source = "./modules/traefik/cert-manager/cert-manager"
   namespace = local.namespace
@@ -269,7 +269,7 @@ module "certificate" {
   dns_names = ["trimino.xyz", "www.trimino.xyz"]
   secret_name = local.traefik_secret_cert_name
 }
-# ***/ # cert manager
+***/ # cert manager
 
 ###################################################################################################
 # whoami                                                                                          #
@@ -527,7 +527,7 @@ module "mem-filebeat" {
 ###################################################################################################
 # mongodb                                                                                         #
 ###################################################################################################
-/*** mongodb - deployment goodxxxx
+# /*** mongodb - deployment goodxxxx
 # Deployment.
 module "mem-mongodb" {
   count = var.k8s_manifest_crd ? 0 : 1
@@ -551,7 +551,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
 }
-***/  # mongodb - deployment
+# ***/  # mongodb - deployment
 
 /*** mongodb - statefulset active
 # StatefulSet.
@@ -632,17 +632,39 @@ module "mem-rabbitmq" {
   pvc_access_modes = ["ReadWriteOnce"]
   pvc_storage_size = "10Gi"
   pvc_storage_class_name = "ibmc-block-silver"
+  security_context = [{
+    run_as_non_root = true
+    run_as_user = 1060
+    run_as_group = 1060
+    read_only_root_filesystem = false
+  }]
   env = {
     # If a system uses fully qualified domain names (FQDNs) for hostnames, RabbitMQ nodes and CLI
     # tools must be configured to use so called long node names.
-    RABBITMQ_USE_LONGNAME = true
+    RABBITMQ_USE_LONGNAME: true
     # Override the main RabbitMQ config file location.
-    RABBITMQ_CONFIG_FILE = "/config/rabbitmq"
+    RABBITMQ_CONFIG_FILE: "/config/rabbitmq"
   }
-  amqp_service_port = 5672
-  amqp_service_target_port = 5672
-  mgmt_service_port = 15672
-  mgmt_service_target_port = 15672
+  # env_field_ref = [{
+  #   name = "RABBIT_POD_NAME"
+  #   field_path = "metadata.name"
+  # },
+  # {
+  #   name = "RABBIT_POD_NAMESPACE"
+  #   field_path = "metadata.namespace"
+  # }]
+  port = [{
+    name = "amqp"
+    service_port = 5672
+    target_port = 5672
+    protocol = "TCP"
+  },
+  {
+    name = "mgmt"
+    service_port = 15672
+    target_port = 15672
+    protocol = "TCP"
+  }]
   service_name = local.svc_rabbitmq
 }
 # ***/  # rabbitmq - statefulset
@@ -650,7 +672,7 @@ module "mem-rabbitmq" {
 ###################################################################################################
 # Application                                                                                     #
 ###################################################################################################
-/*** app
+# /*** app
 module "mem-gateway" {
   count = var.k8s_manifest_crd ? 0 : 1
   # Specify the location of the module, which contains the file main.tf.
@@ -665,8 +687,15 @@ module "mem-gateway" {
   cr_login_server = local.cr_login_server
   cr_username = var.cr_username
   cr_password = var.cr_password
+  security_context = [{
+    run_as_non_root = true
+    run_as_user = 2100
+    run_as_group = 2100
+    read_only_root_filesystem = false
+  }]
   # Configure environment variables specific to the mem-gateway.
   env = {
+    PORT: "8081"
     SVC_NAME: local.svc_gateway
     SVC_DNS_METADATA: local.svc_dns_metadata
     SVC_DNS_HISTORY: local.svc_dns_history
@@ -679,7 +708,7 @@ module "mem-gateway" {
   readiness_probe = [{
     http_get = [{
       path = "/readiness"
-      port = 0
+      port = 8081  # Same as target port.
       scheme = "HTTP"
     }]
     initial_delay_seconds = 30
@@ -688,8 +717,14 @@ module "mem-gateway" {
     failure_threshold = 4
     success_threshold = 1
   }]
+  port = [{
+    name = "ports"
+    service_port = 80
+    target_port = 8081
+    protocol = "TCP"
+  }]
   service_name = local.svc_gateway
-  # service_type = "LoadBalancer"
+  service_type = "LoadBalancer"
 }
 
 module "mem-history" {
@@ -706,6 +741,7 @@ module "mem-history" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    PORT: "8080"
     SVC_NAME: local.svc_history
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
@@ -745,6 +781,7 @@ module "mem-metadata" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    PORT: "8080"
     SVC_NAME: local.svc_metadata
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_DB: local.svc_dns_db
@@ -781,6 +818,7 @@ module "mem-video-storage" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    PORT: "8080"
     SVC_NAME: local.svc_video_storage
     BUCKET_NAME: var.bucket_name
     # Without HMAC.
@@ -815,6 +853,7 @@ module "mem-video-streaming" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    PORT: "8080"
     SVC_NAME: local.svc_video_streaming
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
@@ -851,6 +890,7 @@ module "mem-video-upload" {
   cr_username = var.cr_username
   cr_password = var.cr_password
   env = {
+    PORT: "8080"
     SVC_NAME: local.svc_video_upload
     SVC_DNS_RABBITMQ: local.svc_dns_rabbitmq
     SVC_DNS_VIDEO_STORAGE: local.svc_dns_video_storage
@@ -872,7 +912,7 @@ module "mem-video-upload" {
   }]
   service_name = local.svc_video_upload
 }
-***/  # app
+# ***/  # app
 
 /*** #finances
 module "fin-finance" {

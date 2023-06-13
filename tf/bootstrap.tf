@@ -653,7 +653,7 @@ module "mem-rabbitmq" {
   #   name = "RABBIT_POD_NAMESPACE"
   #   field_path = "metadata.namespace"
   # }]
-  port = [{
+  ports = [{
     name = "amqp"
     service_port = 5672
     target_port = 5672

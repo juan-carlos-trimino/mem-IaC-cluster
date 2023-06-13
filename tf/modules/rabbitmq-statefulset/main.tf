@@ -105,7 +105,7 @@ variable service_name {
 variable service_session_affinity {
   default = "None"
 }
-variable port {
+variable ports {
   default = []
   type = list(object({
     name = string
@@ -348,11 +348,12 @@ resource "kubernetes_stateful_set" "stateful_set" {
           image_pull_policy = var.image_pull_policy
           dynamic "security_context" {
             for_each = var.security_context
+            iterator = item
             content {
-              run_as_non_root = security_context.value["run_as_non_root"]
-              run_as_user = security_context.value["run_as_user"]
-              run_as_group = security_context.value["run_as_group"]
-              read_only_root_filesystem = security_context.value["read_only_root_filesystem"]
+              run_as_non_root = item.value.run_as_non_root
+              run_as_user = item.value.run_as_user
+              run_as_group = item.value.run_as_group
+              read_only_root_filesystem = item.value.read_only_root_filesystem
             }
           }
           # Specifying ports in the pod definition is purely informational. Omitting them has no
@@ -362,11 +363,11 @@ resource "kubernetes_stateful_set" "stateful_set" {
           # explicitly. Nonetheless, it is good practice to define the ports explicitly so that
           # everyone using the cluster can quickly see what ports each pod exposes.
           dynamic "port" {
-            for_each = var.port
+            for_each = var.ports
             content {
-              name = port.value["name"]
-              container_port = port.value["target_port"] # The port the app is listening.
-              protocol = port.value["protocol"]
+              name = port.value.name
+              container_port = port.value.target_port  # The port the app is listening.
+              protocol = port.value.protocol
             }
           }
           resources {
@@ -604,12 +605,12 @@ resource "kubernetes_service" "headless_service" { # For inter-node communicatio
     }
     session_affinity = var.service_session_affinity
     dynamic "port" {
-      for_each = var.port
+      for_each = var.ports
       content {
-        name = port.value["name"]
-        port = port.value["service_port"]
-        target_port = port.value["target_port"]
-        protocol = port.value["protocol"]
+        name = port.value.name
+        port = port.value.service_port
+        target_port = port.value.target_port
+        protocol = port.value.protocol
       }
     }
     type = var.service_type

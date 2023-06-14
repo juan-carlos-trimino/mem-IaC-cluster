@@ -595,7 +595,7 @@ module "mem-mongodb" {
   service_port = 27017
   service_target_port = 27017
   env = {
-    MONGO_INITDB_DATABASE = "test"  # 'test' is the default db.
+    MONGO_INITDB_DATABASE: "test"  # 'test' is the default db.
   }
 }
 ***/  # mongodb - statefulset
@@ -935,7 +935,7 @@ module "fin-finance" {
     APP_NAME_VER: "${var.app_name} ${var.app_version}"
     # PORT: "8080"
     MAX_RETRIES: 20
-    SERVER = "http://${local.svc_dns_finance}"
+    SERVER: "http://${local.svc_dns_finance}"
   }
   readiness_probe = [{
     http_get = [{
